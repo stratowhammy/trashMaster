@@ -94,7 +94,7 @@ class TrashManager {
 
     checkPickup(entityX, entityY, pickupRadius, followerCount = 0) {
         const picked = [];
-        const pointValue = Math.round(Math.pow(2, 1 + 0.25 * followerCount));
+        const pointValue = Math.round(Math.pow(2, 1 + 0.5 * followerCount));
         for (const item of this.items) {
             if (item.collected) continue;
 

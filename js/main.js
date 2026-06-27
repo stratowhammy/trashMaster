@@ -349,15 +349,8 @@ class Game {
                 
                 if (tiles.length > 0) {
                     const t = tiles[Math.floor(Math.random() * tiles.length)];
-                    const typeId = Math.floor(Math.random() * 4) + 1; // 1-4
-                    this.trashManager.items.push({
-                        x: t.x * TILE_SIZE + TILE_SIZE / 2,
-                        y: t.y * TILE_SIZE + TILE_SIZE / 2,
-                        tileX: t.x,
-                        tileY: t.y,
-                        spriteId: `trash${typeId}`,
-                        collected: false
-                    });
+                    const trashType = Math.floor(Math.random() * 4); // 0-3
+                    this.trashManager.items.push(new TrashItem(t.x, t.y, trashType));
                 }
             }
         }
@@ -617,6 +610,8 @@ class Game {
     }
 
     _startGame(spriteId) {
+        this.gameMap = new GameMap();
+        this.miniMap.buildStatic(this.gameMap);
         // Find a walkable spawn point — start on a road near center
         let spawnX = 5, spawnY = 5; // Default to first road intersection area
         // Search for a walkable road tile near center

@@ -18,7 +18,7 @@ class Pirate {
         this.animTimer = 0;
     }
 
-    update(dt) {
+    update(dt, gameMap) {
         if (!this.alive || this.arrived) return;
 
         const dx = this.targetX - this.x;
@@ -33,8 +33,22 @@ class Pirate {
         // Normalize and move
         const nx = dx / dist;
         const ny = dy / dist;
-        this.x += nx * this.speed * dt;
-        this.y += ny * this.speed * dt;
+        
+        const nextX = this.x + nx * this.speed * dt;
+        const nextY = this.y + ny * this.speed * dt;
+
+        // Wall collision slide
+        if (gameMap) {
+            if (this._canMoveTo(nextX, this.y, gameMap)) {
+                this.x = nextX;
+            }
+            if (this._canMoveTo(this.x, nextY, gameMap)) {
+                this.y = nextY;
+            }
+        } else {
+            this.x = nextX;
+            this.y = nextY;
+        }
 
         // Direction for rendering
         if (Math.abs(dx) > Math.abs(dy)) {
@@ -48,6 +62,22 @@ class Pirate {
             this.animTimer = 0;
             this.animFrame = (this.animFrame + 1) % 4;
         }
+    }
+
+    _canMoveTo(newX, newY, gameMap) {
+        const hs = this.size / 2 - 4; // collision box for pirate
+        const corners = [
+            { x: newX - hs, y: newY - hs }, { x: newX + hs, y: newY - hs },
+            { x: newX - hs, y: newY + hs }, { x: newX + hs, y: newY + hs },
+        ];
+        for (const c of corners) {
+            const tx = Math.floor(c.x / TILE_SIZE);
+            const ty = Math.floor(c.y / TILE_SIZE);
+            // Since pirates are outside, call isWalkable without player curTX/curTY
+            if (!gameMap.isWalkable(tx, ty))
+                return false;
+        }
+        return true;
     }
 
     render(ctx, camera, spriteManager) {

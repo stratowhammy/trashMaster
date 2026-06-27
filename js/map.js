@@ -186,21 +186,56 @@ class GameMap {
     }
 
     // ── Wrapping tile access ──
-    isWalkable(tileX, tileY) {
+    isWalkable(tileX, tileY, curTX, curTY) {
         const wx = wrapTileX(tileX);
         const wy = wrapTileY(tileY);
         const t = this.tiles[wy][wx];
-        if (t === TileType.BUILDING) return false;
-        if (t === TileType.BUILDING_DOOR) {
-            // Check if this door's building is open
-            for (const bldg of this.buildings) {
-                if (bldg.doorTiles.some(d => d.x === wx && d.y === wy)) {
-                    return this.openDoors.has(bldg.id);
+        
+        // If current position isn't specified (e.g. spawn checks, pathfinding initial steps), use default walkability
+        if (curTX === undefined || curTY === undefined) {
+            if (t === TileType.BUILDING) return false;
+            if (t === TileType.BUILDING_DOOR) {
+                for (const bldg of this.buildings) {
+                    if (bldg.doorTiles.some(d => d.x === wx && d.y === wy)) {
+                        return this.openDoors.has(bldg.id);
+                    }
                 }
+                return false;
             }
-            return false;
+            return true;
         }
-        return true;
+
+        const curWX = wrapTileX(curTX);
+        const curWY = wrapTileY(curTY);
+
+        const bldgA = this.getBuildingAtTile(curWX, curWY);
+        const bldgB = this.getBuildingAtTile(wx, wy);
+
+        // Scenario 1: Both outside
+        if (!bldgA && !bldgB) {
+            return t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR;
+        }
+
+        // Scenario 2: Outside trying to enter building B
+        if (!bldgA && bldgB) {
+            const isOpen = this.openDoors.has(bldgB.id);
+            const isDoor = bldgB.doorTiles.some(d => d.x === wx && d.y === wy);
+            return isOpen && isDoor;
+        }
+
+        // Scenario 3: Inside building A trying to exit
+        if (bldgA && !bldgB) {
+            const isOpen = this.openDoors.has(bldgA.id);
+            const isDoor = bldgA.doorTiles.some(d => d.x === curWX && d.y === curWY);
+            return isOpen && isDoor;
+        }
+
+        // Scenario 4: Inside building A moving to tile B
+        if (bldgA && bldgB) {
+            return bldgA.id === bldgB.id;
+        }
+
+        return false;
     }
 
     getTile(tileX, tileY) {
@@ -208,11 +243,20 @@ class GameMap {
     }
 
     // ── Wrapping renderer ──
-    render(ctx, camera) {
+    render(ctx, camera, player) {
         const startTX = Math.floor(camera.x / TILE_SIZE);
         const startTY = Math.floor(camera.y / TILE_SIZE);
         const tilesW = Math.ceil(camera.width / TILE_SIZE) + 2;
         const tilesH = Math.ceil(camera.height / TILE_SIZE) + 2;
+
+        let playerBldgId = -1;
+        if (player) {
+            const pb = this.getBuildingAtTile(player.getTileX(), player.getTileY());
+            if (pb && this.openDoors.has(pb.id)) {
+                playerBldgId = pb.id;
+            }
+        }
+        this._playerInsideBuildingId = playerBldgId;
 
         for (let dy = 0; dy < tilesH; dy++) {
             for (let dx = 0; dx < tilesW; dx++) {
@@ -251,6 +295,13 @@ class GameMap {
                 else if((tx*5+ty*11)%19===0){ctx.fillStyle='#d46a6a';ctx.fillRect(sx+20,sy+8,3,3);}
                 break;
             case TileType.BUILDING: {
+                const bldg = this.getBuildingAtTile(tx, ty);
+                if (bldg && this._playerInsideBuildingId === bldg.id) {
+                    // Draw interior floor
+                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
+                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
+                    break;
+                }
                 const ci=this.buildingMeta[ty][tx]; const c=BUILDING_COLORS[ci>=0?ci:0];
                 ctx.fillStyle=c.base; ctx.fillRect(sx,sy,s,s);
                 ctx.fillStyle='#2a2a3a';
@@ -261,6 +312,13 @@ class GameMap {
                 ctx.strokeStyle=c.dark;ctx.lineWidth=1;ctx.strokeRect(sx+.5,sy+.5,s-1,s-1);
                 break; }
             case TileType.BUILDING_DOOR: {
+                const bldg2 = this.getBuildingAtTile(tx, ty);
+                if (bldg2 && this._playerInsideBuildingId === bldg2.id) {
+                    // Draw interior floor for door tile when inside
+                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
+                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
+                    break;
+                }
                 const ci2=this.buildingMeta[ty][tx]; const c2=BUILDING_COLORS[ci2>=0?ci2:0];
                 ctx.fillStyle=c2.base;ctx.fillRect(sx,sy,s,s);
                 ctx.fillStyle=TILE_COLORS[TileType.BUILDING_DOOR];ctx.fillRect(sx+8,sy+6,16,20);

@@ -107,26 +107,7 @@ class Game {
                     e.preventDefault();
                 }
             }
-            if (this.state === GameState.INSIDE_BUILDING && this.buildingInterior) {
-                let dx = 0, dy = 0;
-                if (e.key === 'ArrowUp') dy = -1;
-                if (e.key === 'ArrowDown') dy = 1;
-                if (e.key === 'ArrowLeft') dx = -1;
-                if (e.key === 'ArrowRight') dx = 1;
-                
-                if (dx !== 0 || dy !== 0) {
-                    e.preventDefault();
-                    const action = this.buildingInterior.movePlayer(dx, dy);
-                    if (action === 'exit') {
-                        // Exit building!
-                        this.trashManager.totalPoints += this.buildingInterior.getTotalPoints();
-                        this.hud.updateScore(this.trashManager.totalPoints);
-                        this.state = GameState.PLAYING;
-                        this.buildingInterior = null;
-                        this.hud.showFollowerNotification('Exited building! Posse reconnected.', true);
-                    }
-                }
-            }
+
             if (this.state === GameState.GAME_OVER && e.key === ' ') {
                 this._restartGame();
             }
@@ -243,7 +224,7 @@ class Game {
     }
 
     _update(dt) {
-        if (this.state !== GameState.PLAYING && this.state !== GameState.INSIDE_BUILDING) return;
+        if (this.state !== GameState.PLAYING) return;
 
         // Consumable timers
         if (this.mushroomTimer > 0) {
@@ -291,16 +272,6 @@ class Game {
             return;
         }
 
-        // Interior Mode branches here
-        if (this.state === GameState.INSIDE_BUILDING && this.buildingInterior) {
-            this.buildingInterior.update(dt);
-            const picked = this.buildingInterior.checkPickup();
-            if (picked > 0) {
-                this.hud.updateScore(this.trashManager.totalPoints + this.buildingInterior.getTotalPoints());
-            }
-            return;
-        }
-
         // Frenzy Mode updates
         if (window.frenzyMode) {
             this.npcManager.update();
@@ -326,16 +297,43 @@ class Game {
         // Update player
         this.player.update(this.gameMap);
 
-        // Check if player enters open building
-        const tileX = this.player.getTileX();
-        const tileY = this.player.getTileY();
-        if (this.gameMap.getTile(tileX, tileY) === TileType.BUILDING_DOOR) {
-            const bldg = this.gameMap.getBuildingAtDoor(tileX, tileY);
-            if (bldg && this.gameMap.openDoors.has(bldg.id)) {
-                this.state = GameState.INSIDE_BUILDING;
-                this.buildingInterior = new BuildingInterior(10, 10);
-                this.hud.showFollowerNotification('Entered building! Posse stays outside.', true);
-                this.player.keys = { up: false, down: false, left: false, right: false };
+        // Check if player enters/exits building for notifications and interior trash spawn
+        const curTX = this.player.getTileX();
+        const curTY = this.player.getTileY();
+        const curBldg = this.gameMap.getBuildingAtTile(curTX, curTY);
+        const isCurrentlyInside = curBldg && this.gameMap.openDoors.has(curBldg.id);
+        
+        if (isCurrentlyInside && !this._playerInsideBuildingLastFrame) {
+            this.hud.showFollowerNotification('Entered building! Posse stays outside.', true);
+        } else if (!isCurrentlyInside && this._playerInsideBuildingLastFrame) {
+            this.hud.showFollowerNotification('Exited building! Posse reconnected.', true);
+        }
+        this._playerInsideBuildingLastFrame = isCurrentlyInside;
+
+        // Interior trash spawning
+        if (isCurrentlyInside) {
+            this.buildingTrashTimer = (this.buildingTrashTimer || 0) + dt;
+            if (this.buildingTrashTimer >= 1.0) {
+                this.buildingTrashTimer -= 1.0;
+                
+                const tiles = curBldg.tiles.filter(t => {
+                    const isDoor = curBldg.doorTiles.some(d => d.x === t.x && d.y === t.y);
+                    const hasTrash = this.trashManager.items.some(item => !item.collected && item.tileX === t.x && item.tileY === t.y);
+                    return !isDoor && !hasTrash;
+                });
+                
+                if (tiles.length > 0) {
+                    const t = tiles[Math.floor(Math.random() * tiles.length)];
+                    const typeId = Math.floor(Math.random() * 4) + 1; // 1-4
+                    this.trashManager.items.push({
+                        x: t.x * TILE_SIZE + TILE_SIZE / 2,
+                        y: t.y * TILE_SIZE + TILE_SIZE / 2,
+                        tileX: t.x,
+                        tileY: t.y,
+                        spriteId: `trash${typeId}`,
+                        collected: false
+                    });
+                }
             }
         }
 
@@ -674,7 +672,7 @@ class Game {
     async _endRoundAndReturnToStore() {
         if (!window.apiCall) return; // Not logged in
         
-        const earned = this.trashManager.totalPoints + (this.buildingInterior ? this.buildingInterior.getTotalPoints() : 0);
+        const earned = this.trashManager.totalPoints;
         try {
             await window.apiCall('/api/game/end-round', 'POST', { 
                 earned, 
@@ -699,13 +697,8 @@ class Game {
     }
 
     _renderGame(ctx, w, h) {
-        if (this.state === GameState.INSIDE_BUILDING && this.buildingInterior) {
-            this.buildingInterior.render(ctx, w, h, this.spriteManager);
-            return;
-        }
-
         // Render map
-        this.gameMap.render(ctx, this.camera);
+        this.gameMap.render(ctx, this.camera, this.player);
 
         if (window.frenzyMode) {
             this.gameMap.renderAddresses(ctx, this.camera);

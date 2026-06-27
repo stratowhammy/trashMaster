@@ -80,8 +80,12 @@ class Player {
             { x: newX - hs, y: newY - hs }, { x: newX + hs, y: newY - hs },
             { x: newX - hs, y: newY + hs }, { x: newX + hs, y: newY + hs },
         ];
+        const curTX = this.getTileX();
+        const curTY = this.getTileY();
         for (const c of corners) {
-            if (!gameMap.isWalkable(Math.floor(c.x / TILE_SIZE), Math.floor(c.y / TILE_SIZE)))
+            const targetTX = Math.floor(c.x / TILE_SIZE);
+            const targetTY = Math.floor(c.y / TILE_SIZE);
+            if (!gameMap.isWalkable(targetTX, targetTY, curTX, curTY))
                 return false;
         }
         return true;

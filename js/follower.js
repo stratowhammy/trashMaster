@@ -159,16 +159,55 @@ class FollowerManager {
     }
 
     update(player, gameMap) {
+        const pb = gameMap.getBuildingAtTile(player.getTileX(), player.getTileY());
+        const isPlayerInside = pb && gameMap.openDoors.has(pb.id);
+
         for (let i = 0; i < this.followers.length; i++) {
             const follower = this.followers[i];
-            // Each follower follows the entity in front of it
-            let leaderHistory;
-            if (i === 0) {
-                leaderHistory = player.positionHistory;
+            
+            if (isPlayerInside) {
+                const door = pb.doorTiles[0];
+                if (door) {
+                    const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
+                    const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
+                    
+                    if (i === 0) {
+                        const dx = doorX - follower.x;
+                        const dy = doorY - follower.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist > 4) {
+                            follower.moving = true;
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+                            follower.x += nx * 4;
+                            follower.y += ny * 4;
+                            if (Math.abs(dx) > Math.abs(dy)) {
+                                follower.direction = dx > 0 ? 'right' : 'left';
+                            } else {
+                                follower.direction = dy > 0 ? 'down' : 'up';
+                            }
+                            
+                            follower.positionHistory.push({ x: follower.x, y: follower.y });
+                            if (follower.positionHistory.length > follower.historyMaxLength) {
+                                follower.positionHistory.shift();
+                            }
+                        } else {
+                            follower.moving = false;
+                        }
+                    } else {
+                        const leaderHistory = this.followers[i - 1].positionHistory;
+                        follower.update(leaderHistory, gameMap);
+                    }
+                }
             } else {
-                leaderHistory = this.followers[i - 1].positionHistory;
+                let leaderHistory;
+                if (i === 0) {
+                    leaderHistory = player.positionHistory;
+                } else {
+                    leaderHistory = this.followers[i - 1].positionHistory;
+                }
+                follower.update(leaderHistory, gameMap);
             }
-            follower.update(leaderHistory, gameMap);
         }
     }
 

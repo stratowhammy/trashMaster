@@ -74,7 +74,10 @@ class GameMap {
     constructor() {
         this.tiles = [];
         this.buildingMeta = [];
+        this.buildings = []; // { id, address, tiles: [{x,y}], doorTiles: [{x,y}] }
+        this.openDoors = new Set(); // Set of building IDs whose doors are open (walkable)
         this.generate();
+        this._catalogBuildings();
     }
 
     generate() {
@@ -184,8 +187,20 @@ class GameMap {
 
     // ── Wrapping tile access ──
     isWalkable(tileX, tileY) {
-        const t = this.tiles[wrapTileY(tileY)][wrapTileX(tileX)];
-        return t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR;
+        const wx = wrapTileX(tileX);
+        const wy = wrapTileY(tileY);
+        const t = this.tiles[wy][wx];
+        if (t === TileType.BUILDING) return false;
+        if (t === TileType.BUILDING_DOOR) {
+            // Check if this door's building is open
+            for (const bldg of this.buildings) {
+                if (bldg.doorTiles.some(d => d.x === wx && d.y === wy)) {
+                    return this.openDoors.has(bldg.id);
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     getTile(tileX, tileY) {
@@ -265,6 +280,92 @@ class GameMap {
                 ctx.moveTo(sx+2*s/3,sy);ctx.lineTo(sx+2*s/3,sy+s);
                 ctx.moveTo(sx,sy+s/2);ctx.lineTo(sx+s,sy+s/2);ctx.stroke();
                 break;
+        }
+    }
+
+    _catalogBuildings() {
+        // Flood-fill to find connected building clusters and assign addresses
+        const visited = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let letterIdx = 0;
+        let numCounter = 100;
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (visited[y][x]) continue;
+                if (this.tiles[y][x] !== TileType.BUILDING && this.tiles[y][x] !== TileType.BUILDING_DOOR) continue;
+
+                // Flood fill this building cluster
+                const tiles = [];
+                const doorTiles = [];
+                const stack = [{ x, y }];
+                while (stack.length > 0) {
+                    const p = stack.pop();
+                    if (p.x < 0 || p.x >= MAP_WIDTH || p.y < 0 || p.y >= MAP_HEIGHT) continue;
+                    if (visited[p.y][p.x]) continue;
+                    const t = this.tiles[p.y][p.x];
+                    if (t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR) continue;
+                    visited[p.y][p.x] = true;
+                    tiles.push({ x: p.x, y: p.y });
+                    if (t === TileType.BUILDING_DOOR) doorTiles.push({ x: p.x, y: p.y });
+                    stack.push({ x: p.x + 1, y: p.y });
+                    stack.push({ x: p.x - 1, y: p.y });
+                    stack.push({ x: p.x, y: p.y + 1 });
+                    stack.push({ x: p.x, y: p.y - 1 });
+                }
+
+                if (tiles.length > 0) {
+                    const letter = letters[letterIdx % letters.length];
+                    const address = letter + numCounter;
+                    this.buildings.push({
+                        id: this.buildings.length,
+                        address,
+                        tiles,
+                        doorTiles
+                    });
+                    numCounter += Math.floor(Math.random() * 20) + 10;
+                    if (numCounter > 999) { numCounter = 100; letterIdx++; }
+                    if (numCounter % 100 === 0) numCounter++;
+                }
+            }
+        }
+    }
+
+    openBuildingDoor(buildingId) {
+        this.openDoors.add(buildingId);
+    }
+
+    getBuildingAtDoor(tileX, tileY) {
+        const wx = wrapTileX(tileX);
+        const wy = wrapTileY(tileY);
+        for (const bldg of this.buildings) {
+            if (bldg.doorTiles.some(d => d.x === wx && d.y === wy)) {
+                return bldg;
+            }
+        }
+        return null;
+    }
+
+    renderAddresses(ctx, camera) {
+        // Render building addresses near their first door tile
+        for (const bldg of this.buildings) {
+            if (bldg.doorTiles.length === 0) continue;
+            const door = bldg.doorTiles[0];
+            const sx = door.x * TILE_SIZE - camera.x;
+            const sy = door.y * TILE_SIZE - camera.y;
+
+            // Only render if on screen
+            if (sx < -100 || sx > camera.width + 100 || sy < -100 || sy > camera.height + 100) continue;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.beginPath();
+            ctx.roundRect(sx - 2, sy - 14, ctx.measureText(bldg.address).width + 8 || 40, 14, 3);
+            ctx.fill();
+
+            ctx.fillStyle = this.openDoors.has(bldg.id) ? '#00ff88' : '#ffcc00';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(bldg.address, sx, sy - 4);
         }
     }
 }

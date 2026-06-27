@@ -74,19 +74,57 @@ class Game {
             if (this.state === GameState.PLAYING && this.player) {
                 this.player.handleKeyDown(e);
 
-                // P or p key to pick up trash
-                if (e.key === 'p' || e.key === 'P') {
+                // Q or q key to pick up trash
+                if (e.key === 'q' || e.key === 'Q') {
                     this.pickupTrash();
                 }
 
+                // E or e key to interact with NPC
+                if (e.key === 'e' || e.key === 'E') {
+                    if (window.frenzyMode) {
+                        const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
+                        if (result && result.isInformant) {
+                            // Open door!
+                            this.gameMap.openBuildingDoor(result.buildingId);
+                            // Spawn pirates!
+                            const bldg = this.gameMap.buildings.find(b => b.id === result.buildingId);
+                            if (bldg && bldg.doorTiles.length > 0) {
+                                const door = bldg.doorTiles[0];
+                                this.pirateManager.spawnPirates(door.x, door.y);
+                            }
+                        }
+                    }
+                }
+
                 // Hotkeys for Consumables
-                if (e.key === '1') this.useConsumable('Borrowed Time');
-                if (e.key === '2') this.useConsumable('Mushrooms');
-                if (e.key === '3') this.useConsumable('Wings');
+                if (e.key === 't' || e.key === 'T') this.useConsumable('Borrowed Time');
+                if (e.key === 'm' || e.key === 'M') this.useConsumable('Mushrooms');
+                if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
+                if (e.key === 'p' || e.key === 'P') this.useConsumable('Protection');
 
                 // Prevent scrolling with arrow keys
                 if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
                     e.preventDefault();
+                }
+            }
+            if (this.state === GameState.INSIDE_BUILDING && this.buildingInterior) {
+                let dx = 0, dy = 0;
+                if (e.key === 'ArrowUp') dy = -1;
+                if (e.key === 'ArrowDown') dy = 1;
+                if (e.key === 'ArrowLeft') dx = -1;
+                if (e.key === 'ArrowRight') dx = 1;
+                
+                if (dx !== 0 || dy !== 0) {
+                    e.preventDefault();
+                    const action = this.buildingInterior.movePlayer(dx, dy);
+                    if (action === 'exit') {
+                        // Exit building!
+                        this.trashManager.totalPoints += this.buildingInterior.getTotalPoints();
+                        this.hud.updateScore(this.trashManager.totalPoints);
+                        this.state = GameState.PLAYING;
+                        this.buildingInterior = null;
+                        this.hud.showFollowerNotification('Exited building! Posse reconnected.', true);
+                    }
                 }
             }
             if (this.state === GameState.GAME_OVER && e.key === ' ') {
@@ -205,7 +243,7 @@ class Game {
     }
 
     _update(dt) {
-        if (this.state !== GameState.PLAYING) return;
+        if (this.state !== GameState.PLAYING && this.state !== GameState.INSIDE_BUILDING) return;
 
         // Consumable timers
         if (this.mushroomTimer > 0) {
@@ -222,6 +260,14 @@ class Game {
                 this.wingsTimer = 0;
             }
         }
+        if (this.protectionTimer > 0) {
+            this.protectionTimer -= dt;
+            if (this.protectionTimer <= 0) {
+                this.protectionTimer = 0;
+                this.protectionBonus = 0;
+                this.hud.showFollowerNotification('Protection Expired!', false);
+            }
+        }
 
         // Employee upkeep timer ($200 every 15s per hired employee, excluding Bruno)
         this.employeeUpkeepTimer += dt;
@@ -231,7 +277,7 @@ class Game {
             if (hired > 0) {
                 const cost = hired * 200;
                 this.totalEmployeeCost += cost;
-                this.hud.showFollowerNotification(`-$${cost} for wages`, false);
+                this.hud.showFollowerNotification(`-$${cost} for posse upkeep`, false);
             }
         }
 
@@ -245,29 +291,56 @@ class Game {
             return;
         }
 
-        // Update player
-        this.player.update(this.gameMap);
+        // Interior Mode branches here
+        if (this.state === GameState.INSIDE_BUILDING && this.buildingInterior) {
+            this.buildingInterior.update(dt);
+            const picked = this.buildingInterior.checkPickup();
+            if (picked > 0) {
+                this.hud.updateScore(this.trashManager.totalPoints + this.buildingInterior.getTotalPoints());
+            }
+            return;
+        }
 
-        // Update followers
-        this.followerManager.update(this.player, this.gameMap);
+        // Frenzy Mode updates
+        if (window.frenzyMode) {
+            this.npcManager.update();
+            this.pirateManager.update(dt);
 
-        // Check if player (truck) runs over followers
-        if (window.playerHasTruck && this.player && this.player.moving) {
-            const hitRadius = TILE_SIZE * 0.6; // collision distance
-            for (let i = this.followerManager.followers.length - 1; i >= 0; i--) {
-                const f = this.followerManager.followers[i];
-                const dx = this.player.x - f.x;
-                const dy = this.player.y - f.y;
-                if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
-                    this.followerManager.followers.splice(i, 1);
-                    this.trashManager.totalPoints -= 1000;
-                    if (window.employeesHired > 0) window.employeesHired--;
-                    this.hud.updateScore(this.trashManager.totalPoints);
-                    this.hud.showFollowerNotification('Ran over employee! -$1,000', false);
+            // Trigger NPC interaction checks
+            this.npcManager.checkInteraction(this.player.x, this.player.y);
+
+            // Handle pirate combat if they arrive at the building entrance
+            if (this.pirateManager.hasArrivedPirates()) {
+                const result = this.pirateManager.runCombat(this.followerManager.getFollowerCount(), this.protectionBonus);
+                if (result) {
+                    // Remove killed posse members from follower manager
+                    for (let i = 0; i < result.posseKilled; i++) {
+                        this.followerManager.removeFollower();
+                    }
+                    this.employeesKilledThisRound += result.posseKilled;
                     this.hud.followerCount = this.followerManager.getFollowerCount();
                 }
             }
         }
+
+        // Update player
+        this.player.update(this.gameMap);
+
+        // Check if player enters open building
+        const tileX = this.player.getTileX();
+        const tileY = this.player.getTileY();
+        if (this.gameMap.getTile(tileX, tileY) === TileType.BUILDING_DOOR) {
+            const bldg = this.gameMap.getBuildingAtDoor(tileX, tileY);
+            if (bldg && this.gameMap.openDoors.has(bldg.id)) {
+                this.state = GameState.INSIDE_BUILDING;
+                this.buildingInterior = new BuildingInterior(10, 10);
+                this.hud.showFollowerNotification('Entered building! Posse stays outside.', true);
+                this.player.keys = { up: false, down: false, left: false, right: false };
+            }
+        }
+
+        // Update followers
+        this.followerManager.update(this.player, this.gameMap);
 
         // Check trash pickup — followers automatically clean up trash
         const pickupRadius = TILE_SIZE * 0.7;
@@ -292,12 +365,12 @@ class Game {
                 // Add follower
                 const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
                 const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
-                this.hud.showFollowerNotification(charConfig ? charConfig.name : 'New Helper', true);
+                this.hud.showFollowerNotification(charConfig ? charConfig.name : 'New posse member!', true);
             } else if (this.trashCollectedInWindow < 5) {
                 // Lose follower
                 if (this.followerManager.getFollowerCount() > baseFollowers) {
                     this.followerManager.removeFollower();
-                    this.hud.showFollowerNotification('A helper left the crew!', false);
+                    this.hud.showFollowerNotification('A posse member left!', false);
                 }
             }
             this.trashCollectedInWindow = 0;
@@ -572,6 +645,15 @@ class Game {
         
         this.hud.reset();
         this.hud.followerCount = this.followerManager.getFollowerCount();
+        
+        this.npcManager = new NPCManager();
+        this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
+        this.pirateManager = new PirateManager();
+        this.buildingInterior = null;
+        this.protectionTimer = 0;
+        this.protectionBonus = 0;
+        this.employeesKilledThisRound = 0;
+        
         this.followerCheckTimer = 0;
         this.employeeUpkeepTimer = 0;
         this.totalEmployeeCost = 0;
@@ -592,9 +674,13 @@ class Game {
     async _endRoundAndReturnToStore() {
         if (!window.apiCall) return; // Not logged in
         
-        const earned = this.trashManager.totalPoints;
+        const earned = this.trashManager.totalPoints + (this.buildingInterior ? this.buildingInterior.getTotalPoints() : 0);
         try {
-            await window.apiCall('/api/game/end-round', 'POST', { earned, employee_cost: this.totalEmployeeCost });
+            await window.apiCall('/api/game/end-round', 'POST', { 
+                earned, 
+                employee_cost: this.totalEmployeeCost,
+                employees_killed: this.employeesKilledThisRound
+            });
             window.employeesHired = 0;
             await window.refreshGameState();
             window.renderStore();
@@ -613,8 +699,19 @@ class Game {
     }
 
     _renderGame(ctx, w, h) {
+        if (this.state === GameState.INSIDE_BUILDING && this.buildingInterior) {
+            this.buildingInterior.render(ctx, w, h, this.spriteManager);
+            return;
+        }
+
         // Render map
         this.gameMap.render(ctx, this.camera);
+
+        if (window.frenzyMode) {
+            this.gameMap.renderAddresses(ctx, this.camera);
+            this.npcManager.render(ctx, this.camera, this.spriteManager);
+            this.pirateManager.render(ctx, this.camera, this.spriteManager);
+        }
 
         // Render trash
         this.trashManager.render(ctx, this.camera, this.spriteManager);
@@ -629,6 +726,11 @@ class Game {
 
         // Render HUD
         this.hud.render(ctx, w, h);
+
+        if (window.frenzyMode) {
+            this.npcManager.renderDialogue(ctx, w, h);
+            this.pirateManager.renderCombatResults(ctx, w, h);
+        }
 
         // Render pickup hint if near trash
         if (this.playerNearTrash) {
@@ -647,7 +749,7 @@ class Game {
             ctx.font = 'bold 9px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('Press [P] to Pick Up Trash!', w / 2, h - 82);
+            ctx.fillText('Press [Q] to Pick Up Trash!', w / 2, h - 82);
             ctx.restore();
         }
 
@@ -665,7 +767,7 @@ class Game {
             ctx.fillText(`Pos: (${Math.round(this.player.x)}, ${Math.round(this.player.y)})`, w - 270, h - 62);
             ctx.fillText(`Tile: (${this.player.getTileX()}, ${this.player.getTileY()})`, w - 270, h - 48);
             ctx.fillText(`Keys: U:${k.up} D:${k.down} L:${k.left} R:${k.right}`, w - 270, h - 34);
-            ctx.fillText(`WASD / Arrows to move, P to pickup`, w - 270, h - 20);
+            ctx.fillText(`Arrows to move, Q to pickup`, w - 270, h - 20);
         }
     }
 }

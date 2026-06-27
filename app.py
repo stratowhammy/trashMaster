@@ -54,6 +54,10 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN employee_death_penalty FLOAT DEFAULT 1.0")
+        except sqlite3.OperationalError:
+            pass
         db.commit()
         
         # Create default admin if not exists
@@ -158,7 +162,7 @@ def sync_game():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT balance, has_truck, employee_death_penalty FROM users WHERE id=?", (user_data['user_id'],))
     user = cursor.fetchone()
     
     cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id=?", (user_data['user_id'],))
@@ -167,6 +171,7 @@ def sync_game():
     return jsonify({
         'balance': user['balance'],
         'has_truck': bool(user['has_truck']),
+        'employee_death_penalty': user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0,
         'inventory': inv
     })
 
@@ -181,6 +186,7 @@ def buy_item():
         'Borrowed Time': 2000,
         'Mushrooms': 2500,
         'Wings': 1500,
+        'Protection': 1000,
         'Bruno The Trash Truck': 10000
     }
     
@@ -237,13 +243,20 @@ def end_round():
     
     earned = int(request.json.get('earned', 0))
     employee_cost = int(request.json.get('employee_cost', 0))
+    employees_killed = int(request.json.get('employees_killed', 0))
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT balance, has_truck, employee_death_penalty FROM users WHERE id=?", (user_data['user_id'],))
     user = cursor.fetchone()
     
-    new_balance = user['balance'] + earned - employee_cost
+    penalty = user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0
+    if employees_killed > 0:
+        penalty = penalty * (1.05 ** employees_killed)
+        db.execute("UPDATE users SET employee_death_penalty=? WHERE id=?", (penalty, user_data['user_id']))
+    
+    adjusted_employee_cost = int(employee_cost * penalty)
+    new_balance = user['balance'] + earned - adjusted_employee_cost
     
     if user['has_truck']:
         if new_balance < 1000:
@@ -256,7 +269,7 @@ def end_round():
     db.execute("UPDATE users SET balance=? WHERE id=?", (new_balance, user_data['user_id']))
     db.commit()
     
-    return jsonify({'success': True, 'balance': new_balance})
+    return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)

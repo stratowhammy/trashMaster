@@ -46,7 +46,7 @@ class HUD {
 
     showFollowerNotification(name, isPositive = true) {
         if (isPositive) {
-            this.followerNotification = `${name} joined your crew!`;
+            this.followerNotification = `${name} joined your posse!`;
         } else {
             this.followerNotification = name;
         }
@@ -173,7 +173,7 @@ class HUD {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 12px "Press Start 2P", monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(`Crew: ${this.followerCount}`, fX + 28, fY + 12);
+        ctx.fillText(`Posse: ${this.followerCount}`, fX + 28, fY + 12);
 
         // ── Follower Notification ──
         if (this.followerNotificationTimer > 0) {
@@ -256,7 +256,7 @@ class HUD {
         if (window.game.totalEmployeeCost > 0) {
             ctx.fillStyle = '#ff4444';
             ctx.font = 'bold 10px "Press Start 2P", monospace';
-            ctx.fillText(`Wages Deducted: $${window.game.totalEmployeeCost}`, centerX, centerY + 40);
+            ctx.fillText(`Posse Upkeep: $${window.game.totalEmployeeCost}`, centerX, centerY + 40);
         }
 
         // Return button

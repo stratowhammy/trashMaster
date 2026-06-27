@@ -101,8 +101,8 @@ function initUI() {
 
     if (btnStartGame) {
         btnStartGame.addEventListener('click', () => {
-            // Check if user has truck and wants to hire employees?
-            // Actually, employees are hired in the store and deducted in-game.
+            const frenzyToggle = document.getElementById('frenzy-toggle');
+            window.frenzyMode = frenzyToggle ? frenzyToggle.checked : false;
             showScreen('game-layer'); // This hides UI and shows canvas
             if (window.startGameFromStore) {
                 window.startGameFromStore(); // Custom method we will add
@@ -125,11 +125,12 @@ async function refreshGameState() {
 
 const STORE_ITEMS = [
     { name: 'Filthadelphia', price: 2500, desc: 'Doubles trash spawn', sprite: 'filthadelphia.png' },
-    { name: 'Borrowed Time', price: 2000, desc: '+20s to timer (Key 1)', sprite: 'borrowed_time.png' },
-    { name: 'Mushrooms', price: 2500, desc: 'Slow timer for 20s (Key 2)', sprite: 'mushrooms.png' },
-    { name: 'Wings', price: 1500, desc: '1.5x speed for 15s (Key 3)', sprite: 'wings.png' },
-    { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm crew, $1000 upkeep', sprite: 'trash_truck.png' },
-    { name: 'Employee Hire', price: 0, desc: 'Hire employee ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' }
+    { name: 'Borrowed Time', price: 2000, desc: '+20s to timer (Key T)', sprite: 'borrowed_time.png' },
+    { name: 'Mushrooms', price: 2500, desc: 'Slow timer for 20s (Key M)', sprite: 'mushrooms.png' },
+    { name: 'Wings', price: 1500, desc: '1.5x speed for 15s (Key W)', sprite: 'wings.png' },
+    { name: 'Protection', price: 1000, desc: '+5% posse win chance for 30s (Key P)', sprite: 'protection.png' },
+    { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
+    { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' }
 ];
 
 function updateStoreUI() {
@@ -173,18 +174,18 @@ function renderStore() {
     document.querySelectorAll('.buy-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const itemName = e.target.getAttribute('data-name');
-            if (itemName === 'Employee Hire') {
+            if (itemName === 'Hire Posse Member') {
                 if (!playerHasTruck) {
-                    alert("You need Bruno The Trash Truck to hire employees!");
+                    alert("You need Bruno The Trash Truck to hire posse members!");
                     return;
                 }
                 const hiredCount = window.employeesHired || 0;
                 if (hiredCount >= 5) {
-                    alert("Maximum 5 employees allowed!");
+                    alert("Maximum 5 posse members allowed!");
                     return;
                 }
                 window.employeesHired = hiredCount + 1;
-                alert(`Hired employee! Total: ${window.employeesHired}`);
+                alert(`Hired posse member! Total: ${window.employeesHired}`);
                 return;
             }
             try {

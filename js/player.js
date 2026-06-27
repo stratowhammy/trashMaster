@@ -24,19 +24,19 @@ class Player {
 
     handleKeyDown(e) {
         switch (e.key) {
-            case 'ArrowUp': case 'w': case 'W': this.keys.up = true; break;
-            case 'ArrowDown': case 's': case 'S': this.keys.down = true; break;
-            case 'ArrowLeft': case 'a': case 'A': this.keys.left = true; break;
-            case 'ArrowRight': case 'd': case 'D': this.keys.right = true; break;
+            case 'ArrowUp': this.keys.up = true; break;
+            case 'ArrowDown': this.keys.down = true; break;
+            case 'ArrowLeft': this.keys.left = true; break;
+            case 'ArrowRight': this.keys.right = true; break;
         }
     }
 
     handleKeyUp(e) {
         switch (e.key) {
-            case 'ArrowUp': case 'w': case 'W': this.keys.up = false; break;
-            case 'ArrowDown': case 's': case 'S': this.keys.down = false; break;
-            case 'ArrowLeft': case 'a': case 'A': this.keys.left = false; break;
-            case 'ArrowRight': case 'd': case 'D': this.keys.right = false; break;
+            case 'ArrowUp': this.keys.up = false; break;
+            case 'ArrowDown': this.keys.down = false; break;
+            case 'ArrowLeft': this.keys.left = false; break;
+            case 'ArrowRight': this.keys.right = false; break;
         }
     }
 
@@ -54,8 +54,9 @@ class Player {
             if (Math.abs(dx) > Math.abs(dy)) this.direction = dx > 0 ? 'right' : 'left';
             else this.direction = dy > 0 ? 'down' : 'up';
 
-            const newX = this.x + dx * this.speed;
-            const newY = this.y + dy * this.speed;
+            const currentSpeed = this.speed * (this.speedMultiplier || 1.0);
+            const newX = this.x + dx * currentSpeed;
+            const newY = this.y + dy * currentSpeed;
 
             // Collision uses wrapping tile lookups — works for infinite world
             if (this._canMoveTo(newX, this.y, gameMap)) this.x = newX;

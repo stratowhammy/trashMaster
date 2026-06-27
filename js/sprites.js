@@ -18,7 +18,10 @@ const SPRITE_CONFIG = {
         { id: 'trash4', name: 'Banana Peel', src: 'assets/sprites/trash4.png' },
     ],
     other: [
-        { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' }
+        { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' },
+        { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },
+        { id: 'char_pirate', name: 'Pirate', src: 'assets/sprites/pirate.png', color: '#aa3333' },
+        { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' }
     ]
 };
 

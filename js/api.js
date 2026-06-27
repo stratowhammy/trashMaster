@@ -124,12 +124,12 @@ async function refreshGameState() {
 }
 
 const STORE_ITEMS = [
-    { name: 'Filthadelphia', price: 2500, desc: 'Doubles trash spawn', sprite: 'filthadelphia.jpg' },
-    { name: 'Borrowed Time', price: 2000, desc: '+20s to timer (Key 1)', sprite: 'borrowed_time.jpg' },
-    { name: 'Mushrooms', price: 2500, desc: 'Slow timer for 20s (Key 2)', sprite: 'mushrooms.jpg' },
-    { name: 'Wings', price: 1500, desc: '1.5x speed for 15s (Key 3)', sprite: 'wings.jpg' },
-    { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm crew, $1000 upkeep', sprite: 'trash_truck.jpg' },
-    { name: 'Employee Hire', price: 0, desc: 'Hire employee ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.jpg' }
+    { name: 'Filthadelphia', price: 2500, desc: 'Doubles trash spawn', sprite: 'filthadelphia.png' },
+    { name: 'Borrowed Time', price: 2000, desc: '+20s to timer (Key 1)', sprite: 'borrowed_time.png' },
+    { name: 'Mushrooms', price: 2500, desc: 'Slow timer for 20s (Key 2)', sprite: 'mushrooms.png' },
+    { name: 'Wings', price: 1500, desc: '1.5x speed for 15s (Key 3)', sprite: 'wings.png' },
+    { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm crew, $1000 upkeep', sprite: 'trash_truck.png' },
+    { name: 'Employee Hire', price: 0, desc: 'Hire employee ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' }
 ];
 
 function updateStoreUI() {

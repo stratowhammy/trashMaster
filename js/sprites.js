@@ -4,21 +4,21 @@
 
 const SPRITE_CONFIG = {
     characters: [
-        { id: 'char1', name: 'Ranger',     src: 'assets/sprites/char1.jpg', color: '#2d6b2d' },
-        { id: 'char2', name: 'Student',    src: 'assets/sprites/char2.jpg', color: '#2d5aa0' },
-        { id: 'char3', name: 'Scientist',  src: 'assets/sprites/char3.jpg', color: '#e0e0e0' },
-        { id: 'char4', name: 'Athlete',    src: 'assets/sprites/char4.jpg', color: '#cc3333' },
-        { id: 'char5', name: 'Robot',      src: 'assets/sprites/char5.jpg', color: '#8899aa' },
-        { id: 'char6', name: 'Superhero',  src: 'assets/sprites/char6.jpg', color: '#7733cc' },
+        { id: 'char1', name: 'Ranger',     src: 'assets/sprites/char1.png', color: '#2d6b2d' },
+        { id: 'char2', name: 'Student',    src: 'assets/sprites/char2.png', color: '#2d5aa0' },
+        { id: 'char3', name: 'Scientist',  src: 'assets/sprites/char3.png', color: '#e0e0e0' },
+        { id: 'char4', name: 'Athlete',    src: 'assets/sprites/char4.png', color: '#cc3333' },
+        { id: 'char5', name: 'Robot',      src: 'assets/sprites/char5.png', color: '#8899aa' },
+        { id: 'char6', name: 'Superhero',  src: 'assets/sprites/char6.png', color: '#7733cc' },
     ],
     trash: [
-        { id: 'trash1', name: 'Paper',       src: 'assets/sprites/trash1.jpg' },
-        { id: 'trash2', name: 'Soda Can',    src: 'assets/sprites/trash2.jpg' },
-        { id: 'trash3', name: 'Plastic Bag', src: 'assets/sprites/trash3.jpg' },
-        { id: 'trash4', name: 'Banana Peel', src: 'assets/sprites/trash4.jpg' },
+        { id: 'trash1', name: 'Paper',       src: 'assets/sprites/trash1.png' },
+        { id: 'trash2', name: 'Soda Can',    src: 'assets/sprites/trash2.png' },
+        { id: 'trash3', name: 'Plastic Bag', src: 'assets/sprites/trash3.png' },
+        { id: 'trash4', name: 'Banana Peel', src: 'assets/sprites/trash4.png' },
     ],
     other: [
-        { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.jpg', color: '#00aa55' }
+        { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' }
     ]
 };
 
@@ -50,14 +50,7 @@ class SpriteManager {
             for (const sprite of allSprites) {
                 const img = new Image();
                 img.onload = () => {
-                    // Process image to make its background transparent
-                    try {
-                        this.images[sprite.id] = this._processTransparency(img, sprite);
-                    } catch (e) {
-                        console.warn("Failed to process transparency, using original image", e);
-                        this.images[sprite.id] = img;
-                    }
-                    
+                    this.images[sprite.id] = img;
                     this.totalLoaded++;
                     if (this.totalLoaded >= this.totalToLoad) {
                         this.loaded = true;

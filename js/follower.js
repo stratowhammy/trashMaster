@@ -19,7 +19,7 @@ class Follower {
         this.historyMaxLength = 2000;
 
         // Spacing: how far behind the leader this follower stays
-        this.followDelay = 20;       // frames of delay behind leader
+        this.followDelay = 16;       // frames of movement delay behind leader
     }
 
     update(leaderHistory, gameMap) {
@@ -56,9 +56,11 @@ class Follower {
         }
 
         // Record own position history for followers behind this one
-        this.positionHistory.push({ x: this.x, y: this.y });
-        if (this.positionHistory.length > this.historyMaxLength) {
-            this.positionHistory.shift();
+        if (this.moving) {
+            this.positionHistory.push({ x: this.x, y: this.y });
+            if (this.positionHistory.length > this.historyMaxLength) {
+                this.positionHistory.shift();
+            }
         }
     }
 

@@ -66,8 +66,10 @@ class Player {
         this.animTimer++;
         if (this.animTimer >= 8) { this.animTimer = 0; this.animFrame = (this.animFrame + 1) % 4; }
 
-        this.positionHistory.push({ x: this.x, y: this.y });
-        if (this.positionHistory.length > this.historyMaxLength) this.positionHistory.shift();
+        if (this.moving) {
+            this.positionHistory.push({ x: this.x, y: this.y });
+            if (this.positionHistory.length > this.historyMaxLength) this.positionHistory.shift();
+        }
     }
 
     _canMoveTo(newX, newY, gameMap) {

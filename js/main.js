@@ -251,6 +251,24 @@ class Game {
         // Update followers
         this.followerManager.update(this.player, this.gameMap);
 
+        // Check if player (truck) runs over followers
+        if (window.playerHasTruck && this.player && this.player.moving) {
+            const hitRadius = TILE_SIZE * 0.6; // collision distance
+            for (let i = this.followerManager.followers.length - 1; i >= 0; i--) {
+                const f = this.followerManager.followers[i];
+                const dx = this.player.x - f.x;
+                const dy = this.player.y - f.y;
+                if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
+                    this.followerManager.followers.splice(i, 1);
+                    this.trashManager.totalPoints -= 1000;
+                    if (window.employeesHired > 0) window.employeesHired--;
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                    this.hud.showFollowerNotification('Ran over employee! -$1,000', false);
+                    this.hud.followerCount = this.followerManager.getFollowerCount();
+                }
+            }
+        }
+
         // Check trash pickup — followers automatically clean up trash
         const pickupRadius = TILE_SIZE * 0.7;
         let followerPicked = [];
@@ -665,9 +683,13 @@ window.addEventListener('DOMContentLoaded', () => {
     
     // Expose start game function to api.js UI logic
     window.startGameFromStore = () => {
-        window.game.state = GameState.CHARACTER_SELECT;
         if (!window.game.gameMap) {
             window.game._restartGame();
+        }
+        if (window.playerHasTruck) {
+            window.game._startGame('char_truck');
+        } else {
+            window.game.state = GameState.CHARACTER_SELECT;
         }
     };
 });

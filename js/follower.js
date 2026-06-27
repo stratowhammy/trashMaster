@@ -150,6 +150,12 @@ class FollowerManager {
         return follower;
     }
 
+    removeFollower() {
+        if (this.followers.length > 0) {
+            this.followers.pop();
+        }
+    }
+
     update(player, gameMap) {
         for (let i = 0; i < this.followers.length; i++) {
             const follower = this.followers[i];

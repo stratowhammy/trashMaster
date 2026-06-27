@@ -150,25 +150,12 @@ class Game {
         if (this.state !== GameState.PLAYING || !this.player) return;
 
         const pickupRadius = TILE_SIZE * 0.8;
-        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius);
+        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.followerManager.getFollowerCount());
 
         if (picked.length > 0) {
-            this.hud.updateScore(this.trashManager.totalCollected);
-            this._checkFollowerMilestone();
-        }
-    }
-
-    _checkFollowerMilestone() {
-        const currentMilestone = Math.floor(this.trashManager.totalCollected / 10);
-        if (currentMilestone > this.lastFollowerMilestone) {
-            const newFollowersToAdd = currentMilestone - this.lastFollowerMilestone;
-            for (let i = 0; i < newFollowersToAdd; i++) {
-                const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
-                const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
-                this.hud.showFollowerNotification(charConfig ? charConfig.name : 'New Helper');
-                this.hud.followerCount = this.followerManager.getFollowerCount();
-            }
-            this.lastFollowerMilestone = currentMilestone;
+            this.hud.updateScore(this.trashManager.totalPoints);
+            this.trashCollectedInWindow += picked.length;
+            this.trashManager.spawnMore(this.gameMap, picked.length);
         }
     }
 
@@ -177,8 +164,11 @@ class Game {
 
         // Update timer
         this.hud.update(dt);
+        this.hud.evalTimer = 10 - this.followerCheckTimer;
+        this.hud.trashInWindow = this.trashCollectedInWindow;
 
         if (this.hud.isTimeUp()) {
+            this._saveScore();
             this.state = GameState.GAME_OVER;
             return;
         }
@@ -193,13 +183,34 @@ class Game {
         const pickupRadius = TILE_SIZE * 0.7;
         let followerPicked = [];
         for (const follower of this.followerManager.followers) {
-            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8);
+            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.followerManager.getFollowerCount());
             followerPicked = followerPicked.concat(picked);
         }
 
         if (followerPicked.length > 0) {
-            this.hud.updateScore(this.trashManager.totalCollected);
-            this._checkFollowerMilestone();
+            this.hud.updateScore(this.trashManager.totalPoints);
+            this.trashCollectedInWindow += followerPicked.length;
+            this.trashManager.spawnMore(this.gameMap, followerPicked.length);
+        }
+
+        // Follower economy logic (10-second window)
+        this.followerCheckTimer += dt;
+        if (this.followerCheckTimer >= 10) {
+            this.followerCheckTimer -= 10;
+            if (this.trashCollectedInWindow >= 7) {
+                // Add follower
+                const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
+                const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+                this.hud.showFollowerNotification(charConfig ? charConfig.name : 'New Helper', true);
+            } else if (this.trashCollectedInWindow < 5) {
+                // Lose follower
+                if (this.followerManager.getFollowerCount() > 0) {
+                    this.followerManager.removeFollower();
+                    this.hud.showFollowerNotification('A helper left the crew!', false);
+                }
+            }
+            this.trashCollectedInWindow = 0;
+            this.hud.followerCount = this.followerManager.getFollowerCount();
         }
 
         // Check if player is near any trash to display a "Press P" hint
@@ -450,14 +461,42 @@ class Game {
         this.trashManager = new TrashManager();
         this.trashManager.spawnInitial(this.gameMap, 120);
         this.hud.reset();
-        this.lastFollowerMilestone = 0;
+        this.followerCheckTimer = 0;
+        this.trashCollectedInWindow = 0;
         this.playerNearTrash = false;
+        this.scoreSaved = false;
 
         // Snap camera to player
         this.camera.snapTo(this.player.x, this.player.y);
 
         this.state = GameState.PLAYING;
         console.log('Game state set to PLAYING. Player:', this.player);
+    }
+
+    _saveScore() {
+        if (this.scoreSaved) return;
+        this.scoreSaved = true;
+
+        const charConfig = SPRITE_CONFIG.characters.find(c => c.id === this.player.spriteId);
+        const spriteName = charConfig ? charConfig.name : 'Unknown';
+        
+        let scores = JSON.parse(localStorage.getItem('trashMasterScores') || '[]');
+        const newScore = {
+            score: this.trashManager.totalPoints,
+            sprite: spriteName,
+            date: new Date().toISOString()
+        };
+        
+        // Check if high score
+        const isHighScore = scores.length === 0 || newScore.score > scores[0].score;
+        this.hud.isHighScore = isHighScore;
+
+        scores.push(newScore);
+        scores.sort((a, b) => b.score - a.score);
+        scores = scores.slice(0, 10); // Keep top 10
+        
+        localStorage.setItem('trashMasterScores', JSON.stringify(scores));
+        this.hud.leaderboard = scores;
     }
 
     _restartGame() {

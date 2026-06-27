@@ -20,6 +20,7 @@ class TrashManager {
     constructor() {
         this.items = [];
         this.totalCollected = 0;
+        this.totalPoints = 0;
         this.respawnTimer = 0;
         this.respawnInterval = 180; // frames (~3 seconds at 60fps)
         this.maxTrashOnMap = 150;
@@ -91,25 +92,28 @@ class TrashManager {
         }
     }
 
-    checkPickup(entityX, entityY, pickupRadius) {
+    checkPickup(entityX, entityY, pickupRadius, followerCount = 0) {
         const picked = [];
+        const pointValue = Math.pow(2, followerCount);
         for (const item of this.items) {
             if (item.collected) continue;
 
-            const dx = entityX - item.x;
-            const dy = entityY - item.y;
+            const wrapped = nearestWrap(item.x, item.y, entityX, entityY);
+            const dx = entityX - wrapped.x;
+            const dy = entityY - wrapped.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < pickupRadius) {
                 item.collected = true;
                 this.totalCollected++;
+                this.totalPoints += pointValue;
                 picked.push(item);
 
                 // Create pickup effect
                 this.pickupEffects.push({
-                    x: item.x,
-                    y: item.y,
-                    text: '+1',
+                    x: wrapped.x,
+                    y: wrapped.y,
+                    text: `+${pointValue}`,
                     timer: 0,
                     alpha: 1,
                     color: '#00ff88',
@@ -121,12 +125,16 @@ class TrashManager {
 
     render(ctx, camera, spriteManager) {
         const time = performance.now() / 1000;
+        const camCX = camera.getCenterX();
+        const camCY = camera.getCenterY();
 
         for (const item of this.items) {
             if (item.collected) continue;
-            if (!camera.isVisible(item.x - 16, item.y - 16, 32, 32)) continue;
+            
+            const wrapped = nearestWrap(item.x, item.y, camCX, camCY);
+            if (!camera.isVisible(wrapped.x - 16, wrapped.y - 16, 32, 32)) continue;
 
-            const screen = camera.worldToScreen(item.x, item.y);
+            const screen = camera.worldToScreen(wrapped.x, wrapped.y);
 
             // Gentle bob animation
             const bobY = Math.sin(time * 2 + item.bobOffset) * 2;

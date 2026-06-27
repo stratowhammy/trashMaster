@@ -4,7 +4,7 @@
 
 class HUD {
     constructor() {
-        this.gameDuration = 180;  // 3 minutes in seconds
+        this.gameDuration = 90;  // 90 seconds in seconds
         this.timeRemaining = this.gameDuration;
         this.score = 0;
         this.followerCount = 0;
@@ -28,6 +28,11 @@ class HUD {
         this.lastScore = 0;
         this.followerNotification = '';
         this.followerNotificationTimer = 0;
+        this.followerNotificationPositive = true;
+        this.evalTimer = 10;
+        this.trashInWindow = 0;
+        this.isHighScore = false;
+        this.leaderboard = [];
     }
 
     updateScore(newScore) {
@@ -37,9 +42,14 @@ class HUD {
         this.score = newScore;
     }
 
-    showFollowerNotification(name) {
-        this.followerNotification = `${name} joined your crew!`;
+    showFollowerNotification(name, isPositive = true) {
+        if (isPositive) {
+            this.followerNotification = `${name} joined your crew!`;
+        } else {
+            this.followerNotification = name;
+        }
         this.followerNotificationTimer = 180; // ~3 seconds
+        this.followerNotificationPositive = isPositive;
     }
 
     update(deltaTime) {
@@ -69,73 +79,47 @@ class HUD {
     }
 
     render(ctx, canvasWidth, canvasHeight) {
-        const barWidth = 300;
-        const barHeight = 24;
-        const barX = (canvasWidth - barWidth) / 2;
-        const barY = 14;
-
-        // ── Timer Bar ──
-        // Background
+        // ── Timer Display (top-right) ──
+        const timerX = canvasWidth - 20;
+        const timerY = 20;
+        
         ctx.fillStyle = 'rgba(10,15,25,0.75)';
         ctx.beginPath();
-        ctx.roundRect(barX - 6, barY - 6, barWidth + 12, barHeight + 12, 8);
+        ctx.roundRect(timerX - 120, timerY - 10, 130, 60, 8);
         ctx.fill();
         ctx.strokeStyle = 'rgba(100,200,255,0.2)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(barX - 6, barY - 6, barWidth + 12, barHeight + 12, 8);
+        ctx.roundRect(timerX - 120, timerY - 10, 130, 60, 8);
         ctx.stroke();
 
-        // Timer fill
-        const ratio = this.timeRemaining / this.gameDuration;
-        const fillWidth = barWidth * ratio;
+        ctx.fillStyle = '#ff4444';
+        ctx.font = '16px serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('⏱️', timerX - 110, timerY + 12);
 
-        // Color gradient: green → yellow → red
-        let barColor;
-        if (ratio > 0.5) {
-            barColor = `hsl(${120 * (ratio - 0.5) * 2 + 60}, 80%, 50%)`;
-        } else if (ratio > 0.2) {
-            barColor = `hsl(${60 * ((ratio - 0.2) / 0.3)}, 90%, 50%)`;
-        } else {
-            barColor = `hsl(0, 90%, ${50 + Math.sin(performance.now() / 200) * 15}%)`;
-        }
-
-        const gradient = ctx.createLinearGradient(barX, barY, barX + fillWidth, barY);
-        gradient.addColorStop(0, barColor);
-        gradient.addColorStop(1, barColor + '88');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.roundRect(barX, barY, Math.max(0, fillWidth), barHeight, 4);
-        ctx.fill();
-
-        // Timer bar outline
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(barX, barY, barWidth, barHeight, 4);
-        ctx.stroke();
-
-        // Timer text
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px "Press Start 2P", monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.getTimeString(), barX + barWidth / 2, barY + barHeight / 2 + 1);
+        ctx.font = 'bold 12px "Press Start 2P", monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(Math.ceil(this.timeRemaining).toString() + 's', timerX - 10, timerY + 12);
+        
+        ctx.fillStyle = '#888';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillText('TIMER', timerX - 10, timerY + 32);
 
-        // ── Score Display (top-right) ──
-        const scoreX = canvasWidth - 20;
+        // ── Score Display (to the left of Timer) ──
+        const scoreX = canvasWidth - 160;
         const scoreY = 20;
 
         // Score panel
         ctx.fillStyle = 'rgba(10,15,25,0.75)';
         ctx.beginPath();
-        ctx.roundRect(scoreX - 170, scoreY - 10, 180, 50, 8);
+        ctx.roundRect(scoreX - 170, scoreY - 10, 180, 60, 8);
         ctx.fill();
         ctx.strokeStyle = 'rgba(100,200,255,0.2)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(scoreX - 170, scoreY - 10, 180, 50, 8);
+        ctx.roundRect(scoreX - 170, scoreY - 10, 180, 60, 8);
         ctx.stroke();
 
         // Trash icon
@@ -156,11 +140,14 @@ class HUD {
         ctx.restore();
 
         // Next follower progress
-        const trashToNext = this.nextFollowerAt - (this.score % 10 === 0 && this.score > 0 ? 10 : this.score % 10);
+        const evalTime = Math.ceil(this.evalTimer || 0);
         ctx.fillStyle = '#888';
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.textAlign = 'right';
-        ctx.fillText(`Next helper: ${trashToNext > 10 ? 10 : trashToNext}`, scoreX - 5, scoreY + 30);
+        ctx.fillText(`Next eval: ${evalTime}s`, scoreX - 5, scoreY + 28);
+        
+        ctx.fillStyle = (this.trashInWindow >= 7) ? '#0f8' : (this.trashInWindow >= 5 ? '#ffcc00' : '#f44');
+        ctx.fillText(`Trash: ${this.trashInWindow || 0}/7`, scoreX - 5, scoreY + 40);
 
         // ── Follower Count (top-left) ──
         const fX = 20;
@@ -199,18 +186,18 @@ class HUD {
             ctx.scale(notifScale, notifScale);
 
             // Background
-            ctx.fillStyle = 'rgba(0,50,100,0.85)';
+            ctx.fillStyle = this.followerNotificationPositive ? 'rgba(0,50,100,0.85)' : 'rgba(100,20,20,0.85)';
             const tw = ctx.measureText(this.followerNotification).width + 40;
             ctx.beginPath();
             ctx.roundRect(-tw / 2 - 10, -18, tw + 20, 40, 10);
             ctx.fill();
-            ctx.strokeStyle = '#0af';
+            ctx.strokeStyle = this.followerNotificationPositive ? '#0af' : '#f44';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.roundRect(-tw / 2 - 10, -18, tw + 20, 40, 10);
             ctx.stroke();
 
-            ctx.fillStyle = '#0f8';
+            ctx.fillStyle = this.followerNotificationPositive ? '#0f8' : '#f44';
             ctx.font = 'bold 12px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -236,7 +223,7 @@ class HUD {
 
         // Panel
         const panelW = 400;
-        const panelH = 320;
+        const panelH = 380;
         ctx.fillStyle = 'rgba(10,20,40,0.95)';
         ctx.beginPath();
         ctx.roundRect(centerX - panelW / 2, centerY - panelH / 2, panelW, panelH, 16);
@@ -253,41 +240,64 @@ class HUD {
         ctx.fillStyle = '#ff4444';
         ctx.font = 'bold 24px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText("TIME'S UP!", centerX, centerY - 110);
+        ctx.fillText("TIME'S UP!", centerX, centerY - 140);
 
         // Score
         ctx.fillStyle = '#0f8';
         ctx.font = 'bold 14px "Press Start 2P", monospace';
-        ctx.fillText('TRASH COLLECTED', centerX, centerY - 60);
+        ctx.fillText('FINAL SCORE', centerX, centerY - 100);
 
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 36px "Press Start 2P", monospace';
-        ctx.fillText(this.score.toString(), centerX, centerY - 20);
+        ctx.fillText(this.score.toString(), centerX, centerY - 60);
 
-        // Followers earned
-        ctx.fillStyle = '#68f';
+        if (this.isHighScore) {
+            ctx.fillStyle = '#ffcc00';
+            ctx.font = 'bold 10px "Press Start 2P", monospace';
+            const pulseMsg = Math.sin(performance.now() / 200) * 0.3 + 0.7;
+            ctx.globalAlpha = pulseMsg;
+            ctx.fillText("You Are a Trash Master! New High Score!", centerX, centerY - 30);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Leaderboard
+        if (this.leaderboard && this.leaderboard.length > 0) {
+            ctx.fillStyle = '#88ccff';
+            ctx.font = 'bold 12px "Press Start 2P", monospace';
+            ctx.fillText('TOP 5 SCORES', centerX, centerY + 10);
+            
+            ctx.font = '10px "Press Start 2P", monospace';
+            const numEntries = Math.min(5, this.leaderboard.length);
+            for (let i = 0; i < numEntries; i++) {
+                const entry = this.leaderboard[i];
+                const yPos = centerY + 35 + i * 20;
+                
+                ctx.textAlign = 'left';
+                ctx.fillStyle = (i === 0) ? '#ffcc00' : '#cccccc';
+                ctx.fillText(`${i + 1}. ${entry.sprite}`, centerX - 120, yPos);
+                
+                ctx.textAlign = 'right';
+                ctx.fillText(`${entry.score} pts`, centerX + 120, yPos);
+            }
+        }
+        ctx.textAlign = 'center';
+
+        // Restart button
+        const btnW = 200;
+        const btnH = 40;
+        const btnX = centerX - btnW / 2;
+        const btnY = centerY + 145;
+        
+        const pulse = Math.sin(performance.now() / 300) * 0.1 + 0.9;
+        ctx.fillStyle = `rgba(255, 69, 0, ${pulse})`; // Red-Orange color
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 12px "Press Start 2P", monospace';
-        ctx.fillText(`Crew Members Earned: ${this.followerCount}`, centerX, centerY + 30);
-
-        // Rating
-        let rating = '🌟';
-        let ratingText = 'Beginner';
-        if (this.score >= 100) { rating = '🌟🌟🌟🌟🌟'; ratingText = 'Trash Master!'; }
-        else if (this.score >= 75) { rating = '🌟🌟🌟🌟'; ratingText = 'Expert Cleaner'; }
-        else if (this.score >= 50) { rating = '🌟🌟🌟'; ratingText = 'Great Job!'; }
-        else if (this.score >= 25) { rating = '🌟🌟'; ratingText = 'Good Start'; }
-
-        ctx.fillStyle = '#ffd700';
-        ctx.font = '20px serif';
-        ctx.fillText(rating, centerX, centerY + 70);
-        ctx.fillStyle = '#ccc';
-        ctx.font = 'bold 11px "Press Start 2P", monospace';
-        ctx.fillText(ratingText, centerX, centerY + 95);
-
-        // Restart prompt
-        const pulse = Math.sin(performance.now() / 400) * 0.3 + 0.7;
-        ctx.fillStyle = `rgba(255,255,255,${pulse})`;
-        ctx.font = 'bold 10px "Press Start 2P", monospace';
-        ctx.fillText('Press SPACE or Click to Play Again', centerX, centerY + 135);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('red orange', centerX, btnY + btnH / 2);
     }
 }

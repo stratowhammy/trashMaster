@@ -1,0 +1,95 @@
+/* ============================================================
+   style.css — Trash Master UI & HUD Styles
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0e1a;
+    font-family: 'Press Start 2P', monospace;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#gameCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* Loading screen fallback */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0a0e1a 0%, #1a1a3e 50%, #0a1a2a 100%);
+    z-index: 100;
+    transition: opacity 0.5s ease;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-title {
+    color: #00ff88;
+    font-size: 24px;
+    margin-bottom: 30px;
+    text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+    animation: titlePulse 2s ease-in-out infinite;
+}
+
+@keyframes titlePulse {
+    0%, 100% { text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    50% { text-shadow: 0 0 40px rgba(0, 255, 136, 0.8); }
+}
+
+.loading-bar-container {
+    width: 300px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.loading-bar-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #00ff88, #0088ff);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    animation: barShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes barShimmer {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
+
+/* Cursor styles */
+#gameCanvas:hover {
+    cursor: crosshair;
+}
+
+.char-select #gameCanvas:hover {
+    cursor: pointer;
+}

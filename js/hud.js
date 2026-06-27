@@ -6,6 +6,7 @@ class HUD {
     constructor() {
         this.gameDuration = 90;  // 90 seconds in seconds
         this.timeRemaining = this.gameDuration;
+        this.timerSpeed = 1.0;
         this.score = 0;
         this.followerCount = 0;
         this.nextFollowerAt = 10;
@@ -21,6 +22,7 @@ class HUD {
 
     reset() {
         this.timeRemaining = this.gameDuration;
+        this.timerSpeed = 1.0;
         this.score = 0;
         this.followerCount = 0;
         this.nextFollowerAt = 10;
@@ -53,7 +55,7 @@ class HUD {
     }
 
     update(deltaTime) {
-        this.timeRemaining -= deltaTime;
+        this.timeRemaining -= deltaTime * this.timerSpeed;
         if (this.timeRemaining < 0) this.timeRemaining = 0;
 
         // Animate score pop
@@ -136,7 +138,7 @@ class HUD {
         ctx.fillStyle = this.scorePop > 0 ? '#00ff88' : '#fff';
         ctx.font = 'bold 16px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(this.score.toString(), 0, 0);
+        ctx.fillText('$' + this.score.toString(), 0, 0);
         ctx.restore();
 
         // Next follower progress
@@ -240,56 +242,31 @@ class HUD {
         ctx.fillStyle = '#ff4444';
         ctx.font = 'bold 24px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText("TIME'S UP!", centerX, centerY - 140);
+        ctx.fillText("TIME'S UP!", centerX, centerY - 80);
 
         // Score
         ctx.fillStyle = '#0f8';
         ctx.font = 'bold 14px "Press Start 2P", monospace';
-        ctx.fillText('FINAL SCORE', centerX, centerY - 100);
+        ctx.fillText('TOTAL EARNED', centerX, centerY - 40);
 
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 36px "Press Start 2P", monospace';
-        ctx.fillText(this.score.toString(), centerX, centerY - 60);
+        ctx.fillText('$' + this.score.toString(), centerX, centerY + 10);
 
-        if (this.isHighScore) {
-            ctx.fillStyle = '#ffcc00';
+        if (window.game.totalEmployeeCost > 0) {
+            ctx.fillStyle = '#ff4444';
             ctx.font = 'bold 10px "Press Start 2P", monospace';
-            const pulseMsg = Math.sin(performance.now() / 200) * 0.3 + 0.7;
-            ctx.globalAlpha = pulseMsg;
-            ctx.fillText("You Are a Trash Master! New High Score!", centerX, centerY - 30);
-            ctx.globalAlpha = 1.0;
+            ctx.fillText(`Wages Deducted: $${window.game.totalEmployeeCost}`, centerX, centerY + 40);
         }
 
-        // Leaderboard
-        if (this.leaderboard && this.leaderboard.length > 0) {
-            ctx.fillStyle = '#88ccff';
-            ctx.font = 'bold 12px "Press Start 2P", monospace';
-            ctx.fillText('TOP 5 SCORES', centerX, centerY + 10);
-            
-            ctx.font = '10px "Press Start 2P", monospace';
-            const numEntries = Math.min(5, this.leaderboard.length);
-            for (let i = 0; i < numEntries; i++) {
-                const entry = this.leaderboard[i];
-                const yPos = centerY + 35 + i * 20;
-                
-                ctx.textAlign = 'left';
-                ctx.fillStyle = (i === 0) ? '#ffcc00' : '#cccccc';
-                ctx.fillText(`${i + 1}. ${entry.sprite}`, centerX - 120, yPos);
-                
-                ctx.textAlign = 'right';
-                ctx.fillText(`${entry.score} pts`, centerX + 120, yPos);
-            }
-        }
-        ctx.textAlign = 'center';
-
-        // Restart button
+        // Return button
         const btnW = 200;
         const btnH = 40;
         const btnX = centerX - btnW / 2;
         const btnY = centerY + 145;
         
         const pulse = Math.sin(performance.now() / 300) * 0.1 + 0.9;
-        ctx.fillStyle = `rgba(255, 69, 0, ${pulse})`; // Red-Orange color
+        ctx.fillStyle = `rgba(0, 136, 255, ${pulse})`; // Blue store button
         ctx.beginPath();
         ctx.roundRect(btnX, btnY, btnW, btnH, 8);
         ctx.fill();
@@ -298,6 +275,6 @@ class HUD {
         ctx.font = 'bold 12px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('red orange', centerX, btnY + btnH / 2);
+        ctx.fillText('Return to Store', centerX, btnY + btnH / 2);
     }
 }

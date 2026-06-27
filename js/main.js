@@ -7,6 +7,7 @@ const GameState = {
     CHARACTER_SELECT: 'character_select',
     PLAYING: 'playing',
     GAME_OVER: 'game_over',
+    UI_OVERLAY: 'ui_overlay', // when looking at store
 };
 
 class Game {
@@ -78,6 +79,11 @@ class Game {
                     this.pickupTrash();
                 }
 
+                // Hotkeys for Consumables
+                if (e.key === '1') this.useConsumable('Borrowed Time');
+                if (e.key === '2') this.useConsumable('Mushrooms');
+                if (e.key === '3') this.useConsumable('Wings');
+
                 // Prevent scrolling with arrow keys
                 if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
                     e.preventDefault();
@@ -112,7 +118,19 @@ class Game {
             if (this.state === GameState.CHARACTER_SELECT) {
                 this._handleCharSelect(e);
             } else if (this.state === GameState.GAME_OVER) {
-                this._restartGame();
+                // Return to store handled in render button click
+                const rect = this.canvas.getBoundingClientRect();
+                const clickX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+                const clickY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                const btnW = 200;
+                const btnH = 40;
+                const btnX = centerX - btnW / 2;
+                const btnY = centerY + 145;
+                if (clickX >= btnX && clickX <= btnX + btnW && clickY >= btnY && clickY <= btnY + btnH) {
+                    this._endRoundAndReturnToStore();
+                }
             }
         });
     }
@@ -159,8 +177,63 @@ class Game {
         }
     }
 
+    async useConsumable(itemName) {
+        if (!window.playerInventory || !window.playerInventory[itemName] || window.playerInventory[itemName] <= 0) {
+            this.hud.showFollowerNotification(`No ${itemName} in inventory!`, false);
+            return;
+        }
+        
+        try {
+            await window.apiCall('/api/game/consume', 'POST', { item_name: itemName });
+            window.playerInventory[itemName] -= 1;
+            
+            if (itemName === 'Borrowed Time') {
+                this.hud.timeRemaining += 20;
+                this.hud.showFollowerNotification('+20s Timer Added!', true);
+            } else if (itemName === 'Mushrooms') {
+                this.hud.timerSpeed = 0.5;
+                this.mushroomTimer = 20;
+                this.hud.showFollowerNotification('Timer Slowed!', true);
+            } else if (itemName === 'Wings') {
+                if (this.player) this.player.speedMultiplier = 1.5;
+                this.wingsTimer = 15;
+                this.hud.showFollowerNotification('Super Speed!', true);
+            }
+        } catch (e) {
+            console.error("Consume error:", e);
+        }
+    }
+
     _update(dt) {
         if (this.state !== GameState.PLAYING) return;
+
+        // Consumable timers
+        if (this.mushroomTimer > 0) {
+            this.mushroomTimer -= dt;
+            if (this.mushroomTimer <= 0) {
+                this.hud.timerSpeed = 1.0;
+                this.mushroomTimer = 0;
+            }
+        }
+        if (this.wingsTimer > 0) {
+            this.wingsTimer -= dt;
+            if (this.wingsTimer <= 0) {
+                if (this.player) this.player.speedMultiplier = 1.0;
+                this.wingsTimer = 0;
+            }
+        }
+
+        // Employee upkeep timer ($200 every 15s per hired employee, excluding Bruno)
+        this.employeeUpkeepTimer += dt;
+        if (this.employeeUpkeepTimer >= 15) {
+            this.employeeUpkeepTimer -= 15;
+            const hired = window.employeesHired || 0;
+            if (hired > 0) {
+                const cost = hired * 200;
+                this.totalEmployeeCost += cost;
+                this.hud.showFollowerNotification(`-$${cost} for wages`, false);
+            }
+        }
 
         // Update timer
         this.hud.update(dt);
@@ -168,7 +241,6 @@ class Game {
         this.hud.trashInWindow = this.trashCollectedInWindow;
 
         if (this.hud.isTimeUp()) {
-            this._saveScore();
             this.state = GameState.GAME_OVER;
             return;
         }
@@ -197,6 +269,7 @@ class Game {
         this.followerCheckTimer += dt;
         if (this.followerCheckTimer >= 10) {
             this.followerCheckTimer -= 10;
+            const baseFollowers = (window.playerHasTruck ? 2 : 0) + (window.employeesHired || 0);
             if (this.trashCollectedInWindow >= 7) {
                 // Add follower
                 const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
@@ -204,7 +277,7 @@ class Game {
                 this.hud.showFollowerNotification(charConfig ? charConfig.name : 'New Helper', true);
             } else if (this.trashCollectedInWindow < 5) {
                 // Lose follower
-                if (this.followerManager.getFollowerCount() > 0) {
+                if (this.followerManager.getFollowerCount() > baseFollowers) {
                     this.followerManager.removeFollower();
                     this.hud.showFollowerNotification('A helper left the crew!', false);
                 }
@@ -458,13 +531,38 @@ class Game {
         this.player = new Player(spawnX, spawnY, spriteId);
         this.followerManager = new FollowerManager();
         this.followerManager.initialize(spriteId);
+        
+        // Add Truck base followers + Hired employees
+        const baseFollowers = (window.playerHasTruck ? 2 : 0) + (window.employeesHired || 0);
+        for(let i=0; i<baseFollowers; i++) {
+            this.followerManager.addFollower(this.player.x, this.player.y);
+        }
+
         this.trashManager = new TrashManager();
-        this.trashManager.spawnInitial(this.gameMap, 120);
+        let initialTrash = 120;
+        
+        // Check Filthadelphia
+        if (window.playerInventory && window.playerInventory['Filthadelphia'] > 0) {
+            initialTrash *= 2;
+            window.apiCall('/api/game/consume', 'POST', { item_name: 'Filthadelphia' }).then(() => {
+                window.playerInventory['Filthadelphia'] -= 1;
+                console.log("Consumed Filthadelphia!");
+            }).catch(e => console.error(e));
+        }
+        
+        this.trashManager.spawnInitial(this.gameMap, initialTrash);
+        
         this.hud.reset();
+        this.hud.followerCount = this.followerManager.getFollowerCount();
         this.followerCheckTimer = 0;
+        this.employeeUpkeepTimer = 0;
+        this.totalEmployeeCost = 0;
         this.trashCollectedInWindow = 0;
         this.playerNearTrash = false;
-        this.scoreSaved = false;
+        
+        this.mushroomTimer = 0;
+        this.wingsTimer = 0;
+        if (this.player) this.player.speedMultiplier = 1.0;
 
         // Snap camera to player
         this.camera.snapTo(this.player.x, this.player.y);
@@ -473,30 +571,20 @@ class Game {
         console.log('Game state set to PLAYING. Player:', this.player);
     }
 
-    _saveScore() {
-        if (this.scoreSaved) return;
-        this.scoreSaved = true;
-
-        const charConfig = SPRITE_CONFIG.characters.find(c => c.id === this.player.spriteId);
-        const spriteName = charConfig ? charConfig.name : 'Unknown';
+    async _endRoundAndReturnToStore() {
+        if (!window.apiCall) return; // Not logged in
         
-        let scores = JSON.parse(localStorage.getItem('trashMasterScores') || '[]');
-        const newScore = {
-            score: this.trashManager.totalPoints,
-            sprite: spriteName,
-            date: new Date().toISOString()
-        };
-        
-        // Check if high score
-        const isHighScore = scores.length === 0 || newScore.score > scores[0].score;
-        this.hud.isHighScore = isHighScore;
-
-        scores.push(newScore);
-        scores.sort((a, b) => b.score - a.score);
-        scores = scores.slice(0, 10); // Keep top 10
-        
-        localStorage.setItem('trashMasterScores', JSON.stringify(scores));
-        this.hud.leaderboard = scores;
+        const earned = this.trashManager.totalPoints;
+        try {
+            await window.apiCall('/api/game/end-round', 'POST', { earned, employee_cost: this.totalEmployeeCost });
+            window.employeesHired = 0;
+            await window.refreshGameState();
+            window.renderStore();
+            window.showScreen('store-screen');
+            this.state = GameState.UI_OVERLAY;
+        } catch(e) {
+            console.error("End round sync failed:", e);
+        }
     }
 
     _restartGame() {
@@ -574,4 +662,12 @@ window.addEventListener('DOMContentLoaded', () => {
     // Make canvas focusable
     canvas.setAttribute('tabindex', '0');
     window.game = new Game(canvas);
+    
+    // Expose start game function to api.js UI logic
+    window.startGameFromStore = () => {
+        window.game.state = GameState.CHARACTER_SELECT;
+        if (!window.game.gameMap) {
+            window.game._restartGame();
+        }
+    };
 });

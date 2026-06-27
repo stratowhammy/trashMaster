@@ -8,9 +8,52 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <canvas id="gameCanvas" tabindex="0"></canvas>
+    <div id="ui-layer">
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen">
+            <h1>Trash Master</h1>
+            <div class="panel">
+                <h2>Login</h2>
+                <input type="text" id="login-username" placeholder="Username">
+                <input type="password" id="login-password" placeholder="Password">
+                <button id="btn-login" class="btn">Login</button>
+                <p id="login-error" class="error"></p>
+            </div>
+        </div>
+
+        <!-- Admin Screen -->
+        <div id="admin-screen" class="screen hidden">
+            <h1>Admin Dashboard</h1>
+            <div class="panel admin-panel">
+                <h2>Generate Accounts</h2>
+                <input type="number" id="admin-count" value="1" min="1" max="50">
+                <button id="btn-generate" class="btn">Generate</button>
+                <div id="generated-accounts" class="account-list"></div>
+                <button id="btn-admin-logout" class="btn secondary">Logout</button>
+            </div>
+        </div>
+
+        <!-- Store Screen -->
+        <div id="store-screen" class="screen hidden">
+            <h1>Trash Master Store</h1>
+            <div class="store-layout">
+                <div class="store-sidebar">
+                    <h2 id="store-balance">$0</h2>
+                    <div id="store-inventory"></div>
+                    <button id="btn-start-game" class="btn play-btn">Play Game</button>
+                    <button id="btn-store-logout" class="btn secondary">Logout</button>
+                </div>
+                <div class="store-items">
+                    <!-- Items populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" tabindex="0" class="hidden"></canvas>
 
     <!-- Game scripts loaded in dependency order -->
+    <script src="js/api.js"></script>
     <script src="js/map.js"></script>
     <script src="js/camera.js"></script>
     <script src="js/sprites.js"></script>

@@ -122,9 +122,9 @@ class NPCManager {
         const positions = sidewalks.slice(0, 10);
         const informantIndices = new Set();
 
-        if (frenzyMode && buildings && buildings.length >= 2) {
-            // Pick 2 random NPCs to be informants
-            while (informantIndices.size < 2) {
+        if (frenzyMode && buildings && buildings.length >= 5) {
+            // Pick 5 random NPCs to be informants
+            while (informantIndices.size < 5) {
                 informantIndices.add(Math.floor(Math.random() * Math.min(10, positions.length)));
             }
         }

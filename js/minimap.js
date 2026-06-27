@@ -44,7 +44,7 @@ class MiniMap {
         this.staticDirty = false;
     }
 
-    render(ctx, canvasWidth, canvasHeight, camera, player, followers, trashItems) {
+    render(ctx, canvasWidth, canvasHeight, camera, player, followers, trashItems, gameMap) {
         const s = this.pixelPerTile;
         const mapX = this.padding;
         const mapY = canvasHeight - this.height - this.padding;
@@ -76,6 +76,22 @@ class MiniMap {
         // Draw static map
         if (this.staticDirty) return;
         ctx.drawImage(this.staticCanvas, mapX, mapY);
+
+        // Highlight open frenzy buildings
+        if (gameMap && gameMap.openDoors) {
+            const pulse = Math.sin(performance.now() / 150) * 0.4 + 0.6;
+            ctx.fillStyle = `rgba(255, 68, 0, ${pulse})`;
+            for (const bldgId of gameMap.openDoors) {
+                const bldg = gameMap.buildings.find(b => b.id === bldgId);
+                if (bldg) {
+                    for (const tile of bldg.tiles) {
+                        const tx = mapX + tile.x * s;
+                        const ty = mapY + tile.y * s;
+                        ctx.fillRect(tx, ty, s, s);
+                    }
+                }
+            }
+        }
 
         // Draw trash as tiny dots
         if (trashItems) {

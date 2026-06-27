@@ -630,7 +630,7 @@ class Game {
         }
 
         this.trashManager = new TrashManager();
-        let initialTrash = 120;
+        let initialTrash = 150; // Spawn 25% more trash (was 120)
         
         // Check Filthadelphia
         if (window.playerInventory && window.playerInventory['Filthadelphia'] > 0) {
@@ -754,7 +754,7 @@ class Game {
         }
 
         // Render mini-map
-        this.miniMap.render(ctx, w, h, this.camera, this.player, this.followerManager, this.trashManager.items);
+        this.miniMap.render(ctx, w, h, this.camera, this.player, this.followerManager, this.trashManager.items, this.gameMap);
 
         // Debug overlay: show player position and key state
         if (this.player) {

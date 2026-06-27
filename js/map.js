@@ -118,7 +118,6 @@ class GameMap {
             buildingIndex++;
         }
         this._createParks();
-        this._placeDoors();
     }
 
     _getBlockRanges(hRoads, vRoads) {
@@ -173,16 +172,6 @@ class GameMap {
                     this.tiles[y][midX] !== TileType.ROAD && this.tiles[y][midX] !== TileType.SIDEWALK)
                     this.tiles[y][midX] = TileType.PARK_PATH;
         }
-    }
-
-    _placeDoors() {
-        for (let y = 1; y < MAP_HEIGHT - 1; y++)
-            for (let x = 1; x < MAP_WIDTH - 1; x++)
-                if (this.tiles[y][x] === TileType.BUILDING) {
-                    const adj = this.tiles[y-1][x]===TileType.SIDEWALK||this.tiles[y+1][x]===TileType.SIDEWALK||
-                                this.tiles[y][x-1]===TileType.SIDEWALK||this.tiles[y][x+1]===TileType.SIDEWALK;
-                    if (adj && Math.random() < 0.03) this.tiles[y][x] = TileType.BUILDING_DOOR;
-                }
     }
 
     // ── Wrapping tile access ──
@@ -374,7 +363,6 @@ class GameMap {
 
                 // Flood fill this building cluster
                 const tiles = [];
-                const doorTiles = [];
                 const stack = [{ x, y }];
                 while (stack.length > 0) {
                     const p = stack.pop();
@@ -384,7 +372,6 @@ class GameMap {
                     if (t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR) continue;
                     visited[p.y][p.x] = true;
                     tiles.push({ x: p.x, y: p.y });
-                    if (t === TileType.BUILDING_DOOR) doorTiles.push({ x: p.x, y: p.y });
                     stack.push({ x: p.x + 1, y: p.y });
                     stack.push({ x: p.x - 1, y: p.y });
                     stack.push({ x: p.x, y: p.y + 1 });
@@ -394,11 +381,44 @@ class GameMap {
                 if (tiles.length > 0) {
                     const letter = letters[letterIdx % letters.length];
                     const address = letter + numCounter;
+                    
+                    // Find a sidewalk-adjacent building tile to serve as the door
+                    let doorTile = null;
+                    for (const tile of tiles) {
+                        const neighbors = [
+                            { x: tile.x + 1, y: tile.y },
+                            { x: tile.x - 1, y: tile.y },
+                            { x: tile.x, y: tile.y + 1 },
+                            { x: tile.x, y: tile.y - 1 }
+                        ];
+                        let isAdjToSidewalk = false;
+                        for (const n of neighbors) {
+                            const nwx = wrapTileX(n.x);
+                            const nwy = wrapTileY(n.y);
+                            if (this.tiles[nwy][nwx] === TileType.SIDEWALK) {
+                                isAdjToSidewalk = true;
+                                break;
+                            }
+                        }
+                        if (isAdjToSidewalk) {
+                            doorTile = tile;
+                            break;
+                        }
+                    }
+
+                    // Fallback
+                    if (!doorTile) {
+                        doorTile = tiles[0];
+                    }
+
+                    // Convert this tile on the map to be the building door
+                    this.tiles[doorTile.y][doorTile.x] = TileType.BUILDING_DOOR;
+
                     this.buildings.push({
                         id: this.buildings.length,
                         address,
                         tiles,
-                        doorTiles
+                        doorTiles: [doorTile]
                     });
                     numCounter += Math.floor(Math.random() * 20) + 10;
                     if (numCounter > 999) { numCounter = 100; letterIdx++; }

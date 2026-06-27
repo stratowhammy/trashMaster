@@ -88,11 +88,13 @@ class MiniMap {
             }
         }
 
-        // Draw viewport rectangle
+        // Draw viewport rectangle (use wrapped coordinates)
         ctx.strokeStyle = 'rgba(255,255,255,0.6)';
         ctx.lineWidth = 1;
-        const vx = mapX + (camera.x / MAP_PIXEL_W) * this.width;
-        const vy = mapY + (camera.y / MAP_PIXEL_H) * this.height;
+        const wrappedCamX = ((camera.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+        const wrappedCamY = ((camera.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
+        const vx = mapX + (wrappedCamX / MAP_PIXEL_W) * this.width;
+        const vy = mapY + (wrappedCamY / MAP_PIXEL_H) * this.height;
         const vw = (camera.width / MAP_PIXEL_W) * this.width;
         const vh = (camera.height / MAP_PIXEL_H) * this.height;
         ctx.strokeRect(vx, vy, vw, vh);
@@ -109,9 +111,11 @@ class MiniMap {
             }
         }
 
-        // Draw player as bright green dot
-        const px = mapX + (player.x / MAP_PIXEL_W) * this.width;
-        const py = mapY + (player.y / MAP_PIXEL_H) * this.height;
+        // Draw player as bright green dot (use wrapped coordinates for infinite map)
+        const wrappedPx = player.getWrappedX ? player.getWrappedX() : player.x;
+        const wrappedPy = player.getWrappedY ? player.getWrappedY() : player.y;
+        const px = mapX + (wrappedPx / MAP_PIXEL_W) * this.width;
+        const py = mapY + (wrappedPy / MAP_PIXEL_H) * this.height;
 
         // Pulsing glow
         const pulse = Math.sin(performance.now() / 300) * 0.3 + 0.7;

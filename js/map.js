@@ -12,7 +12,7 @@ const TileType = {
     PARK_PATH: 6,
 };
 
-const TILE_SIZE = 32;
+const TILE_SIZE = 64;
 const MAP_WIDTH = 64;
 const MAP_HEIGHT = 64;
 const MAP_PIXEL_W = MAP_WIDTH * TILE_SIZE;

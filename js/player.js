@@ -8,10 +8,11 @@ class Player {
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
         if (window.playerHasTruck) {
             this.spriteId = 'char_truck';
+            this.speed = 8;
         } else {
             this.spriteId = spriteId;
+            this.speed = 4;
         }
-        this.speed = 4;
         this.size = TILE_SIZE - 4;
         this.direction = 'down';
         this.moving = false;

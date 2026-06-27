@@ -319,12 +319,31 @@ class GameMap {
                     ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
                     break;
                 }
-                const ci2=this.buildingMeta[ty][tx]; const c2=BUILDING_COLORS[ci2>=0?ci2:0];
-                ctx.fillStyle=c2.base;ctx.fillRect(sx,sy,s,s);
-                ctx.fillStyle=TILE_COLORS[TileType.BUILDING_DOOR];ctx.fillRect(sx+8,sy+6,16,20);
-                ctx.strokeStyle='#5a4530';ctx.lineWidth=1;ctx.strokeRect(sx+8,sy+6,16,20);
-                ctx.fillStyle='#ffd700';ctx.fillRect(sx+20,sy+16,2,2);
-                ctx.fillStyle='#ff4444';ctx.fillRect(sx+14,sy+2,4,3);
+                const isOpen = bldg2 && this.openDoors.has(bldg2.id);
+                if (isOpen) {
+                    // Open door - black doorway with golden glowing frame
+                    ctx.fillStyle = '#111111';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#ffaa00';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
+                } else {
+                    // Closed door - fills the whole tile
+                    ctx.fillStyle = TILE_COLORS[TileType.BUILDING_DOOR];
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#5a4530';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+                    
+                    // Golden doorknob
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(sx + s - 16, sy + s / 2, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#b59300';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
                 break; }
             case TileType.CROSSWALK:
                 ctx.fillStyle=TILE_COLORS[TileType.ROAD];ctx.fillRect(sx,sy,s,s);

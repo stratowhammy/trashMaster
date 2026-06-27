@@ -75,7 +75,7 @@ class Player {
     }
 
     _canMoveTo(newX, newY, gameMap) {
-        const hs = this.size / 2 - 2;
+        const hs = this.size / 2 - 12; // Inset collision bounds by 12px for smooth door/corridor entry
         const corners = [
             { x: newX - hs, y: newY - hs }, { x: newX + hs, y: newY - hs },
             { x: newX - hs, y: newY + hs }, { x: newX + hs, y: newY + hs },

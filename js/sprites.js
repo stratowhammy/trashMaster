@@ -17,6 +17,9 @@ const SPRITE_CONFIG = {
         { id: 'trash3', name: 'Plastic Bag', src: 'assets/sprites/trash3.jpg' },
         { id: 'trash4', name: 'Banana Peel', src: 'assets/sprites/trash4.jpg' },
     ],
+    other: [
+        { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.jpg', color: '#00aa55' }
+    ]
 };
 
 class SpriteManager {
@@ -32,6 +35,7 @@ class SpriteManager {
             const allSprites = [
                 ...SPRITE_CONFIG.characters,
                 ...SPRITE_CONFIG.trash,
+                ...(SPRITE_CONFIG.other || []),
             ];
 
             this.totalToLoad = allSprites.length;

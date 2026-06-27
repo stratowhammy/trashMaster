@@ -6,7 +6,11 @@ class Player {
     constructor(tileX, tileY, spriteId) {
         this.x = tileX * TILE_SIZE + TILE_SIZE / 2;
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
-        this.spriteId = spriteId;
+        if (window.playerHasTruck) {
+            this.spriteId = 'char_truck';
+        } else {
+            this.spriteId = spriteId;
+        }
         this.speed = 4;
         this.size = TILE_SIZE - 4;
         this.direction = 'down';

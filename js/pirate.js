@@ -110,58 +110,60 @@ class PirateManager {
         }
     }
 
-    update(dt) {
+    update(dt, game) {
         for (const pirate of this.pirates) {
             pirate.update(dt);
         }
-    }
 
-    hasArrivedPirates() {
-        if (this.combatTriggered) return false;
-        return this.pirates.some(p => p.alive && p.arrived);
-    }
+        if (!game) return;
 
-    // posseCount: total posse size
-    // protectionBonus: percentage points from Protection items
-    // Returns combat result object
-    runCombat(posseCount, protectionBonus) {
-        if (this.combatTriggered) return null;
-        this.combatTriggered = true;
+        // Check if any pirate arrived at the door and we have posse members
+        const arrivedPirates = this.pirates.filter(p => p.alive && p.arrived);
+        const posseCount = game.followerManager.getFollowerCount();
 
-        let baseWinChance = 0.5;
-
-        // Extra posse members increase win chance
-        if (posseCount > 6) {
-            baseWinChance += (posseCount - 6) * 0.10;
-        }
-
-        // Protection stacking
-        baseWinChance += (protectionBonus || 0) / 100;
-
-        // Cap at 95%
-        if (baseWinChance > 0.95) baseWinChance = 0.95;
-
-        const fights = [];
-        let piratesKilled = 0;
-        let posseKilled = 0;
-
-        const alivePirates = this.pirates.filter(p => p.alive && p.arrived);
-
-        for (let i = 0; i < alivePirates.length; i++) {
-            const roll = Math.random();
-            const posseWon = roll < baseWinChance;
-            if (posseWon) {
-                alivePirates[i].alive = false;
-                piratesKilled++;
+        if (arrivedPirates.length > 0 && posseCount > 0) {
+            const totalPosse = posseCount + 1; // player counts as a posse member
+            let baseWinChance = 0.5;
+            if (totalPosse < 6) {
+                baseWinChance -= (6 - totalPosse) * 0.05;
             } else {
-                posseKilled++;
+                baseWinChance += (totalPosse - 6) * 0.10;
             }
-            fights.push({ pirateIndex: i, posseWon, roll, winChance: baseWinChance });
-        }
+            baseWinChance += (game.protectionBonus || 0) / 100;
+            
+            // Clamp win chance
+            if (baseWinChance > 0.95) baseWinChance = 0.95;
+            if (baseWinChance < 0.05) baseWinChance = 0.05;
 
-        this.combatResults = { piratesKilled, posseKilled, fights, winChance: baseWinChance };
-        this.combatDisplayTimer = 300; // ~5 seconds to show results
-        return this.combatResults;
+            let piratesKilled = 0;
+            let posseKilled = 0;
+
+            for (const pirate of arrivedPirates) {
+                if (game.followerManager.getFollowerCount() === 0) break;
+
+                const roll = Math.random();
+                const posseWon = roll < baseWinChance;
+
+                if (posseWon) {
+                    pirate.alive = false;
+                    piratesKilled++;
+                } else {
+                    posseKilled++;
+                    game.followerManager.removeFollower();
+                }
+            }
+
+            if (piratesKilled > 0 || posseKilled > 0) {
+                this.combatResults = {
+                    piratesKilled,
+                    posseKilled,
+                    winChance: baseWinChance
+                };
+                this.combatDisplayTimer = 180; // 3 seconds overlay
+                game.employeesKilledThisRound += posseKilled;
+                game.hud.followerCount = game.followerManager.getFollowerCount();
+            }
+        }
     }
 
     allDead() {

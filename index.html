@@ -55,6 +55,18 @@
                 </div>
             </div>
         </div>
+
+        <!-- Pirate Defeat Screen -->
+        <div id="pirate-defeat-screen" class="screen hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #1a0505;">
+            <h1 style="color: #ff3333; text-shadow: 0 0 10px rgba(255, 0, 0, 0.7); font-family: 'Press Start 2P', monospace; font-size: 20px; margin-bottom: 20px; text-align: center;">WASTED BY PIRATES</h1>
+            <div class="defeat-container" style="display: flex; flex-direction: column; align-items: center; gap: 20px; background: rgba(0,0,0,0.6); padding: 25px; border: 3px solid #ff3333; border-radius: 8px;">
+                <div id="defeat-art-container" style="width: 256px; height: 128px; border: 4px solid #ff3333; background: #000; image-rendering: pixelated;">
+                    <canvas id="defeatArtCanvas" width="256" height="128" style="width: 256px; height: 128px; image-rendering: pixelated; display: block;"></canvas>
+                </div>
+                <p id="defeat-message" style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ff8888; text-align: center; max-width: 320px; line-height: 1.8; margin: 10px 0;"></p>
+                <button id="btn-defeat-return" class="btn play-btn" style="background: #ff3333; border: 2px solid #990000; box-shadow: 0 4px #660000; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Return to Store</button>
+            </div>
+        </div>
     </div>
 
     <canvas id="gameCanvas" tabindex="0" class="hidden"></canvas>

@@ -275,21 +275,46 @@ class Game {
         // Frenzy Mode updates
         if (window.frenzyMode) {
             this.npcManager.update();
-            this.pirateManager.update(dt);
+            this.pirateManager.update(dt, this);
 
             // Trigger NPC interaction checks
             this.npcManager.checkInteraction(this.player.x, this.player.y);
 
-            // Handle pirate combat if they arrive at the building entrance
-            if (this.pirateManager.hasArrivedPirates()) {
-                const result = this.pirateManager.runCombat(this.followerManager.getFollowerCount(), this.protectionBonus);
-                if (result) {
-                    // Remove killed posse members from follower manager
-                    for (let i = 0; i < result.posseKilled; i++) {
-                        this.followerManager.removeFollower();
+            // Check if player intersects with any alive pirate
+            if (this.player) {
+                for (const pirate of this.pirateManager.pirates) {
+                    if (pirate.alive) {
+                        const dx = this.player.x - pirate.x;
+                        const dy = this.player.y - pirate.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < TILE_SIZE * 0.6) {
+                            // Player fights the pirate!
+                            const posseCount = this.followerManager.getFollowerCount();
+                            const totalPosse = posseCount + 1; // player counts as a posse member
+                            let winChance = 0.5;
+                            if (totalPosse < 6) {
+                                winChance -= (6 - totalPosse) * 0.05;
+                            } else {
+                                winChance += (totalPosse - 6) * 0.10;
+                            }
+                            winChance += (this.protectionBonus || 0) / 100;
+                            
+                            // Clamp win chance
+                            if (winChance > 0.95) winChance = 0.95;
+                            if (winChance < 0.05) winChance = 0.05;
+
+                            const roll = Math.random();
+                            const playerWon = roll < winChance;
+
+                            if (playerWon) {
+                                pirate.alive = false;
+                                this.hud.showFollowerNotification('Defeated pirate!', true);
+                            } else {
+                                this._triggerPlayerDefeat();
+                                return;
+                            }
+                        }
                     }
-                    this.employeesKilledThisRound += result.posseKilled;
-                    this.hud.followerCount = this.followerManager.getFollowerCount();
                 }
             }
         }
@@ -761,6 +786,100 @@ class Game {
             ctx.fillText(`Tile: (${this.player.getTileX()}, ${this.player.getTileY()})`, w - 270, h - 48);
             ctx.fillText(`Keys: U:${k.up} D:${k.down} L:${k.left} R:${k.right}`, w - 270, h - 34);
             ctx.fillText(`Arrows to move, Q to pickup`, w - 270, h - 20);
+        }
+    }
+
+    async _triggerPlayerDefeat() {
+        this.state = GameState.UI_OVERLAY;
+        if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
+
+        const hadTruck = !!window.playerHasTruck;
+        const msgEl = document.getElementById('defeat-message');
+        if (msgEl) {
+            if (hadTruck) {
+                msgEl.innerText = "The pirates defeated you and drove off with Bruno the Trash Truck! All earnings this round were lost.";
+            } else {
+                msgEl.innerText = "The pirates defeated you! All earnings this round were lost.";
+            }
+        }
+
+        // Hide game canvas and show defeat screen
+        this.canvas.classList.add('hidden');
+        const screenEl = document.getElementById('pirate-defeat-screen');
+        if (screenEl) screenEl.classList.remove('hidden');
+
+        // Draw pixel art to defeat canvas
+        const artCanvas = document.getElementById('defeatArtCanvas');
+        if (artCanvas) {
+            const ctx = artCanvas.getContext('2d');
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 256, 128);
+
+            // Ground
+            ctx.fillStyle = '#222222';
+            ctx.fillRect(0, 96, 256, 32);
+
+            const pirateImg = this.spriteManager.getCharacterImage('char_pirate');
+            const truckImg = this.spriteManager.getCharacterImage('char_truck');
+
+            if (hadTruck && truckImg && pirateImg) {
+                // Draw road lines
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0, 108); ctx.lineTo(256, 108); ctx.stroke();
+
+                // Draw trash truck driving away
+                ctx.drawImage(truckImg, 96, 36, 64, 64);
+                
+                // Draw pirate driving
+                ctx.drawImage(pirateImg, 112, 24, 32, 32);
+                // Draw another pirate waving from the back
+                ctx.drawImage(pirateImg, 140, 28, 32, 32);
+            } else {
+                // Draw ground red blob for shapeless body
+                ctx.fillStyle = '#aa2222';
+                ctx.fillRect(96, 90, 48, 10);
+                ctx.fillStyle = '#666666';
+                ctx.fillRect(104, 84, 16, 6);
+                ctx.fillRect(124, 86, 10, 4);
+
+                if (pirateImg) {
+                    // Two pirates standing triumphantly over body
+                    ctx.drawImage(pirateImg, 90, 52, 32, 32);
+                    ctx.drawImage(pirateImg, 120, 52, 32, 32);
+                }
+            }
+        }
+
+        // Setup the return button listener
+        const btnReturn = document.getElementById('btn-defeat-return');
+        if (btnReturn) {
+            // Remove previous listeners by replacing the button clone
+            const newBtn = btnReturn.cloneNode(true);
+            btnReturn.parentNode.replaceChild(newBtn, btnReturn);
+
+            newBtn.addEventListener('click', async () => {
+                if (window.apiCall) {
+                    try {
+                        await window.apiCall('/api/game/end-round', 'POST', {
+                            earned: 0,
+                            employee_cost: this.totalEmployeeCost,
+                            employees_killed: this.employeesKilledThisRound,
+                            lose_truck: hadTruck
+                        });
+                        window.employeesHired = 0;
+                        await window.refreshGameState();
+                        window.renderStore();
+                        
+                        // Hide defeat screen, show store screen
+                        if (screenEl) screenEl.classList.add('hidden');
+                        window.showScreen('store-screen');
+                        this._restartGame();
+                    } catch (e) {
+                        console.error("Return from defeat error:", e);
+                    }
+                }
+            });
         }
     }
 }

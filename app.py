@@ -244,6 +244,7 @@ def end_round():
     earned = int(request.json.get('earned', 0))
     employee_cost = int(request.json.get('employee_cost', 0))
     employees_killed = int(request.json.get('employees_killed', 0))
+    lose_truck = bool(request.json.get('lose_truck', False))
     
     db = get_db()
     cursor = db.cursor()
@@ -258,7 +259,10 @@ def end_round():
     adjusted_employee_cost = int(employee_cost * penalty)
     new_balance = user['balance'] + earned - adjusted_employee_cost
     
-    if user['has_truck']:
+    # If defeated, lose truck
+    if lose_truck:
+        db.execute("UPDATE users SET has_truck = 0 WHERE id=?", (user_data['user_id'],))
+    elif user['has_truck']:
         if new_balance < 1000:
             db.execute("UPDATE users SET has_truck = 0 WHERE id=?", (user_data['user_id'],))
         else:

@@ -404,6 +404,17 @@ class GameMap {
         return null;
     }
 
+    getBuildingAtTile(tileX, tileY) {
+        const wx = wrapTileX(tileX);
+        const wy = wrapTileY(tileY);
+        for (const bldg of this.buildings) {
+            if (bldg.tiles.some(t => t.x === wx && t.y === wy)) {
+                return bldg;
+            }
+        }
+        return null;
+    }
+
     renderAddresses(ctx, camera) {
         // Render building addresses near their first door tile
         for (const bldg of this.buildings) {

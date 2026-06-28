@@ -24,6 +24,7 @@ class Game {
         this.hud = new HUD();
         this.trashManager = new TrashManager();
         this.followerManager = new FollowerManager();
+        this.carManager = new CarManager();
         this.player = null;
 
         // Timing
@@ -79,7 +80,7 @@ class Game {
                     this.pickupTrash();
                 }
 
-                // E or e key to interact with NPC
+                // E or e key to interact with NPC or green cars
                 if (e.key === 'e' || e.key === 'E') {
                     if (window.frenzyMode) {
                         const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
@@ -91,6 +92,23 @@ class Game {
                             if (bldg && bldg.doorTiles.length > 0) {
                                 const door = bldg.doorTiles[0];
                                 this.pirateManager.spawnPirates(door.x, door.y);
+                            }
+                        }
+                    }
+
+                    // Green car interaction check
+                    if (this.carManager && this.carManager.cars) {
+                        for (const car of this.carManager.cars) {
+                            if (car.active && car.color === 'green') {
+                                const dx = this.player.x - car.x;
+                                const dy = this.player.y - car.y;
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                if (dist < TILE_SIZE * 0.8) {
+                                    car.active = false;
+                                    this.followerManager.addFollower(this.player.x, this.player.y);
+                                    this.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -321,6 +339,11 @@ class Game {
 
         // Update player
         this.player.update(this.gameMap);
+
+        // Update traffic cars
+        if (this.carManager) {
+            this.carManager.update(dt, this);
+        }
 
         // Check if player enters/exits building for notifications and interior trash spawn
         const curTX = this.player.getTileX();
@@ -667,6 +690,7 @@ class Game {
         this.npcManager = new NPCManager();
         this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
         this.pirateManager = new PirateManager();
+        this.carManager.spawnCars();
         this.buildingInterior = null;
         this.protectionTimer = 0;
         this.protectionBonus = 0;
@@ -724,6 +748,11 @@ class Game {
             this.gameMap.renderAddresses(ctx, this.camera);
             this.npcManager.render(ctx, this.camera, this.spriteManager);
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
+        }
+
+        // Render traffic cars
+        if (this.carManager) {
+            this.carManager.render(ctx, this.camera);
         }
 
         // Render trash
@@ -867,6 +896,78 @@ class Game {
                         window.renderStore();
                         
                         // Hide defeat screen, show store screen
+                        if (screenEl) screenEl.classList.add('hidden');
+                        window.showScreen('store-screen');
+                        this._restartGame();
+                    } catch (e) {
+                        console.error("Return from defeat error:", e);
+                    }
+                }
+            });
+        }
+    }
+
+    async _triggerCarDefeat() {
+        this.state = GameState.UI_OVERLAY;
+        if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
+
+        const msgEl = document.getElementById('defeat-message');
+        if (msgEl) {
+            msgEl.innerText = "You were run over by a red car! All earnings this round were lost.";
+        }
+
+        // Hide game canvas and show defeat screen
+        this.canvas.classList.add('hidden');
+        const screenEl = document.getElementById('pirate-defeat-screen');
+        if (screenEl) screenEl.classList.remove('hidden');
+
+        // Draw pixel art to defeat canvas: player run over by car
+        const artCanvas = document.getElementById('defeatArtCanvas');
+        if (artCanvas) {
+            const ctx = artCanvas.getContext('2d');
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 256, 128);
+
+            // Ground
+            ctx.fillStyle = '#222222';
+            ctx.fillRect(0, 96, 256, 32);
+
+            // Draw a red car
+            ctx.fillStyle = '#ed1c24';
+            ctx.beginPath();
+            ctx.roundRect(120, 72, 40, 24, 6);
+            ctx.fill();
+            
+            // Windshield
+            ctx.fillStyle = '#aaddff';
+            ctx.fillRect(126, 76, 5, 16);
+
+            // Draw shapeless body on ground (red/gray blob)
+            ctx.fillStyle = '#aa2222';
+            ctx.fillRect(70, 92, 32, 8);
+            ctx.fillStyle = '#666666';
+            ctx.fillRect(76, 88, 12, 4);
+        }
+
+        // Setup the return button listener (no lose_truck!)
+        const btnReturn = document.getElementById('btn-defeat-return');
+        if (btnReturn) {
+            const newBtn = btnReturn.cloneNode(true);
+            btnReturn.parentNode.replaceChild(newBtn, btnReturn);
+
+            newBtn.addEventListener('click', async () => {
+                if (window.apiCall) {
+                    try {
+                        await window.apiCall('/api/game/end-round', 'POST', {
+                            earned: 0,
+                            employee_cost: this.totalEmployeeCost,
+                            employees_killed: this.employeesKilledThisRound,
+                            lose_truck: false // they do NOT lose their truck from car accident!
+                        });
+                        window.employeesHired = 0;
+                        await window.refreshGameState();
+                        window.renderStore();
+                        
                         if (screenEl) screenEl.classList.add('hidden');
                         window.showScreen('store-screen');
                         this._restartGame();

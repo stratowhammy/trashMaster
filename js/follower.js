@@ -158,6 +158,15 @@ class FollowerManager {
         }
     }
 
+    removeFollowerAt(index) {
+        if (index >= 0 && index < this.followers.length) {
+            this.followers.splice(index, 1);
+            for (let i = 0; i < this.followers.length; i++) {
+                this.followers[i].index = i;
+            }
+        }
+    }
+
     update(player, gameMap) {
         const pb = gameMap.getBuildingAtTile(player.getTileX(), player.getTileY());
         const isPlayerInside = pb && gameMap.openDoors.has(pb.id);

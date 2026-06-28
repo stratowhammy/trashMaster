@@ -40,12 +40,19 @@
                 <div class="store-sidebar">
                     <h2 id="store-balance">$0</h2>
                     <div id="store-inventory"></div>
-                    <div class="toggle-container">
+                    <div class="toggle-container" style="margin-bottom: 8px;">
                         <label class="switch">
                             <input type="checkbox" id="frenzy-toggle">
                             <span class="slider round"></span>
                         </label>
                         <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Frenzy Mode</span>
+                    </div>
+                    <div class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="crime-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Crime Mode</span>
                     </div>
                     <button id="btn-start-game" class="btn play-btn">Play Game</button>
                     <button id="btn-store-logout" class="btn secondary">Logout</button>
@@ -53,6 +60,44 @@
                 <div class="store-items">
                     <!-- Items populated dynamically -->
                 </div>
+            </div>
+        </div>
+
+        <!-- Made Man Dialog -->
+        <div id="made-man-dialog" class="screen hidden" style="position: absolute; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+            <div class="dialog-box" style="background: #111; border: 4px solid #cc0000; padding: 30px; border-radius: 8px; text-align: center; max-width: 400px;">
+                <h2 style="color: #ff3333; font-family: 'Press Start 2P', monospace; font-size: 16px; margin-bottom: 20px;">MAFIA FAMILY OFFER</h2>
+                <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: center;">
+                    <div id="made-man-don-avatar" style="width: 64px; height: 64px; border: 2px solid #ff3333; background: #222; flex-shrink: 0;"></div>
+                    <p style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ff8888; text-align: left; line-height: 1.6; margin: 0;">You wanna be a "Made Man" for the family? Work for us and we'll make you rich. Cross us and you'll sleep with the fishes.</p>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 20px;">
+                    <button id="btn-made-man-yes" class="btn play-btn" style="background: #00aa00; border-color: #006600; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">YES</button>
+                    <button id="btn-made-man-no" class="btn secondary" style="padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">NO</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bribe Dialog -->
+        <div id="bribe-dialog" class="screen hidden" style="position: absolute; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+            <div class="dialog-box" style="background: #111; border: 4px solid #3366cc; padding: 30px; border-radius: 8px; text-align: center; max-width: 400px; width: 90%;">
+                <h2 style="color: #3388ff; font-family: 'Press Start 2P', monospace; font-size: 14px; margin-bottom: 15px;">BRIBE POLICE CHIEF</h2>
+                <p style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; line-height: 1.6; margin-bottom: 25px; text-align: center;">"Everything has a price, son. Make it worth my while and the boys will look the other way."</p>
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                    <button id="btn-bribe-1" class="btn play-btn" style="background: #3366cc; border-color: #224488; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; color:#fff; cursor: pointer;">Offer $500</button>
+                    <button id="btn-bribe-2" class="btn play-btn" style="background: #3366cc; border-color: #224488; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; color:#fff; cursor: pointer;">Offer $1000</button>
+                    <button id="btn-bribe-3" class="btn play-btn" style="background: #3366cc; border-color: #224488; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; color:#fff; cursor: pointer;">Offer $2000</button>
+                </div>
+                <button id="btn-bribe-cancel" class="btn secondary" style="width: 100%; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; color:#fff; cursor: pointer;">CANCEL</button>
+            </div>
+        </div>
+
+        <!-- Mafia Task HUD Popup -->
+        <div id="mafia-task-popup" class="hidden" style="position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); width: 420px; background: rgba(17,17,17,0.95); border: 3px solid #ff3333; border-radius: 8px; padding: 15px; z-index: 999; display: flex; gap: 15px; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+            <div id="mafia-don-avatar-hud" style="width: 48px; height: 48px; border: 2px solid #ff3333; background: #222; flex-shrink: 0;"></div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <h3 id="mafia-don-name-hud" style="color: #ff3333; font-family: 'Press Start 2P', monospace; font-size: 8px; margin: 0; padding: 0;">Don Salieri</h3>
+                <p id="mafia-task-text-hud" style="color: #ffffff; font-family: 'Press Start 2P', monospace; font-size: 7px; margin: 0; padding: 0; line-height: 1.5; text-align: left;"></p>
             </div>
         </div>
 
@@ -89,6 +134,7 @@
     <script src="js/npc.js"></script>
     <script src="js/pirate.js"></script>
     <script src="js/car.js"></script>
+    <script src="js/crime.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

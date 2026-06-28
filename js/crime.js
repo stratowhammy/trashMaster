@@ -1,0 +1,468 @@
+// ============================================================
+// crime.js — Crime Mode logic, Mafia tasks, police, bank robbery
+// ============================================================
+
+class MafiaDon {
+    constructor(id, name, tx, ty, color) {
+        this.id = id;
+        this.name = name;
+        this.tx = tx;
+        this.ty = ty;
+        this.x = tx * TILE_SIZE + TILE_SIZE / 2;
+        this.y = ty * TILE_SIZE + TILE_SIZE / 2;
+        this.color = color;
+        this.size = 32;
+    }
+
+    render(ctx, camera) {
+        const screen = camera.worldToScreen(this.x, this.y);
+        if (!camera.isVisible(this.x - 20, this.y - 20, 40, 40)) return;
+
+        ctx.save();
+        // Draw Mafia Don (black suit, white shirt, red tie)
+        ctx.fillStyle = '#111';
+        ctx.fillRect(screen.x - 12, screen.y - 16, 24, 32);
+        
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(screen.x - 4, screen.y - 12, 8, 8); // shirt
+        ctx.fillStyle = '#cc0000';
+        ctx.fillRect(screen.x - 1, screen.y - 12, 2, 8); // tie
+
+        // Head
+        ctx.fillStyle = '#ffdbac';
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y - 20, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Fedora hat
+        ctx.fillStyle = this.color;
+        ctx.fillRect(screen.x - 14, screen.y - 26, 28, 4);
+        ctx.fillRect(screen.x - 8, screen.y - 32, 16, 6);
+
+        ctx.restore();
+    }
+}
+
+class PoliceOfficer {
+    constructor(tx, ty) {
+        this.x = tx * TILE_SIZE + TILE_SIZE / 2;
+        this.y = ty * TILE_SIZE + TILE_SIZE / 2;
+        this.size = 32;
+        this.speed = TILE_SIZE * 0.45; // slightly faster than 1/3 tile per second
+        this.alive = true;
+    }
+
+    update(dt, playerX, playerY, gameMap) {
+        if (!this.alive) return;
+
+        const dx = playerX - this.x;
+        const dy = playerY - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 5) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const nextX = this.x + nx * this.speed * dt;
+            const nextY = this.y + ny * this.speed * dt;
+
+            // police collision sliding
+            if (this._canMoveTo(nextX, this.y, gameMap)) {
+                this.x = nextX;
+            }
+            if (this._canMoveTo(this.x, nextY, gameMap)) {
+                this.y = nextY;
+            }
+        }
+    }
+
+    _canMoveTo(newX, newY, gameMap) {
+        const hs = this.size / 2 - 4;
+        const corners = [
+            { x: newX - hs, y: newY - hs }, { x: newX + hs, y: newY - hs },
+            { x: newX - hs, y: newY + hs }, { x: newX + hs, y: newY + hs },
+        ];
+        for (const c of corners) {
+            const tx = Math.floor(c.x / TILE_SIZE);
+            const ty = Math.floor(c.y / TILE_SIZE);
+            if (!gameMap.isWalkable(tx, ty)) return false;
+        }
+        return true;
+    }
+
+    render(ctx, camera) {
+        if (!this.alive) return;
+        const screen = camera.worldToScreen(this.x, this.y);
+        if (!camera.isVisible(this.x - 20, this.y - 20, 40, 40)) return;
+
+        ctx.save();
+        // Blue uniform
+        ctx.fillStyle = '#0f2b5c';
+        ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);
+
+        // Gold badge
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(screen.x - 2, screen.y - 8, 4, 4);
+
+        // Head
+        ctx.fillStyle = '#ffdbac';
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Police Cap
+        ctx.fillStyle = '#0f2b5c';
+        ctx.fillRect(screen.x - 10, screen.y - 24, 20, 4);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(screen.x - 12, screen.y - 22, 24, 2);
+
+        ctx.restore();
+    }
+}
+
+class GoldBag {
+    constructor(tx, ty) {
+        this.tx = tx;
+        this.ty = ty;
+        this.x = tx * TILE_SIZE + TILE_SIZE / 2;
+        this.y = ty * TILE_SIZE + TILE_SIZE / 2;
+        this.size = 20;
+        this.collected = false;
+    }
+
+    render(ctx, camera) {
+        if (this.collected) return;
+        const screen = camera.worldToScreen(this.x, this.y);
+        if (!camera.isVisible(this.x - 16, this.y - 16, 32, 32)) return;
+
+        ctx.save();
+        // Draw Gold Sack
+        ctx.fillStyle = '#d4af37'; // gold
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y + 4, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#aa8800';
+        ctx.fillRect(screen.x - 4, screen.y - 6, 8, 4); // collar of sack
+
+        // Dollar sign
+        ctx.fillStyle = '#111';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', screen.x, screen.y + 4);
+
+        ctx.restore();
+    }
+}
+
+class CrimeManager {
+    constructor() {
+        this.dons = [];
+        this.policeChief = null;
+        this.police = [];
+        this.goldBags = [];
+        
+        this.madeMan = false;
+        this.activeFamily = -1; // 0: Salieri, 1: Morello
+        
+        this.activeTask = null;
+        this.taskStartClock = 0;
+        this.taskTimeElapsed = 0;
+        
+        this.bankRobbed = false;
+        this.policeActive = false;
+        this.policeSpawnTimer = 0;
+        this.policeSpawnInterval = 10.0; // seconds
+        this.policeKilledCount = 0;
+        this.baseArrestChance = 0.8; // 80%
+        
+        this.chiefBribeTarget = 1000;
+        this.bribeOptionMultiplier = 1.0;
+    }
+
+    initialize(gameMap) {
+        this.dons = [
+            new MafiaDon(0, "Don Salieri", 6, 6, '#000000'), // Salieri (Black)
+            new MafiaDon(1, "Don Morello", 58, 58, '#ffffff') // Morello (White)
+        ];
+
+        // Police Chief spawns near Police Station (building ID 1)
+        const policeStation = gameMap.buildings[1];
+        if (policeStation && policeStation.doorTiles.length > 0) {
+            const door = policeStation.doorTiles[0];
+            // Spawn just outside the door (1 tile to the side)
+            this.policeChief = {
+                x: (door.x + 1) * TILE_SIZE + TILE_SIZE / 2,
+                y: door.y * TILE_SIZE + TILE_SIZE / 2,
+                size: 32
+            };
+        }
+
+        this.madeMan = false;
+        this.activeFamily = -1;
+        this.activeTask = null;
+        this.bankRobbed = false;
+        this.policeActive = false;
+        this.police = [];
+        this.goldBags = [];
+        this.policeSpawnTimer = 0;
+        this.policeSpawnInterval = 10.0;
+        this.policeKilledCount = 0;
+        this.baseArrestChance = 0.8;
+        this.chiefBribeTarget = 800 + Math.floor(Math.random() * 800); // 800 to 1600 target
+        this.bribeOptionMultiplier = 1.0;
+    }
+
+    triggerMadeManOffer(familyId) {
+        const dialog = document.getElementById('made-man-dialog');
+        const donAvatar = document.getElementById('made-man-don-avatar');
+        if (donAvatar) {
+            donAvatar.innerHTML = `<div style="width:100%; height:100%; background:${familyId === 0 ? '#111' : '#eee'}; border:3px solid #ff3333; display:flex; align-items:center; justify-content:center; color:${familyId === 0 ? '#fff' : '#000'}; font-family:'Press Start 2P', monospace; font-size:16px;">${familyId === 0 ? 'S' : 'M'}</div>`;
+        }
+        if (dialog) {
+            dialog.classList.remove('hidden');
+        }
+        
+        // YES/NO setup
+        const btnYes = document.getElementById('btn-made-man-yes');
+        const btnNo = document.getElementById('btn-made-man-no');
+        
+        const yesClone = btnYes.cloneNode(true);
+        btnYes.parentNode.replaceChild(yesClone, btnYes);
+        const noClone = btnNo.cloneNode(true);
+        btnNo.parentNode.replaceChild(noClone, btnNo);
+
+        yesClone.addEventListener('click', () => {
+            this.madeMan = true;
+            this.activeFamily = familyId;
+            dialog.classList.add('hidden');
+            this.assignNextTask(window.game.gameMap);
+        });
+
+        noClone.addEventListener('click', () => {
+            dialog.classList.add('hidden');
+        });
+    }
+
+    assignNextTask(gameMap) {
+        const tasks = [
+            { type: 'collect_gold', desc: 'Collect gold from the target building.', targetBldgId: 2 + Math.floor(Math.random() * 8) },
+            { type: 'intimidate', desc: 'Find and Intimidate [I] the rival mafia NPC.', targetNPCIndex: Math.floor(Math.random() * 10) },
+            { type: 'rob_npc', desc: 'Find and Rob [R] the target citizen NPC.', targetNPCIndex: Math.floor(Math.random() * 10) },
+            { type: 'steal_car', desc: 'Steal [S] a car at any street intersection.' },
+            { type: 'rob_bank', desc: 'Rob the city BANK. Get to the entrance!' }
+        ];
+
+        this.activeTask = tasks[Math.floor(Math.random() * tasks.length)];
+        this.taskStartClock = window.game.hud.timer; // current time
+        this.taskTimeElapsed = 0;
+
+        // Show Mafia HUD Popup
+        const popup = document.getElementById('mafia-task-popup');
+        const donNameHud = document.getElementById('mafia-don-name-hud');
+        const taskTextHud = document.getElementById('mafia-task-text-hud');
+        const avatarHud = document.getElementById('mafia-don-avatar-hud');
+
+        if (donNameHud) donNameHud.innerText = this.activeFamily === 0 ? "Don Salieri" : "Don Morello";
+        if (taskTextHud) taskTextHud.innerText = this.activeTask.desc;
+        if (avatarHud) {
+            avatarHud.innerHTML = `<div style="width:100%; height:100%; background:${this.activeFamily === 0 ? '#111' : '#eee'}; border:2px solid #ff3333; display:flex; align-items:center; justify-content:center; color:${this.activeFamily === 0 ? '#fff' : '#000'}; font-family:'Press Start 2P', monospace; font-size:12px;">${this.activeFamily === 0 ? 'S' : 'M'}</div>`;
+        }
+
+        if (popup) {
+            popup.classList.remove('hidden');
+            setTimeout(() => { popup.classList.add('hidden'); }, 6000); // hide after 6s
+        }
+
+        // If robbing a bank, open the bank door!
+        if (this.activeTask.type === 'rob_bank') {
+            gameMap.openBuildingDoor(0); // Bank door open
+            // Spawn gold bags inside bank
+            this.goldBags = [];
+            const bank = gameMap.buildings[0];
+            if (bank) {
+                // Spawn up to 18 bags inside bank interior tiles
+                const spawnTiles = bank.tiles.filter(t => !bank.doorTiles.some(d => d.x === t.x && d.y === t.y));
+                const count = Math.min(18, spawnTiles.length);
+                for (let i = 0; i < count; i++) {
+                    this.goldBags.push(new GoldBag(spawnTiles[i].x, spawnTiles[i].y));
+                }
+            }
+        }
+    }
+
+    triggerBribeChief() {
+        const dialog = document.getElementById('bribe-dialog');
+        if (dialog) dialog.classList.remove('hidden');
+
+        // Bribe options based on multiplier
+        const opt1 = Math.round(500 * this.bribeOptionMultiplier);
+        const opt2 = Math.round(1000 * this.bribeOptionMultiplier);
+        const opt3 = Math.round(2000 * this.bribeOptionMultiplier);
+
+        const btn1 = document.getElementById('btn-bribe-1');
+        const btn2 = document.getElementById('btn-bribe-2');
+        const btn3 = document.getElementById('btn-bribe-3');
+        const btnCancel = document.getElementById('btn-bribe-cancel');
+
+        if (btn1) btn1.innerText = `Offer $${opt1}`;
+        if (btn2) btn2.innerText = `Offer $${opt2}`;
+        if (btn3) btn3.innerText = `Offer $${opt3}`;
+
+        const setupBtn = (btn, amount) => {
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+            clone.addEventListener('click', async () => {
+                // Check if permanent account balance has enough
+                if (window.playerBalance < amount) {
+                    alert("Insufficient permanent account balance to bribe!");
+                    dialog.classList.add('hidden');
+                    return;
+                }
+
+                // Check against chief target threshold
+                if (amount < this.chiefBribeTarget) {
+                    // Declined!
+                    alert("Police Chief: 'Not enough, kid. Try harder.'");
+                    this.bribeOptionMultiplier *= 1.10; // increase option prices by 10%
+                    dialog.classList.add('hidden');
+                } else {
+                    // Accepted!
+                    try {
+                        const response = await window.apiCall('/api/game/bribe', 'POST', { amount });
+                        window.playerBalance = response.balance;
+                        window.renderStore();
+                        this.baseArrestChance = 0.40; // drop chance to 40%
+                        alert(`Police Chief: 'Deal. The boys will look the other way.' (Arrest chance dropped to 40%)`);
+                    } catch (e) {
+                        alert("Bribe failed: " + e.message);
+                    }
+                    dialog.classList.add('hidden');
+                }
+            });
+        };
+
+        setupBtn(btn1, opt1);
+        setupBtn(btn2, opt2);
+        setupBtn(btn3, opt3);
+
+        const cancelClone = btnCancel.cloneNode(true);
+        btnCancel.parentNode.replaceChild(cancelClone, btnCancel);
+        cancelClone.addEventListener('click', () => {
+            dialog.classList.add('hidden');
+        });
+    }
+
+    update(dt, game) {
+        if (!window.crimeMode) return;
+
+        // If robbing the bank, decay gold bags over time
+        if (this.activeTask && this.activeTask.type === 'rob_bank' && this.goldBags.length > 0) {
+            // For every 10 seconds elapsed past start time, remove one bag
+            const timeElapsed = game.hud.timer - this.taskStartClock;
+            const expectedBags = Math.max(0, 18 - Math.floor(timeElapsed / 10));
+            if (this.goldBags.filter(b => !b.collected).length > expectedBags) {
+                // Remove one uncollected bag
+                const uncoll = this.goldBags.find(b => !b.collected);
+                if (uncoll) uncoll.collected = true; // silently remove
+            }
+        }
+
+        // Update active police officers
+        if (this.policeActive) {
+            // Spawn police officers from station (building ID 1)
+            this.policeSpawnTimer += dt;
+            if (this.policeSpawnTimer >= this.policeSpawnInterval) {
+                this.policeSpawnTimer = 0;
+                // Spawn one officer
+                const station = game.gameMap.buildings[1];
+                if (station && station.doorTiles.length > 0) {
+                    const door = station.doorTiles[0];
+                    this.police.push(new PoliceOfficer(door.x, door.y));
+                }
+            }
+
+            // Update chase pathing
+            for (const cop of this.police) {
+                if (cop.alive) {
+                    cop.update(dt, game.player.x, game.player.y, game.gameMap);
+                }
+            }
+
+            // Combat Check between Police and Posse / Player
+            const arrivedCops = this.police.filter(c => c.alive && Math.sqrt((c.x - game.player.x)**2 + (c.y - game.player.y)**2) < TILE_SIZE * 0.6);
+            if (arrivedCops.length > 0) {
+                for (const cop of arrivedCops) {
+                    const posseCount = game.followerManager.getFollowerCount();
+                    if (posseCount > 0) {
+                        // Posse fight!
+                        const roll = Math.random();
+                        const copWins = roll < this.baseArrestChance;
+                        if (copWins) {
+                            // Arrested posse member
+                            game.followerManager.removeFollower();
+                            game.hud.showFollowerNotification('Posse member arrested by police!', true);
+                            cop.alive = false; // cop leaves with arrested member
+                        } else {
+                            // Killed police officer
+                            cop.alive = false;
+                            this.policeKilledCount++;
+                            this.baseArrestChance = Math.min(0.95, this.baseArrestChance + 0.10); // increase chance by 10%
+                            this.policeSpawnInterval = Math.max(2.0, 10.0 - this.policeKilledCount); // spawn 1s faster
+                            game.hud.showFollowerNotification('Posse member killed the cop! New cop spawns faster.', true);
+                        }
+                    } else {
+                        // No posse left -> Player arrested!
+                        game._triggerArrestDefeat();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    render(ctx, camera) {
+        if (!window.crimeMode) return;
+
+        // Render Mafia Dons
+        for (const don of this.dons) {
+            don.render(ctx, camera);
+        }
+
+        // Render Police Chief
+        if (this.madeMan && this.policeChief) {
+            const screen = camera.worldToScreen(this.policeChief.x, this.policeChief.y);
+            if (camera.isVisible(this.policeChief.x - 20, this.policeChief.y - 20, 40, 40)) {
+                ctx.save();
+                // Chief render (dark blue coat, gold badge, brown pants)
+                ctx.fillStyle = '#1c2e4a';
+                ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);
+                ctx.fillStyle = '#ffd700';
+                ctx.fillRect(screen.x - 2, screen.y - 8, 4, 4); // gold badge
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1c2e4a'; // Hat
+                ctx.fillRect(screen.x - 10, screen.y - 24, 20, 4);
+                ctx.fillStyle = '#ffd700';
+                ctx.fillRect(screen.x - 4, screen.y - 23, 8, 2);
+                ctx.restore();
+            }
+        }
+
+        // Render Gold Bags inside Bank
+        if (this.activeTask && this.activeTask.type === 'rob_bank') {
+            for (const bag of this.goldBags) {
+                bag.render(ctx, camera);
+            }
+        }
+
+        // Render Police Officers
+        if (this.policeActive) {
+            for (const cop of this.police) {
+                cop.render(ctx, camera);
+            }
+        }
+    }
+}

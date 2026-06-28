@@ -465,15 +465,28 @@ class GameMap {
             // Only render if on screen
             if (sx < -100 || sx > camera.width + 100 || sy < -100 || sy > camera.height + 100) continue;
 
+            let text = bldg.address;
+            let color = this.openDoors.has(bldg.id) ? '#00ff88' : '#ffcc00';
+
+            if (window.crimeMode) {
+                if (bldg.id === 0) {
+                    text = `BANK - ${bldg.address}`;
+                    color = '#ffd700';
+                } else if (bldg.id === 1) {
+                    text = `POLICE - ${bldg.address}`;
+                    color = '#3388ff';
+                }
+            }
+
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
             ctx.beginPath();
-            ctx.roundRect(sx - 2, sy - 14, ctx.measureText(bldg.address).width + 8 || 40, 14, 3);
+            ctx.roundRect(sx - 2, sy - 14, ctx.measureText(text).width + 8 || 40, 14, 3);
             ctx.fill();
 
-            ctx.fillStyle = this.openDoors.has(bldg.id) ? '#00ff88' : '#ffcc00';
+            ctx.fillStyle = color;
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'left';
-            ctx.fillText(bldg.address, sx, sy - 4);
+            ctx.fillText(text, sx, sy - 4);
         }
     }
 }

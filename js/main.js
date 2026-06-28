@@ -25,6 +25,7 @@ class Game {
         this.trashManager = new TrashManager();
         this.followerManager = new FollowerManager();
         this.carManager = new CarManager();
+        this.crimeManager = new CrimeManager();
         this.player = null;
 
         // Timing
@@ -80,8 +81,33 @@ class Game {
                     this.pickupTrash();
                 }
 
-                // E or e key to interact with NPC or green cars
+                // E or e key to interact with NPC or green cars, Dons or Chief
                 if (e.key === 'e' || e.key === 'E') {
+                    // Crime Mode checks
+                    if (window.crimeMode && this.crimeManager) {
+                        let nearDon = null;
+                        for (const don of this.crimeManager.dons) {
+                            const dist = Math.sqrt((this.player.x - don.x)**2 + (this.player.y - don.y)**2);
+                            if (dist < TILE_SIZE * 0.8) {
+                                nearDon = don;
+                                break;
+                            }
+                        }
+                        if (nearDon) {
+                            this.crimeManager.triggerMadeManOffer(nearDon.id);
+                            return;
+                        }
+
+                        // Check Police Chief bribe
+                        if (this.crimeManager.madeMan && this.crimeManager.policeChief) {
+                            const chiefDist = Math.sqrt((this.player.x - this.crimeManager.policeChief.x)**2 + (this.player.y - this.crimeManager.policeChief.y)**2);
+                            if (chiefDist < TILE_SIZE * 0.8) {
+                                this.crimeManager.triggerBribeChief();
+                                return;
+                            }
+                        }
+                    }
+
                     if (window.frenzyMode) {
                         const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
                         if (result && result.isInformant) {
@@ -109,6 +135,103 @@ class Game {
                                     this.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
                                     break;
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // K or k to kill NPC
+                if (e.key === 'k' || e.key === 'K') {
+                    if (window.crimeMode) {
+                        const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                        if (npc) {
+                            const idx = this.npcManager.npcs.indexOf(npc);
+                            if (idx >= 0) {
+                                this.npcManager.npcs.splice(idx, 1);
+                                this.hud.showFollowerNotification('NPC killed!', true);
+                                
+                                if (this.crimeManager.activeTask && 
+                                    (this.crimeManager.activeTask.type === 'collect_gold' || this.crimeManager.activeTask.type === 'intimidate' || this.crimeManager.activeTask.type === 'rob_npc')) {
+                                    this.hud.showFollowerNotification('Favor completed for the Don!', true);
+                                    this.crimeManager.assignNextTask(this.gameMap);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // I or i to intimidate NPC
+                if (e.key === 'i' || e.key === 'I') {
+                    if (window.crimeMode) {
+                        const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                        if (npc) {
+                            this.npcManager.activeDialogue = {
+                                lines: ["Please don't hurt me!", "I'll do whatever you say!"],
+                                lineIndex: 0,
+                                timer: 120
+                            };
+                            this.hud.showFollowerNotification('NPC Intimidated!', true);
+                            if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate') {
+                                this.hud.showFollowerNotification('Favor completed for the Don!', true);
+                                this.crimeManager.assignNextTask(this.gameMap);
+                            }
+                        }
+                    }
+                }
+
+                // R or r to rob NPC
+                if (e.key === 'r' || e.key === 'R') {
+                    if (window.crimeMode) {
+                        const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                        if (npc) {
+                            const robbedAmount = 100 + Math.floor(Math.random() * 701); // 100 to 800
+                            this.trashManager.totalPoints += robbedAmount;
+                            this.hud.showFollowerNotification(`Robbed NPC for $${robbedAmount}!`, true);
+                            if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'rob_npc') {
+                                this.hud.showFollowerNotification('Favor completed for the Don!', true);
+                                this.crimeManager.assignNextTask(this.gameMap);
+                            }
+                        }
+                    }
+                }
+
+                // S or s to steal car
+                if (e.key === 's' || e.key === 'S') {
+                    if (window.crimeMode) {
+                        let targetCar = null;
+                        for (const car of this.carManager.cars) {
+                            if (car.active) {
+                                const dx = this.player.x - car.x;
+                                const dy = this.player.y - car.y;
+                                const dist = Math.sqrt(dx * dx + dy * dy);
+                                if (dist < TILE_SIZE * 0.8) {
+                                    targetCar = car;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (targetCar) {
+                            const curTX = this.player.getTileX();
+                            const curTY = this.player.getTileY();
+                            const tile = this.gameMap.getTile(curTX, curTY);
+                            
+                            if (tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.SIDEWALK) {
+                                if (this.followerManager.getFollowerCount() > 0) {
+                                    targetCar.active = false;
+                                    this.followerManager.removeFollower();
+                                    this.trashManager.totalPoints += 1000;
+                                    this.hud.showFollowerNotification('Car stolen! Posse member drove off. +$1,000', true);
+
+                                    if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'steal_car') {
+                                        this.hud.showFollowerNotification('Favor completed for the Don!', true);
+                                        this.crimeManager.assignNextTask(this.gameMap);
+                                    }
+                                } else {
+                                    this.hud.showFollowerNotification('You need a posse member to drive off with the stolen car!', true);
+                                }
+                            } else {
+                                this.hud.showFollowerNotification('You can only steal cars on roads or intersections!', true);
                             }
                         }
                     }
@@ -333,6 +456,68 @@ class Game {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Crime Mode updates
+        if (window.crimeMode && this.crimeManager) {
+            this.npcManager.update();
+            this.npcManager.checkInteraction(this.player.x, this.player.y);
+            this.crimeManager.update(dt, this);
+
+            // Check gold bags interaction
+            if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'rob_bank') {
+                for (const bag of this.crimeManager.goldBags) {
+                    if (!bag.collected) {
+                        const dx = this.player.x - bag.x;
+                        const dy = this.player.y - bag.y;
+                        if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 0.6) {
+                            bag.collected = true;
+                            this.trashManager.totalPoints += 1000;
+                            this.hud.updateScore(this.trashManager.totalPoints);
+                            this.hud.showFollowerNotification('+$1,000 Gold Bag!', true);
+                            
+                            // Spawn police on first bag
+                            if (!this.crimeManager.policeActive) {
+                                this.crimeManager.policeActive = true;
+                                this.crimeManager.policeSpawnTimer = 0;
+                                const station = this.gameMap.buildings[1];
+                                if (station && station.doorTiles.length > 0) {
+                                    const door = station.doorTiles[0];
+                                    for (let i = 0; i < 3; i++) {
+                                        this.crimeManager.police.push(new PoliceOfficer(door.x, door.y));
+                                    }
+                                }
+                                this.hud.showFollowerNotification('🚨 ALARM! Police dispatched!', true);
+                            }
+
+                            // Check complete
+                            const remaining = this.crimeManager.goldBags.filter(b => !b.collected).length;
+                            if (remaining === 0) {
+                                this.hud.showFollowerNotification('Favor completed for the Don!', true);
+                                this.crimeManager.assignNextTask(this.gameMap);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check if player is near any Don or Police Chief to show HUD prompt
+            let nearDon = false;
+            for (const don of this.crimeManager.dons) {
+                const dist = Math.sqrt((this.player.x - don.x)**2 + (this.player.y - don.y)**2);
+                if (dist < TILE_SIZE * 0.8) {
+                    nearDon = true;
+                    this.hud.showFollowerNotification(`Press [E] to talk to ${don.name}`, false);
+                    break;
+                }
+            }
+
+            if (!nearDon && this.crimeManager.madeMan && this.crimeManager.policeChief) {
+                const chiefDist = Math.sqrt((this.player.x - this.crimeManager.policeChief.x)**2 + (this.player.y - this.crimeManager.policeChief.y)**2);
+                if (chiefDist < TILE_SIZE * 0.8) {
+                    this.hud.showFollowerNotification('Press [E] to Bribe Police Chief', false);
                 }
             }
         }
@@ -691,6 +876,9 @@ class Game {
         this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
         this.pirateManager = new PirateManager();
         this.carManager.spawnCars();
+        if (this.crimeManager) {
+            this.crimeManager.initialize(this.gameMap);
+        }
         this.buildingInterior = null;
         this.protectionTimer = 0;
         this.protectionBonus = 0;
@@ -750,6 +938,14 @@ class Game {
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
         }
 
+        if (window.crimeMode) {
+            this.gameMap.renderAddresses(ctx, this.camera);
+            this.npcManager.render(ctx, this.camera, this.spriteManager);
+            if (this.crimeManager) {
+                this.crimeManager.render(ctx, this.camera);
+            }
+        }
+
         // Render traffic cars
         if (this.carManager) {
             this.carManager.render(ctx, this.camera);
@@ -772,6 +968,10 @@ class Game {
         if (window.frenzyMode) {
             this.npcManager.renderDialogue(ctx, w, h);
             this.pirateManager.renderCombatResults(ctx, w, h);
+        }
+
+        if (window.crimeMode) {
+            this.npcManager.renderDialogue(ctx, w, h);
         }
 
         // Render pickup hint if near trash
@@ -963,6 +1163,84 @@ class Game {
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
                             lose_truck: false // they do NOT lose their truck from car accident!
+                        });
+                        window.employeesHired = 0;
+                        await window.refreshGameState();
+                        window.renderStore();
+                        
+                        if (screenEl) screenEl.classList.add('hidden');
+                        window.showScreen('store-screen');
+                        this._restartGame();
+                    } catch (e) {
+                        console.error("Return from defeat error:", e);
+                    }
+                }
+            });
+        }
+    }
+
+    async _triggerArrestDefeat() {
+        this.state = GameState.UI_OVERLAY;
+        if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
+
+        const msgEl = document.getElementById('defeat-message');
+        if (msgEl) {
+            msgEl.innerText = "You were arrested by the police! All earnings this round were lost.";
+        }
+
+        // Hide game canvas and show defeat screen
+        this.canvas.classList.add('hidden');
+        const screenEl = document.getElementById('pirate-defeat-screen');
+        if (screenEl) screenEl.classList.remove('hidden');
+
+        // Draw pixel art to defeat canvas: player behind bars (jail)
+        const artCanvas = document.getElementById('defeatArtCanvas');
+        if (artCanvas) {
+            const ctx = artCanvas.getContext('2d');
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 256, 128);
+
+            // Draw prison bars
+            ctx.strokeStyle = '#888888';
+            ctx.lineWidth = 4;
+            for (let x = 20; x < 256; x += 30) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, 128);
+                ctx.stroke();
+            }
+
+            // Draw player head looking sad through bars
+            ctx.fillStyle = '#ffdbac';
+            ctx.beginPath();
+            ctx.arc(128, 64, 16, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sad eyes
+            ctx.fillStyle = '#000';
+            ctx.font = '12px Arial';
+            ctx.fillText('o', 120, 62);
+            ctx.fillText('o', 132, 62);
+            // Sad mouth
+            ctx.beginPath();
+            ctx.arc(128, 76, 6, Math.PI, 0, false);
+            ctx.stroke();
+        }
+
+        // Setup the return button listener (no lose_truck!)
+        const btnReturn = document.getElementById('btn-defeat-return');
+        if (btnReturn) {
+            const newBtn = btnReturn.cloneNode(true);
+            btnReturn.parentNode.replaceChild(newBtn, btnReturn);
+
+            newBtn.addEventListener('click', async () => {
+                if (window.apiCall) {
+                    try {
+                        await window.apiCall('/api/game/end-round', 'POST', {
+                            earned: 0,
+                            employee_cost: this.totalEmployeeCost,
+                            employees_killed: this.employeesKilledThisRound,
+                            lose_truck: false // they do NOT lose their truck from arrest!
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();

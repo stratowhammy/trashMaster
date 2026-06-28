@@ -103,6 +103,10 @@ function initUI() {
         btnStartGame.addEventListener('click', () => {
             const frenzyToggle = document.getElementById('frenzy-toggle');
             window.frenzyMode = frenzyToggle ? frenzyToggle.checked : false;
+            
+            const crimeToggle = document.getElementById('crime-toggle');
+            window.crimeMode = crimeToggle ? crimeToggle.checked : false;
+            
             showScreen('game-layer'); // This hides UI and shows canvas
             if (window.startGameFromStore) {
                 window.startGameFromStore(); // Custom method we will add

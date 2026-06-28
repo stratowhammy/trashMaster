@@ -93,6 +93,41 @@ class MiniMap {
             }
         }
 
+        // Draw Crime Mode Task Highlight
+        if (window.crimeMode && window.game && window.game.crimeManager && window.game.crimeManager.activeTask) {
+            const task = window.game.crimeManager.activeTask;
+            const pulse = Math.sin(performance.now() / 100) * 0.5 + 0.5;
+            ctx.fillStyle = `rgba(255, 0, 255, ${pulse})`; // flashing purple
+
+            if (task.type === 'collect_gold' && task.targetBldgId !== undefined) {
+                const bldg = gameMap.buildings.find(b => b.id === task.targetBldgId);
+                if (bldg) {
+                    for (const tile of bldg.tiles) {
+                        ctx.fillRect(mapX + tile.x * s, mapY + tile.y * s, s, s);
+                    }
+                }
+            } else if (task.type === 'rob_bank') {
+                const bldg = gameMap.buildings[0]; // Bank
+                if (bldg) {
+                    for (const tile of bldg.tiles) {
+                        ctx.fillRect(mapX + tile.x * s, mapY + tile.y * s, s, s);
+                    }
+                }
+            } else if ((task.type === 'intimidate' || task.type === 'rob_npc') && task.targetNPCIndex !== undefined && window.game.npcManager) {
+                const npcs = window.game.npcManager.npcs;
+                if (npcs && npcs.length > 0) {
+                    const npc = npcs[task.targetNPCIndex % npcs.length];
+                    if (npc) {
+                        const nx = mapX + (npc.x / MAP_PIXEL_W) * this.width;
+                        const ny = mapY + (npc.y / MAP_PIXEL_H) * this.height;
+                        ctx.beginPath();
+                        ctx.arc(nx, ny, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
         // Draw trash as tiny dots
         if (trashItems) {
             ctx.fillStyle = '#ff6';

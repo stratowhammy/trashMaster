@@ -236,6 +236,28 @@ def consume_item():
     db.commit()
     return jsonify({'success': True})
 
+@app.route('/api/game/bribe', methods=['POST'])
+def bribe_police():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    amount = int(request.json.get('amount', 0))
+    if amount <= 0:
+        return jsonify({'error': 'Invalid bribe amount'}), 400
+        
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    
+    if user['balance'] < amount:
+        return jsonify({'error': 'Insufficient balance for bribe'}), 400
+        
+    new_balance = user['balance'] - amount
+    db.execute("UPDATE users SET balance=? WHERE id=?", (new_balance, user_data['user_id']))
+    db.commit()
+    return jsonify({'success': True, 'balance': new_balance})
+
 @app.route('/api/game/end-round', methods=['POST'])
 def end_round():
     user_data = verify_token(request)

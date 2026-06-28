@@ -53,6 +53,7 @@ html, body {
     overflow-y: auto;
 }
 .screen.hidden { display: none; }
+.hidden { display: none !important; }
 
 h1 { margin-bottom: 2rem; color: #00ff88; text-shadow: 2px 2px #000; text-align: center; }
 

@@ -189,6 +189,20 @@ class MiniMap {
             }
         }
 
+        // Draw mafia thugs as red dots on the minimap
+        if (window.crimeMode && window.game && window.game.crimeManager && window.game.crimeManager.thugs) {
+            ctx.fillStyle = '#ff2200';
+            for (const thug of window.game.crimeManager.thugs) {
+                if (thug.alive) {
+                    const tx = mapX + (thug.x / MAP_PIXEL_W) * this.width;
+                    const ty = mapY + (thug.y / MAP_PIXEL_H) * this.height;
+                    ctx.beginPath();
+                    ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
         // Draw player as bright green dot (use wrapped coordinates for infinite map)
         const wrappedPx = player.getWrappedX ? player.getWrappedX() : player.x;
         const wrappedPy = player.getWrappedY ? player.getWrappedY() : player.y;

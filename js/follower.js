@@ -31,19 +31,27 @@ class Follower {
             const prevX = this.x;
             const prevY = this.y;
 
-            this.x = target.x;
-            this.y = target.y;
+            // Check if target is inside a building
+            const targetTX = Math.floor(target.x / TILE_SIZE);
+            const targetTY = Math.floor(target.y / TILE_SIZE);
+            if (gameMap.getBuildingAtTile(targetTX, targetTY)) {
+                // If target is inside building, just freeze (stop moving)
+                this.moving = false;
+            } else {
+                this.x = target.x;
+                this.y = target.y;
 
-            // Determine direction from movement
-            const dx = this.x - prevX;
-            const dy = this.y - prevY;
-            this.moving = Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1;
+                // Determine direction from movement
+                const dx = this.x - prevX;
+                const dy = this.y - prevY;
+                this.moving = Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1;
 
-            if (this.moving) {
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    this.direction = dx > 0 ? 'right' : 'left';
-                } else {
-                    this.direction = dy > 0 ? 'down' : 'up';
+                if (this.moving) {
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        this.direction = dx > 0 ? 'right' : 'left';
+                    } else {
+                        this.direction = dy > 0 ? 'down' : 'up';
+                    }
                 }
             }
         }

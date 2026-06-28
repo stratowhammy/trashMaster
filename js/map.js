@@ -10,6 +10,10 @@ const TileType = {
     BUILDING_DOOR: 4,
     CROSSWALK: 5,
     PARK_PATH: 6,
+    ROAD_UP: 7,
+    ROAD_DOWN: 8,
+    ROAD_LEFT: 9,
+    ROAD_RIGHT: 10,
 };
 
 const TILE_SIZE = 64;
@@ -52,12 +56,16 @@ const TILE_COLORS = {
     [TileType.GRASS]: '#4a8c3f', [TileType.BUILDING]: '#6b5b73',
     [TileType.BUILDING_DOOR]: '#8b7355', [TileType.CROSSWALK]: '#d4d4d4',
     [TileType.PARK_PATH]: '#c8b890',
+    [TileType.ROAD_UP]: '#4a4a4a', [TileType.ROAD_DOWN]: '#4a4a4a',
+    [TileType.ROAD_LEFT]: '#4a4a4a', [TileType.ROAD_RIGHT]: '#4a4a4a',
 };
 const TILE_DETAIL_COLORS = {
     [TileType.ROAD]: '#3d3d3d', [TileType.SIDEWALK]: '#9e978a',
     [TileType.GRASS]: '#3d7a33', [TileType.BUILDING]: '#5a4d62',
     [TileType.BUILDING_DOOR]: '#7a6348', [TileType.CROSSWALK]: '#ffffff',
     [TileType.PARK_PATH]: '#b8a880',
+    [TileType.ROAD_UP]: '#3d3d3d', [TileType.ROAD_DOWN]: '#3d3d3d',
+    [TileType.ROAD_LEFT]: '#3d3d3d', [TileType.ROAD_RIGHT]: '#3d3d3d',
 };
 const BUILDING_COLORS = [
     { base: '#6b5b73', dark: '#5a4d62', roof: '#7d6d85' },
@@ -91,17 +99,24 @@ class GameMap {
         const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
         const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
 
-        for (const ry of hRoads) for (let x = 0; x < MAP_WIDTH; x++) this.tiles[ry][x] = TileType.ROAD;
-        for (const rx of vRoads) for (let y = 0; y < MAP_HEIGHT; y++) this.tiles[y][rx] = TileType.ROAD;
+        for (const ry of hRoads) {
+            const type = (ry % 2 === 0) ? TileType.ROAD_LEFT : TileType.ROAD_RIGHT;
+            for (let x = 0; x < MAP_WIDTH; x++) this.tiles[ry][x] = type;
+        }
+        for (const rx of vRoads) {
+            const type = (rx % 2 === 0) ? TileType.ROAD_DOWN : TileType.ROAD_UP;
+            for (let y = 0; y < MAP_HEIGHT; y++) this.tiles[y][rx] = type;
+        }
         for (const ry of hRoads) for (const rx of vRoads) this.tiles[ry][rx] = TileType.CROSSWALK;
 
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
-                if (this.tiles[y][x] !== TileType.ROAD && this.tiles[y][x] !== TileType.CROSSWALK) {
+                if (this.tiles[y][x] !== TileType.ROAD && this.tiles[y][x] !== TileType.ROAD_UP && this.tiles[y][x] !== TileType.ROAD_DOWN && this.tiles[y][x] !== TileType.ROAD_LEFT && this.tiles[y][x] !== TileType.ROAD_RIGHT && this.tiles[y][x] !== TileType.CROSSWALK) {
                     const neighbors = [[y-1,x],[y+1,x],[y,x-1],[y,x+1]];
                     for (const [ny, nx] of neighbors) {
                         if (ny >= 0 && ny < MAP_HEIGHT && nx >= 0 && nx < MAP_WIDTH) {
-                            if (this.tiles[ny][nx] === TileType.ROAD || this.tiles[ny][nx] === TileType.CROSSWALK) {
+                            const nt = this.tiles[ny][nx];
+                            if (nt === TileType.ROAD || nt === TileType.ROAD_UP || nt === TileType.ROAD_DOWN || nt === TileType.ROAD_LEFT || nt === TileType.ROAD_RIGHT || nt === TileType.CROSSWALK) {
                                 this.tiles[y][x] = TileType.SIDEWALK;
                                 break;
                             }
@@ -208,14 +223,16 @@ class GameMap {
         // Scenario 2: Outside trying to enter building B
         if (!bldgA && bldgB) {
             const isOpen = this.openDoors.has(bldgB.id);
-            const isDoor = bldgB.doorTiles.some(d => d.x === wx && d.y === wy);
+            const isDoor = bldgB.doorTiles.some(d => d.x === wx && d.y === wy) || 
+                           bldgB.doorTiles.some(d => d.x === curWX && d.y === curWY);
             return isOpen && isDoor;
         }
 
         // Scenario 3: Inside building A trying to exit
         if (bldgA && !bldgB) {
             const isOpen = this.openDoors.has(bldgA.id);
-            const isDoor = bldgA.doorTiles.some(d => d.x === curWX && d.y === curWY);
+            const isDoor = bldgA.doorTiles.some(d => d.x === wx && d.y === wy) || 
+                           bldgA.doorTiles.some(d => d.x === curWX && d.y === curWY);
             return isOpen && isDoor;
         }
 

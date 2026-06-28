@@ -187,6 +187,7 @@ def buy_item():
         'Mushrooms': 2500,
         'Wings': 1500,
         'Protection': 1000,
+        'Magic 8-Ball': 1500,
         'Bruno The Trash Truck': 10000
     }
     
@@ -278,6 +279,15 @@ def end_round():
         penalty = penalty * (1.05 ** employees_killed)
         db.execute("UPDATE users SET employee_death_penalty=? WHERE id=?", (penalty, user_data['user_id']))
     
+    # Magic 8-Ball Logic
+    cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Magic 8-Ball'))
+    row = cursor.fetchone()
+    multiplier = 1
+    if row and row['quantity'] > 0:
+        db.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Magic 8-Ball'))
+        multiplier = random.choices([1, 2, 3, 4, 5], weights=[40, 30, 15, 10, 5], k=1)[0]
+        earned = earned * multiplier
+
     adjusted_employee_cost = int(employee_cost * penalty)
     new_balance = user['balance'] + earned - adjusted_employee_cost
     
@@ -295,7 +305,7 @@ def end_round():
     db.execute("UPDATE users SET balance=? WHERE id=?", (new_balance, user_data['user_id']))
     db.commit()
     
-    return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty})
+    return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty, 'multiplier': multiplier})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)

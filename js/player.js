@@ -20,7 +20,7 @@ class Player {
         this.animTimer = 0;
         this.positionHistory = [];
         this.historyMaxLength = 2000;
-        this.keys = { up: false, down: false, left: false, right: false };
+        this.keys = { up: false, down: false, left: false, right: false, k: false };
     }
 
     handleKeyDown(e) {
@@ -29,6 +29,7 @@ class Player {
             case 'ArrowDown': this.keys.down = true; break;
             case 'ArrowLeft': this.keys.left = true; break;
             case 'ArrowRight': this.keys.right = true; break;
+            case 'k': case 'K': this.keys.k = true; break;
         }
     }
 
@@ -38,6 +39,7 @@ class Player {
             case 'ArrowDown': this.keys.down = false; break;
             case 'ArrowLeft': this.keys.left = false; break;
             case 'ArrowRight': this.keys.right = false; break;
+            case 'k': case 'K': this.keys.k = false; break;
         }
     }
 
@@ -82,6 +84,20 @@ class Player {
         ];
         const curTX = this.getTileX();
         const curTY = this.getTileY();
+
+        const curWX = wrapTileX(this.getTileX());
+        const curWY = wrapTileY(this.getTileY());
+        const targetWX = wrapTileX(Math.floor(newX / TILE_SIZE));
+        const targetWY = wrapTileY(Math.floor(newY / TILE_SIZE));
+        
+        const bldgA = gameMap.getBuildingAtTile(curWX, curWY);
+        const bldgB = gameMap.getBuildingAtTile(targetWX, targetWY);
+        
+        if (!bldgA && bldgB) {
+            // Trying to enter building B
+            // Entry allowed (checked later via map.isWalkable)
+        }
+
         for (const c of corners) {
             const targetTX = Math.floor(c.x / TILE_SIZE);
             const targetTY = Math.floor(c.y / TILE_SIZE);

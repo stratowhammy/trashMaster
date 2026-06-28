@@ -2,6 +2,12 @@
 // npc.js — NPC characters & interaction system
 // ============================================================
 
+const NPC_NAMES = [
+    'Tony', 'Paulie', 'Vinny', 'Silvio', 'Carmela', 'Adriana', 'Christopher', 'Vito', 
+    'Clemenza', 'Tessio', 'Fredo', 'Sonny', 'Tom', 'Michael', 'Frank', 'Joe', 
+    'Donnie', 'Lefty', 'Henry', 'Tommy', 'Jimmy', 'Nicky'
+];
+
 const NPC_DIALOGUES = [
     ["Hey there!", "Nice day for cleaning up!"],
     ["Watch out for trash piles!", "Keep the streets clean!"],
@@ -14,13 +20,14 @@ const NPC_DIALOGUES = [
 ];
 
 class NPC {
-    constructor(tileX, tileY, spriteId, dialogueLines, isInformant = false) {
+    constructor(tileX, tileY, spriteId, dialogueLines, name, isInformant = false) {
         this.x = tileX * TILE_SIZE + TILE_SIZE / 2;
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
         this.tileX = tileX;
         this.tileY = tileY;
         this.spriteId = spriteId;
         this.dialogueLines = dialogueLines;
+        this.name = name;
         this.isInformant = isInformant;
         this.frenzyBuildingId = null;
         this.interacted = false;
@@ -42,7 +49,8 @@ class NPC {
         return {
             lines: this.dialogueLines,
             isInformant: this.isInformant,
-            buildingId: this.frenzyBuildingId
+            buildingId: this.frenzyBuildingId,
+            name: this.name
         };
     }
 
@@ -73,7 +81,7 @@ class NPC {
                 ? `rgba(255,200,0,${pulse})`
                 : `rgba(255,255,100,${pulse})`;
             ctx.beginPath();
-            ctx.arc(screen.x, screen.y - drawSize / 2 - 14 + bobY, 8, 0, Math.PI * 2);
+            ctx.arc(screen.x, screen.y - drawSize / 2 - 20 + bobY, 8, 0, Math.PI * 2);
             ctx.fill();
 
             // Exclamation mark
@@ -81,9 +89,15 @@ class NPC {
             ctx.font = 'bold 14px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('!', screen.x, screen.y - drawSize / 2 - 14 + bobY);
+            ctx.fillText('!', screen.x, screen.y - drawSize / 2 - 20 + bobY);
             ctx.restore();
         }
+
+        // NPC Name
+        ctx.fillStyle = '#fff';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.name, screen.x, screen.y - drawSize / 2 - 6);
 
         // "E to talk" prompt when player is near (set externally)
         if (this._showPrompt) {
@@ -131,9 +145,16 @@ class NPCManager {
             }
         }
 
+        let availableNames = [...NPC_NAMES];
+        for (let i = availableNames.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [availableNames[i], availableNames[j]] = [availableNames[j], availableNames[i]];
+        }
+
         for (let i = 0; i < Math.min(10, positions.length); i++) {
             const pos = positions[i];
             const isInformant = informantIndices.has(i);
+            const npcName = availableNames.pop() || "Citizen";
 
             let dialogue;
             if (isInformant) {
@@ -142,12 +163,12 @@ class NPCManager {
                     `Psst! There's a ton of trash at building ${bldg.address}!`,
                     "The door is now open. Be careful of pirates!"
                 ];
-                const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, true);
+                const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, true);
                 npc.frenzyBuildingId = bldg.id;
                 this.npcs.push(npc);
             } else {
                 dialogue = NPC_DIALOGUES[i % NPC_DIALOGUES.length];
-                this.npcs.push(new NPC(pos.x, pos.y, 'char_npc', dialogue, false));
+                this.npcs.push(new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false));
             }
         }
     }
@@ -189,7 +210,8 @@ class NPCManager {
                 lineIndex: 0,
                 timer: 180, // ~3 seconds per line
                 isInformant: result.isInformant,
-                buildingId: result.buildingId
+                buildingId: result.buildingId,
+                name: result.name
             };
             return result;
         }
@@ -241,6 +263,13 @@ class NPCManager {
         ctx.roundRect(boxX, boxY, boxW, boxH, 8);
         ctx.stroke();
 
+        // NPC Name
+        ctx.fillStyle = '#f0d048';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.activeDialogue.name + ":", boxX + 15, boxY + 16);
+
         // Text
         ctx.fillStyle = '#fff';
         ctx.font = '10px "Press Start 2P", monospace';
@@ -263,7 +292,7 @@ class NPCManager {
         lines.push(currentLine);
 
         for (let i = 0; i < lines.length; i++) {
-            ctx.fillText(lines[i], canvasWidth / 2, boxY + 20 + i * 18);
+            ctx.fillText(lines[i], canvasWidth / 2, boxY + 32 + i * 16);
         }
     }
 }

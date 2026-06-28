@@ -1,8 +1,9 @@
-// ============================================================
-// car.js — Traffic on the street grid
-// ============================================================
+import re
 
-class Car {
+with open('js/car.js', 'r') as f:
+    content = f.read()
+
+car_class = """class Car {
     constructor(startX, startY, startDir, speed, color) {
         this.x = startX;
         this.y = startY;
@@ -68,14 +69,12 @@ class Car {
         ctx.fillRect(-8, -11, 16, 5);
         ctx.restore();
     }
-}
+}"""
 
-class CarManager {
-    constructor() {
-        this.cars = [];
-    }
+# Replace Car class
+content = re.sub(r'class Car \{.*?\n\}\n', car_class + '\n', content, flags=re.DOTALL)
 
-    spawnCars(gameMap) {
+spawn_cars = """    spawnCars(gameMap) {
         this.cars = [];
         const colors = ['green', 'green', 'green', 'green', 'green', 'green', 'red', 'red', 'red', 'red', 'red', 'red'];
         
@@ -104,82 +103,10 @@ class CarManager {
             
             this.cars.push(new Car(startX, startY, dir, speed, colors[i]));
         }
-    }
+    }"""
 
-    update(dt, game) {
-        // Update all cars
-        for (const car of this.cars) {
-            car.update(dt, game ? game.gameMap : null);
-        }
+# Replace spawnCars
+content = re.sub(r'    spawnCars\(\) \{.*?\n    \}', spawn_cars, content, flags=re.DOTALL)
 
-        if (!game || !game.player) return;
-
-        const player = game.player;
-        const followers = game.followerManager.followers;
-
-        // Collision check
-        for (const car of this.cars) {
-            if (!car.active) continue;
-
-            // Check collision with player
-            const pdx = player.x - car.x;
-            const pdy = player.y - car.y;
-            const pDist = Math.sqrt(pdx * pdx + pdy * pdy);
-
-            if (car.color === 'red') {
-                // Red Car: kills player or posse members
-                if (pDist < TILE_SIZE * 0.5) {
-                    if (game.followerManager.getFollowerCount() > 0) {
-                        // Kill a follower instead of the player (posse member dies)
-                        game.followerManager.removeFollower();
-                        game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
-                        // Temporarily disable car to prevent multi-kills
-                        car.active = false;
-                        setTimeout(() => { car.active = true; }, 3000);
-                    } else {
-                        // Player dies!
-                        game._triggerCarDefeat();
-                        return;
-                    }
-                }
-
-                // Check collision with followers
-                for (let i = followers.length - 1; i >= 0; i--) {
-                    const fol = followers[i];
-                    const fdx = fol.x - car.x;
-                    const fdy = fol.y - car.y;
-                    const fDist = Math.sqrt(fdx * fdx + fdy * fdy);
-                    
-                    if (fDist < TILE_SIZE * 0.5) {
-                        game.followerManager.removeFollowerAt(i);
-                        game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
-                        // Temporarily disable car
-                        car.active = false;
-                        setTimeout(() => { car.active = true; }, 3000);
-                        break;
-                    }
-                }
-            } else if (car.color === 'green') {
-                // Green Car: Near interaction check (Press E)
-                if (pDist < TILE_SIZE * 0.8) {
-                    // Show prompt on HUD
-                    game.hud.showFollowerNotification('Press [E] to recruit green car helper!', false);
-                    
-                    // Check if player presses interaction key 'E'
-                    if (player.interactionTriggered) {
-                        player.interactionTriggered = false; // consume
-                        car.active = false;
-                        game.followerManager.addFollower(player.x, player.y);
-                        game.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
-                    }
-                }
-            }
-        }
-    }
-
-    render(ctx, camera) {
-        for (const car of this.cars) {
-            car.render(ctx, camera);
-        }
-    }
-}
+with open('js/car.js', 'w') as f:
+    f.write(content)

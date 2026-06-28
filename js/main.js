@@ -145,6 +145,24 @@ class Game {
                 // K or k to kill NPC
                 if (e.key === 'k' || e.key === 'K') {
                     if (window.crimeMode) {
+                        // Check if near a Don first
+                        if (window.crimeMode && this.crimeManager) {
+                            const px = wrapWorldX(this.player.x);
+                            const py = wrapWorldY(this.player.y);
+                            // Check if near a Don
+                            for (const don of this.crimeManager.dons) {
+                                if (don.alive) {
+                                    const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                                    if (dist < TILE_SIZE * 1.5) {
+                                        don.alive = false;
+                                        this.hud.showFollowerNotification(`${don.name} has been killed!`, true);
+                                        this.crimeManager.spawnThugs(this.gameMap);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+
                         const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
                         if (npc) {
                             const idx = this.npcManager.npcs.indexOf(npc);
@@ -155,11 +173,12 @@ class Game {
                                 // Spawn police officer from the station!
                                 if (this.crimeManager) {
                                     this.crimeManager.policeActive = true;
+                                    this.crimeManager.policeActiveTimer = 30.0;
                                     const station = this.gameMap.buildings[1];
                                     if (station && station.doorTiles.length > 0) {
                                         const door = station.doorTiles[0];
-                                        this.crimeManager.police.push(new PoliceOfficer(door.x, door.y));
-                                        this.hud.showFollowerNotification('👮 Police officer dispatched for murder!', true);
+                                        this.crimeManager.police.push(new PoliceOfficer(door.x, door.y, true));
+                                        this.hud.showFollowerNotification('👮 Police officer dispatched for murder! They will chase for 30s!', true);
                                     }
                                 }
 
@@ -195,15 +214,48 @@ class Game {
                 // R or r to rob NPC
                 if (e.key === 'r' || e.key === 'R') {
                     if (window.crimeMode) {
+                        // Check Don rob first
+                        if (window.crimeMode && this.crimeManager) {
+                            const px = wrapWorldX(this.player.x);
+                            const py = wrapWorldY(this.player.y);
+                            for (const don of this.crimeManager.dons) {
+                                if (don.alive && !don.robbed) {
+                                    const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                                    if (dist < TILE_SIZE * 1.5) {
+                                        don.robbed = true;
+                                        const robbedAmount = 500 + Math.floor(Math.random() * 1501);
+                                        this.trashManager.totalPoints += robbedAmount;
+                                        this.hud.showFollowerNotification(`Robbed ${don.name} for $${robbedAmount}!`, true);
+                                        this.crimeManager.spawnThugs(this.gameMap);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+
                         const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
-                        if (npc) {
-                            const robbedAmount = 100 + Math.floor(Math.random() * 701); // 100 to 800
+                        if (npc && !npc.robbed) {
+                            npc.robbed = true;
+                            const robbedAmount = 100 + Math.floor(Math.random() * 701);
                             this.trashManager.totalPoints += robbedAmount;
                             this.hud.showFollowerNotification(`Robbed NPC for $${robbedAmount}!`, true);
+                            
+                            // 50% chance police are called
+                            if (Math.random() < 0.5 && this.crimeManager) {
+                                const station = this.gameMap.buildings[1];
+                                if (station && station.doorTiles.length > 0) {
+                                    const door = station.doorTiles[0];
+                                    this.crimeManager.police.push(new PoliceOfficer(door.x, door.y, true)); // temporary=true, 30s TTL
+                                    this.hud.showFollowerNotification('👮 Police called! They\'ll chase you for 30 seconds!', true);
+                                }
+                            }
+                            
                             if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'rob_npc') {
                                 this.hud.showFollowerNotification('Favor completed for the Don!', true);
                                 this.crimeManager.assignNextTask(this.gameMap);
                             }
+                        } else if (npc && npc.robbed) {
+                            this.hud.showFollowerNotification('This NPC has already been robbed!', false);
                         }
                     }
                 }
@@ -921,7 +973,7 @@ class Game {
         
         const earned = this.trashManager.totalPoints;
         try {
-            await window.apiCall('/api/game/end-round', 'POST', { 
+            const result = await window.apiCall('/api/game/end-round', 'POST', { 
                 earned, 
                 employee_cost: this.totalEmployeeCost,
                 employees_killed: this.employeesKilledThisRound
@@ -931,6 +983,10 @@ class Game {
             window.renderStore();
             window.showScreen('store-screen');
             this.state = GameState.UI_OVERLAY;
+            
+            if (result && result.multiplier && result.multiplier > 1) {
+                alert(`🎱 Magic 8-Ball Activated! Your score was multiplied by ${result.multiplier}x!`);
+            }
         } catch(e) {
             console.error("End round sync failed:", e);
         }

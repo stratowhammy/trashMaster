@@ -36,7 +36,20 @@ class MiniMap {
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
                 const tile = gameMap.tiles[y][x];
-                ctx.fillStyle = miniColors[tile] || '#333';
+                let color = miniColors[tile] || '#333';
+                
+                if (window.crimeMode) {
+                    const bldg = gameMap.getBuildingAtTile(x, y);
+                    if (bldg) {
+                        if (bldg.id === 0) {
+                            color = '#ffd700'; // Bank: Yellow
+                        } else if (bldg.id === 1) {
+                            color = '#3388ff'; // Police Station: Blue
+                        }
+                    }
+                }
+                
+                ctx.fillStyle = color;
                 ctx.fillRect(x * s, y * s, s, s);
             }
         }

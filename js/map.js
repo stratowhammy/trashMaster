@@ -291,6 +291,37 @@ class GameMap {
                     ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
                     break;
                 }
+                
+                if (window.crimeMode && bldg) {
+                    if (bldg.id === 0) {
+                        // Bank: Yellowish gold brick wall style
+                        ctx.fillStyle = '#d4af37';
+                        ctx.fillRect(sx, sy, s, s);
+                        ctx.strokeStyle = '#aa8800';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+                        
+                        // Small highlights
+                        ctx.fillStyle = '#ffd700';
+                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
+                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
+                        break;
+                    } else if (bldg.id === 1) {
+                        // Police Station: Blue brick wall style
+                        ctx.fillStyle = '#0f2b5c';
+                        ctx.fillRect(sx, sy, s, s);
+                        ctx.strokeStyle = '#05132d';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+                        
+                        // Small highlights
+                        ctx.fillStyle = '#1c4280';
+                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
+                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
+                        break;
+                    }
+                }
+
                 const ci=this.buildingMeta[ty][tx]; const c=BUILDING_COLORS[ci>=0?ci:0];
                 ctx.fillStyle=c.base; ctx.fillRect(sx,sy,s,s);
                 ctx.fillStyle='#2a2a3a';

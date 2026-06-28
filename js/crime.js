@@ -181,9 +181,43 @@ class CrimeManager {
     }
 
     initialize(gameMap) {
+        // Find walkable tile near (6,6)
+        let don1Tile = { x: 6, y: 6 };
+        let found1 = false;
+        for (let r = 0; r < 12 && !found1; r++) {
+            for (let dy = -r; dy <= r && !found1; dy++) {
+                for (let dx = -r; dx <= r && !found1; dx++) {
+                    const tx = wrapTileX(6 + dx);
+                    const ty = wrapTileY(6 + dy);
+                    const tile = gameMap.getTile(tx, ty);
+                    if (tile === TileType.ROAD || tile === TileType.SIDEWALK || tile === TileType.CROSSWALK) {
+                        don1Tile = { x: tx, y: ty };
+                        found1 = true;
+                    }
+                }
+            }
+        }
+
+        // Find walkable tile near (58,58)
+        let don2Tile = { x: 58, y: 58 };
+        let found2 = false;
+        for (let r = 0; r < 12 && !found2; r++) {
+            for (let dy = -r; dy <= r && !found2; dy++) {
+                for (let dx = -r; dx <= r && !found2; dx++) {
+                    const tx = wrapTileX(58 + dx);
+                    const ty = wrapTileY(58 + dy);
+                    const tile = gameMap.getTile(tx, ty);
+                    if (tile === TileType.ROAD || tile === TileType.SIDEWALK || tile === TileType.CROSSWALK) {
+                        don2Tile = { x: tx, y: ty };
+                        found2 = true;
+                    }
+                }
+            }
+        }
+
         this.dons = [
-            new MafiaDon(0, "Don Salieri", 6, 6, '#000000'), // Salieri (Black)
-            new MafiaDon(1, "Don Morello", 58, 58, '#ffffff') // Morello (White)
+            new MafiaDon(0, "Don Salieri", don1Tile.x, don1Tile.y, '#000000'), // Salieri (Black)
+            new MafiaDon(1, "Don Morello", don2Tile.x, don2Tile.y, '#ffffff') // Morello (White)
         ];
 
         // Police Chief spawns near Police Station (building ID 1)

@@ -88,7 +88,7 @@ class Game {
                         let nearDon = null;
                         for (const don of this.crimeManager.dons) {
                             const dist = Math.sqrt((this.player.x - don.x)**2 + (this.player.y - don.y)**2);
-                            if (dist < TILE_SIZE * 0.8) {
+                            if (dist < TILE_SIZE * 1.2) {
                                 nearDon = don;
                                 break;
                             }
@@ -101,7 +101,7 @@ class Game {
                         // Check Police Chief bribe
                         if (this.crimeManager.madeMan && this.crimeManager.policeChief) {
                             const chiefDist = Math.sqrt((this.player.x - this.crimeManager.policeChief.x)**2 + (this.player.y - this.crimeManager.policeChief.y)**2);
-                            if (chiefDist < TILE_SIZE * 0.8) {
+                            if (chiefDist < TILE_SIZE * 1.2) {
                                 this.crimeManager.triggerBribeChief();
                                 return;
                             }
@@ -129,7 +129,7 @@ class Game {
                                 const dx = this.player.x - car.x;
                                 const dy = this.player.y - car.y;
                                 const dist = Math.sqrt(dx * dx + dy * dy);
-                                if (dist < TILE_SIZE * 0.8) {
+                                if (dist < TILE_SIZE * 1.2) {
                                     car.active = false;
                                     this.followerManager.addFollower(this.player.x, this.player.y);
                                     this.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
@@ -150,6 +150,17 @@ class Game {
                                 this.npcManager.npcs.splice(idx, 1);
                                 this.hud.showFollowerNotification('NPC killed!', true);
                                 
+                                // Spawn police officer from the station!
+                                if (this.crimeManager) {
+                                    this.crimeManager.policeActive = true;
+                                    const station = this.gameMap.buildings[1];
+                                    if (station && station.doorTiles.length > 0) {
+                                        const door = station.doorTiles[0];
+                                        this.crimeManager.police.push(new PoliceOfficer(door.x, door.y));
+                                        this.hud.showFollowerNotification('👮 Police officer dispatched for murder!', true);
+                                    }
+                                }
+
                                 if (this.crimeManager.activeTask && 
                                     (this.crimeManager.activeTask.type === 'collect_gold' || this.crimeManager.activeTask.type === 'intimidate' || this.crimeManager.activeTask.type === 'rob_npc')) {
                                     this.hud.showFollowerNotification('Favor completed for the Don!', true);
@@ -507,7 +518,7 @@ class Game {
             let nearDon = false;
             for (const don of this.crimeManager.dons) {
                 const dist = Math.sqrt((this.player.x - don.x)**2 + (this.player.y - don.y)**2);
-                if (dist < TILE_SIZE * 0.8) {
+                if (dist < TILE_SIZE * 1.2) {
                     nearDon = true;
                     this.hud.showFollowerNotification(`Press [E] to talk to ${don.name}`, false);
                     break;
@@ -516,7 +527,7 @@ class Game {
 
             if (!nearDon && this.crimeManager.madeMan && this.crimeManager.policeChief) {
                 const chiefDist = Math.sqrt((this.player.x - this.crimeManager.policeChief.x)**2 + (this.player.y - this.crimeManager.policeChief.y)**2);
-                if (chiefDist < TILE_SIZE * 0.8) {
+                if (chiefDist < TILE_SIZE * 1.2) {
                     this.hud.showFollowerNotification('Press [E] to Bribe Police Chief', false);
                 }
             }

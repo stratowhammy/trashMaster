@@ -175,6 +175,20 @@ class MiniMap {
             }
         }
 
+        // Draw police officers as bright blue dots on the minimap
+        if (window.crimeMode && window.game && window.game.crimeManager && window.game.crimeManager.police) {
+            ctx.fillStyle = '#0055ff';
+            for (const cop of window.game.crimeManager.police) {
+                if (cop.alive) {
+                    const cx = mapX + (cop.x / MAP_PIXEL_W) * this.width;
+                    const cy = mapY + (cop.y / MAP_PIXEL_H) * this.height;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
         // Draw player as bright green dot (use wrapped coordinates for infinite map)
         const wrappedPx = player.getWrappedX ? player.getWrappedX() : player.x;
         const wrappedPy = player.getWrappedY ? player.getWrappedY() : player.y;

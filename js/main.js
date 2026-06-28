@@ -85,10 +85,12 @@ class Game {
                 if (e.key === 'e' || e.key === 'E') {
                     // Crime Mode checks
                     if (window.crimeMode && this.crimeManager) {
+                        const px = ((this.player.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+                        const py = ((this.player.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
                         let nearDon = null;
                         for (const don of this.crimeManager.dons) {
-                            const dist = Math.sqrt((this.player.x - don.x)**2 + (this.player.y - don.y)**2);
-                            if (dist < TILE_SIZE * 1.2) {
+                            const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                            if (dist < TILE_SIZE * 1.5) {
                                 nearDon = don;
                                 break;
                             }
@@ -100,8 +102,8 @@ class Game {
 
                         // Check Police Chief bribe
                         if (this.crimeManager.madeMan && this.crimeManager.policeChief) {
-                            const chiefDist = Math.sqrt((this.player.x - this.crimeManager.policeChief.x)**2 + (this.player.y - this.crimeManager.policeChief.y)**2);
-                            if (chiefDist < TILE_SIZE * 1.2) {
+                            const chiefDist = Math.sqrt((px - this.crimeManager.policeChief.x)**2 + (py - this.crimeManager.policeChief.y)**2);
+                            if (chiefDist < TILE_SIZE * 1.5) {
                                 this.crimeManager.triggerBribeChief();
                                 return;
                             }
@@ -516,9 +518,11 @@ class Game {
 
             // Check if player is near any Don or Police Chief to show HUD prompt
             let nearDon = false;
+            const px = ((this.player.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+            const py = ((this.player.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
             for (const don of this.crimeManager.dons) {
-                const dist = Math.sqrt((this.player.x - don.x)**2 + (this.player.y - don.y)**2);
-                if (dist < TILE_SIZE * 1.2) {
+                const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                if (dist < TILE_SIZE * 1.5) {
                     nearDon = true;
                     this.hud.showFollowerNotification(`Press [E] to talk to ${don.name}`, false);
                     break;
@@ -526,8 +530,8 @@ class Game {
             }
 
             if (!nearDon && this.crimeManager.madeMan && this.crimeManager.policeChief) {
-                const chiefDist = Math.sqrt((this.player.x - this.crimeManager.policeChief.x)**2 + (this.player.y - this.crimeManager.policeChief.y)**2);
-                if (chiefDist < TILE_SIZE * 1.2) {
+                const chiefDist = Math.sqrt((px - this.crimeManager.policeChief.x)**2 + (py - this.crimeManager.policeChief.y)**2);
+                if (chiefDist < TILE_SIZE * 1.5) {
                     this.hud.showFollowerNotification('Press [E] to Bribe Police Chief', false);
                 }
             }

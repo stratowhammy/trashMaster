@@ -30,8 +30,10 @@ class NPC {
     }
 
     isPlayerNear(playerX, playerY) {
-        const dx = this.x - playerX;
-        const dy = this.y - playerY;
+        const px = ((playerX % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+        const py = ((playerY % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
+        const dx = this.x - px;
+        const dy = this.y - py;
         return Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 1.5;
     }
 

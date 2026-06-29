@@ -130,6 +130,20 @@ class MiniMap {
             }
         }
 
+        // Draw Flowers Mode Target Park Highlight
+        if (window.flowersMode && window.targetParkId && gameMap && gameMap.parkBlocks) {
+            const park = gameMap.parkBlocks.find(p => p.id === window.targetParkId);
+            if (park) {
+                const pulse = Math.sin(performance.now() / 150) * 0.4 + 0.6;
+                ctx.fillStyle = `rgba(255, 105, 180, ${pulse})`; // Pulsing hot pink
+                const px = mapX + park.x1 * s;
+                const py = mapY + park.y1 * s;
+                const pw = (park.x2 - park.x1 + 1) * s;
+                const ph = (park.y2 - park.y1 + 1) * s;
+                ctx.fillRect(px, py, pw, ph);
+            }
+        }
+
         // Draw Crime Mode Task Highlight
         if (window.crimeMode && window.game && window.game.crimeManager && window.game.crimeManager.activeTask) {
             const task = window.game.crimeManager.activeTask;

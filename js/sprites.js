@@ -22,7 +22,9 @@ const SPRITE_CONFIG = {
         { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },
         { id: 'char_pirate', name: 'Pirate', src: 'assets/sprites/pirate.png', color: '#aa3333' },
         { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' },
-        { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ffaa00' }
+        { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ffaa00' },
+        { id: 'flower', name: 'Flower', src: 'assets/sprites/flower.png' },
+        { id: 'mud', name: 'Mud', src: 'assets/sprites/mud.png' }
     ]
 };
 

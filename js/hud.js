@@ -124,6 +124,12 @@ class HUD {
                 ctx.fillText(`No Trash Req: ${susTimer}s`, timerX - 10, timerY + 45);
             }
         }
+        
+        if (window.flowersMode) {
+            const fert = (window.playerInventory && window.playerInventory['Fertilizer']) || 0;
+            ctx.fillStyle = '#ff66b2';
+            ctx.fillText(`Fertilizer: ${fert}`, timerX - 10, timerY + (window.fastFoodMode && susTimer > 0 ? 55 : 45));
+        }
 
         // ── Score Display (to the left of Timer) ──
         const scoreX = canvasWidth - 160;

@@ -57,6 +57,9 @@
             <div class="store-layout">
                 <div class="store-sidebar">
                     <h2 id="store-balance">$0</h2>
+                    <div id="movement-size-container" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ffcc; margin: 10px 0 20px 0; line-height: 1.5;">
+                        Movement: <span id="store-movement-size">0</span> followers
+                    </div>
                     <div id="store-inventory"></div>
                     <div class="toggle-container" style="margin-bottom: 8px;">
                         <label class="switch">
@@ -79,6 +82,13 @@
                         </label>
                         <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Fast Food Mode</span>
                     </div>
+                    <div class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="flowers-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Flowers Mode</span>
+                    </div>
                     <button id="btn-start-game" class="btn play-btn">Play Game</button>
                     <button id="btn-store-logout" class="btn secondary">Logout</button>
                 </div>
@@ -90,7 +100,7 @@
 
 
         <!-- Pirate Defeat Screen -->
-        <div id="pirate-defeat-screen" class="screen hidden" style="background: #1a0505; justify-content: center; height: 100vh;">
+        <div id="pirate-defeat-screen" class="screen hidden" style="background: #1a0505; display: flex; align-items: center; justify-content: center; height: 100vh; pointer-events: auto;">
             <h1 id="defeat-title" style="color: #ff3333; text-shadow: 0 0 10px rgba(255, 0, 0, 0.7); font-family: 'Press Start 2P', monospace; font-size: 20px; margin-bottom: 20px; text-align: center;">WASTED BY PIRATES</h1>
             <div class="defeat-container" style="display: flex; flex-direction: column; align-items: center; gap: 20px; background: rgba(0,0,0,0.6); padding: 25px; border: 3px solid #ff3333; border-radius: 8px;">
                 <div style="display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap;">

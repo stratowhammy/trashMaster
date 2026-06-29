@@ -165,12 +165,12 @@ class GameMap {
     }
 
     _createParks() {
-        const parkBlocks = [
-            {x1:8,y1:8,x2:12,y2:12},{x1:28,y1:28,x2:32,y2:32},
-            {x1:48,y1:8,x2:52,y2:12},{x1:8,y1:48,x2:12,y2:52},
-            {x1:38,y1:48,x2:42,y2:52},{x1:18,y1:18,x2:22,y2:22},
+        this.parkBlocks = [
+            {id: 'park_1', x1:8,y1:8,x2:12,y2:12},{id: 'park_2', x1:28,y1:28,x2:32,y2:32},
+            {id: 'park_3', x1:48,y1:8,x2:52,y2:12},{id: 'park_4', x1:8,y1:48,x2:12,y2:52},
+            {id: 'park_5', x1:38,y1:48,x2:42,y2:52},{id: 'park_6', x1:18,y1:18,x2:22,y2:22},
         ];
-        for (const park of parkBlocks) {
+        for (const park of this.parkBlocks) {
             for (let y = park.y1; y <= park.y2; y++)
                 for (let x = park.x1; x <= park.x2; x++)
                     if (y >= 0 && y < MAP_HEIGHT && x >= 0 && x < MAP_WIDTH && this.tiles[y][x] === TileType.BUILDING) {
@@ -246,6 +246,16 @@ class GameMap {
 
     getTile(tileX, tileY) {
         return this.tiles[wrapTileY(tileY)][wrapTileX(tileX)];
+    }
+
+    isParkTile(tx, ty) {
+        if (!this.parkBlocks) return null;
+        for (const park of this.parkBlocks) {
+            if (tx >= park.x1 && tx <= park.x2 && ty >= park.y1 && ty <= park.y2) {
+                return park.id;
+            }
+        }
+        return null;
     }
 
     // ── Wrapping renderer ──

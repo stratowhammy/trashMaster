@@ -6,6 +6,7 @@ var userRole = localStorage.getItem('trashMasterRole') || null;
 var playerBalance = 0;
 var playerHasTruck = false;
 var playerInventory = {};
+var playerMovementSize = 0;
 
 async function apiCall(endpoint, method = 'GET', body = null) {
     const headers = { 'Content-Type': 'application/json' };
@@ -110,6 +111,9 @@ function initUI() {
             const fastfoodToggle = document.getElementById('fastfood-toggle');
             window.fastFoodMode = fastfoodToggle ? fastfoodToggle.checked : false;
             
+            const flowersToggle = document.getElementById('flowers-toggle');
+            window.flowersMode = flowersToggle ? flowersToggle.checked : false;
+
             showScreen('game-layer'); // This hides UI and shows canvas
             if (window.startGameFromStore) {
                 window.startGameFromStore(); // Custom method we will add
@@ -124,6 +128,7 @@ async function refreshGameState() {
         playerBalance = data.balance;
         playerHasTruck = data.has_truck;
         playerInventory = data.inventory;
+        playerMovementSize = data.movement_size || 0;
         updateStoreUI();
     } catch (e) {
         console.error("Failed to sync state", e);
@@ -138,12 +143,16 @@ const STORE_ITEMS = [
     { name: 'Protection', price: 1000, desc: '+5% posse win chance for 30s (Key P)', sprite: 'protection.png' },
     { name: 'Magic 8-Ball', price: 1500, desc: 'Score multiplied randomly at end of round', sprite: 'magic_8_ball.png' },
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
+    { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
     { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' }
 ];
 
 function updateStoreUI() {
     const balEl = document.getElementById('store-balance');
     if (balEl) balEl.innerText = `$${playerBalance.toLocaleString()}`;
+
+    const movEl = document.getElementById('store-movement-size');
+    if (movEl) movEl.innerText = playerMovementSize.toLocaleString();
 
     const invEl = document.getElementById('store-inventory');
     if (invEl) {

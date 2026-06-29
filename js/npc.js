@@ -50,7 +50,9 @@ class NPC {
             lines: this.dialogueLines,
             isInformant: this.isInformant,
             buildingId: this.frenzyBuildingId,
-            name: this.name
+            name: this.name,
+            npcType: this.npcType,
+            targetParkId: this.targetParkId
         };
     }
 
@@ -129,19 +131,50 @@ class NPCManager {
             }
         }
 
-        // Shuffle and pick 10
+        // Shuffle sidewalks
         for (let i = sidewalks.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [sidewalks[i], sidewalks[j]] = [sidewalks[j], sidewalks[i]];
         }
 
-        const positions = sidewalks.slice(0, 10);
+        const positions = [];
+        for (const pos of sidewalks) {
+            let tooClose = false;
+            for (const p of positions) {
+                if (Math.hypot(pos.x - p.x, pos.y - p.y) < 10) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (!tooClose) {
+                positions.push(pos);
+            }
+            if (positions.length >= 20) break; // We need at most ~15 NPCs
+        }
+
         const informantIndices = new Set();
+        const flowerIndices = new Set();
+
+        const numNPCsToSpawn = Math.min(10, positions.length);
 
         if (frenzyMode && buildings && buildings.length >= 5) {
             // Pick 5 random NPCs to be informants
-            while (informantIndices.size < 5) {
-                informantIndices.add(Math.floor(Math.random() * Math.min(10, positions.length)));
+            while (informantIndices.size < Math.min(5, numNPCsToSpawn)) {
+                informantIndices.add(Math.floor(Math.random() * numNPCsToSpawn));
+            }
+        }
+
+        let numFlowerNPCs = 0;
+        if (window.flowersMode) {
+            numFlowerNPCs = 3;
+            // Pick 3 random NPCs to be flower NPCs, ensuring they aren't informants
+            let attempts = 0;
+            while (flowerIndices.size < Math.min(numFlowerNPCs, numNPCsToSpawn - informantIndices.size) && attempts < 100) {
+                const idx = Math.floor(Math.random() * numNPCsToSpawn);
+                if (!informantIndices.has(idx)) {
+                    flowerIndices.add(idx);
+                }
+                attempts++;
             }
         }
 
@@ -151,12 +184,16 @@ class NPCManager {
             [availableNames[i], availableNames[j]] = [availableNames[j], availableNames[i]];
         }
 
-        for (let i = 0; i < Math.min(10, positions.length); i++) {
+        for (let i = 0; i < numNPCsToSpawn; i++) {
             const pos = positions[i];
             const isInformant = informantIndices.has(i);
+            const isFlower = flowerIndices.has(i);
             const npcName = availableNames.pop() || "Citizen";
 
             let dialogue;
+            let npcType = 'normal';
+            let targetParkId = null;
+
             if (isInformant) {
                 const bldg = buildings[Math.floor(Math.random() * buildings.length)];
                 dialogue = [
@@ -166,6 +203,21 @@ class NPCManager {
                 const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, true);
                 npc.frenzyBuildingId = bldg.id;
                 this.npcs.push(npc);
+                continue;
+            } else if (isFlower) {
+                npcType = 'flower';
+                const parkNum = Math.floor(Math.random() * 6) + 1;
+                targetParkId = `park_${parkNum}`;
+                dialogue = [
+                    `Hey! We need some help planting flowers in park ${parkNum}!`,
+                    "I marked it on your minimap. Don't forget your fertilizer!"
+                ];
+                const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false);
+                npc.npcType = 'flower';
+                npc.targetParkId = targetParkId;
+                // Tint flower NPCs differently? We can rely on sprite tint if we want.
+                this.npcs.push(npc);
+                continue;
             } else {
                 dialogue = NPC_DIALOGUES[i % NPC_DIALOGUES.length];
                 this.npcs.push(new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false));

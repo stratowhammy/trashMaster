@@ -110,17 +110,24 @@ class Game {
                         }
                     }
 
-                    if (window.frenzyMode) {
+                    if (window.frenzyMode || window.flowersMode) {
                         const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
-                        if (result && result.isInformant) {
-                            // Open door!
-                            this.gameMap.openBuildingDoor(result.buildingId);
-                            // Spawn pirates!
-                            const bldg = this.gameMap.buildings.find(b => b.id === result.buildingId);
-                            if (bldg && bldg.doorTiles.length > 0) {
-                                const door = bldg.doorTiles[0];
-                                this.pirateManager.spawnPirates(door.x, door.y);
+                        if (result) {
+                            if (window.frenzyMode && result.isInformant) {
+                                // Open door!
+                                this.gameMap.openBuildingDoor(result.buildingId);
+                                // Spawn pirates!
+                                const bldg = this.gameMap.buildings.find(b => b.id === result.buildingId);
+                                if (bldg && bldg.doorTiles.length > 0) {
+                                    const door = bldg.doorTiles[0];
+                                    this.pirateManager.spawnPirates(door.x, door.y);
+                                }
                             }
+                            if (window.flowersMode && result.npcType === 'flower') {
+                                window.targetParkId = result.targetParkId;
+                                this.hud.showFollowerNotification(`Target Park Set to ${result.targetParkId}!`, true);
+                            }
+                            return; // Stop processing 'E' if interacted with an NPC
                         }
                     }
 
@@ -135,11 +142,12 @@ class Game {
                                     car.active = false;
                                     this.followerManager.addFollower(this.player.x, this.player.y);
                                     this.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
-                                    break;
+                                    return; // Stop processing 'E' if recruited from a car
                                 }
                             }
                         }
                     }
+
 
                     // Fast Food & Hospital interaction
                     if (window.fastFoodMode) {
@@ -170,6 +178,52 @@ class Game {
                                     return;
                                 }
                             }
+                        }
+                    }
+                }
+
+                // F or f to plant fertilizer
+                if (e.key === 'f' || e.key === 'F') {
+                    if (window.flowersMode) {
+                        const px = wrapWorldX(this.player.x);
+                        const py = wrapWorldY(this.player.y);
+                        const tileX = Math.floor(px / TILE_SIZE);
+                        const tileY = Math.floor(py / TILE_SIZE);
+                        const parkId = this.gameMap.isParkTile(tileX, tileY);
+                        
+                        // Check if fertilizer is already here
+                        const existingFlower = this.flowers.find(f => f.x === tileX && f.y === tileY);
+                        if (!existingFlower) {
+                            if (window.playerInventory && window.playerInventory['Fertilizer'] > 0) {
+                                window.playerInventory['Fertilizer']--; // consume fertilizer
+                                // Roll 80% success chance AND must be in a park
+                                if (Math.random() < 0.8 && parkId) {
+                                    this.flowers.push({
+                                        x: tileX,
+                                        y: tileY,
+                                        parkId: parkId,
+                                        isMud: false,
+                                        plantedAtElapsed: this.hud.gameDuration - this.hud.timeRemaining,
+                                        growTimeRemaining: 90
+                                    });
+                                    this.hud.showFollowerNotification(`Planted flower!`, true);
+                                } else {
+                                    // Mud pile
+                                    this.flowers.push({
+                                        x: tileX,
+                                        y: tileY,
+                                        parkId: parkId,
+                                        isMud: true,
+                                        plantedAtElapsed: this.hud.gameDuration - this.hud.timeRemaining,
+                                        growTimeRemaining: 90
+                                    });
+                                    this.hud.showFollowerNotification(`Fertilized ground.`, parkId ? false : true);
+                                }
+                            } else {
+                                this.hud.showFollowerNotification(`You need Fertilizer!`, false);
+                            }
+                        } else {
+                            this.hud.showFollowerNotification(`Already fertilized here!`, false);
                         }
                     }
                 }
@@ -504,6 +558,19 @@ class Game {
 
         // Update timer
         this.hud.update(dt);
+        
+        // Update flowers
+        if (window.flowersMode) {
+            for (const flower of this.flowers) {
+                if (flower.growTimeRemaining > 0) {
+                    flower.growTimeRemaining -= dt;
+                    if (flower.growTimeRemaining <= 0) {
+                        flower.growTimeRemaining = 0;
+                        this.hud.showFollowerNotification(`A flower has bloomed!`, true);
+                    }
+                }
+            }
+        }
         this.hud.evalTimer = 10 - this.followerCheckTimer;
         this.hud.trashInWindow = this.trashCollectedInWindow;
 
@@ -514,12 +581,12 @@ class Game {
         }
 
         // Frenzy Mode updates
-        if (window.frenzyMode) {
+        if (window.frenzyMode || window.flowersMode) {
             this.npcManager.update();
+        }
+        
+        if (window.frenzyMode) {
             this.pirateManager.update(dt, this);
-
-            // Trigger NPC interaction checks
-            this.npcManager.checkInteraction(this.player.x, this.player.y);
 
             // Check if player intersects with any alive pirate
             if (this.player) {
@@ -1032,6 +1099,7 @@ class Game {
         this.followerCheckTimer = 0;
         this.employeeUpkeepTimer = 0;
         this.totalEmployeeCost = 0;
+        this.flowers = [];
         this.trashCollectedInWindow = 0;
         this.playerNearTrash = false;
         
@@ -1055,12 +1123,27 @@ class Game {
     async _endRoundAndReturnToStore() {
         if (!window.apiCall) return; // Not logged in
         
-        const earned = this.trashManager.totalPoints;
+        let earned = this.trashManager.totalPoints;
+
+        if (window.flowersMode && window.targetParkId) {
+            let flowerPayout = 0;
+            for (const f of this.flowers) {
+                if (!f.isMud && f.parkId === window.targetParkId && f.growTimeRemaining <= 0) {
+                    if (f.plantedAtElapsed <= 60) {
+                        flowerPayout += 250;
+                    } else {
+                        flowerPayout += 200;
+                    }
+                }
+            }
+            earned += flowerPayout;
+        }
         try {
             const result = await window.apiCall('/api/game/end-round', 'POST', { 
                 earned, 
                 employee_cost: this.totalEmployeeCost,
-                employees_killed: this.employeesKilledThisRound
+                employees_killed: this.employeesKilledThisRound,
+                followers: this.followerManager.getFollowerCount()
             });
             window.employeesHired = 0;
             await window.refreshGameState();
@@ -1117,8 +1200,50 @@ class Game {
 
         if (window.frenzyMode) {
             this.gameMap.renderAddresses(ctx, this.camera);
-            this.npcManager.render(ctx, this.camera, this.spriteManager);
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
+        }
+        
+        if (window.frenzyMode || window.flowersMode) {
+            this.npcManager.render(ctx, this.camera, this.spriteManager);
+        }
+
+        if (window.flowersMode) {
+            const flowerImg = this.spriteManager ? this.spriteManager.getImage('flower') : null;
+            const mudImg = this.spriteManager ? this.spriteManager.getImage('mud') : null;
+
+            for (const flower of this.flowers) {
+                const wx = flower.x * TILE_SIZE + TILE_SIZE / 2;
+                const wy = flower.y * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(wx, wy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (!this.camera.isVisible(wrapped.x - 20, wrapped.y - 20, 40, 40)) continue;
+                const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                
+                if (flower.isMud || flower.growTimeRemaining > 0) {
+                    if (mudImg) {
+                        ctx.drawImage(mudImg, screen.x - 16, screen.y - 16, 32, 32);
+                    } else {
+                        // Mud pile fallback
+                        ctx.fillStyle = '#4a3018';
+                        ctx.beginPath();
+                        ctx.ellipse(screen.x, screen.y + 4, 12, 6, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    if (flowerImg) {
+                        ctx.drawImage(flowerImg, screen.x - 16, screen.y - 16, 32, 32);
+                    } else {
+                        // Grown flower fallback
+                        ctx.fillStyle = '#ff66b2';
+                        ctx.beginPath();
+                        ctx.arc(screen.x, screen.y, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#ffff00';
+                        ctx.beginPath();
+                        ctx.arc(screen.x, screen.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
         }
 
         if (window.crimeMode) {
@@ -1197,6 +1322,8 @@ class Game {
     }
 
     async _showSplashGameOver(title, message, isPirateDefeat) {
+        const hadTruck = title === "WASTED BY PIRATES" && message.includes("Bruno");
+        
         if (isPirateDefeat) {
             this.trashManager.totalPoints = 0; // Lose all points
             if (window.playerHasTruck) {
@@ -1214,28 +1341,36 @@ class Game {
         const msgEl = document.getElementById('defeat-message');
         if (msgEl) msgEl.innerText = message;
 
-        // Hide game canvas and show defeat screens and show defeat screen
-        this.canvas.classList.add('hidden');
+        // Hide game canvas and show defeat screen
+        if (window.showScreen) {
+            window.showScreen('pirate-defeat-screen');
+        } else {
+            this.canvas.classList.add('hidden');
+            const screenEl = document.getElementById('pirate-defeat-screen');
+            if (screenEl) screenEl.classList.remove('hidden');
+        }
         const screenEl = document.getElementById('pirate-defeat-screen');
-        if (screenEl) screenEl.classList.remove('hidden');
+
+        // Always show the GIF on the splash screen as requested
+        const gifEl = document.getElementById('defeat-gif');
+        if (gifEl) gifEl.style.display = 'block';
 
         // Draw pixel art to defeat canvas
         const artCanvas = document.getElementById('defeatArtCanvas');
         if (artCanvas) {
+            document.getElementById('defeat-art-container').style.display = 'block';
             const ctx = artCanvas.getContext('2d');
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, 256, 128);
-
-            // Ground
-            ctx.fillStyle = '#222222';
-            ctx.fillRect(0, 96, 256, 32);
 
             const pirateImg = this.spriteManager.getCharacterImage('char_pirate');
             const truckImg = this.spriteManager.getCharacterImage('char_truck');
             
             if (isPirateDefeat) {
-                document.getElementById('defeat-art-container').style.display = 'block';
-                const hadTruck = title === "WASTED BY PIRATES" && message.includes("Bruno"); // A bit hacky but works based on our msg
+                // Ground
+                ctx.fillStyle = '#222222';
+                ctx.fillRect(0, 96, 256, 32);
+
                 if (hadTruck && truckImg && pirateImg) {
                     // Draw road lines
                     ctx.strokeStyle = '#444';
@@ -1264,9 +1399,28 @@ class Game {
                     }
                 }
             } else {
-                // Not a pirate defeat, maybe just draw player collapsing or nothing
-                // For now, let's just clear the art canvas or hide it
-                document.getElementById('defeat-art-container').style.display = 'none';
+                // Time's Up art
+                // Draw night sky
+                ctx.fillStyle = '#111122';
+                ctx.fillRect(0, 0, 256, 128);
+                
+                // Draw moon
+                ctx.fillStyle = '#ffeeaa';
+                ctx.beginPath();
+                ctx.arc(200, 30, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw city skyline silhouette
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(20, 60, 40, 68);
+                ctx.fillRect(65, 40, 30, 88);
+                ctx.fillRect(100, 70, 50, 58);
+                ctx.fillRect(155, 50, 35, 78);
+                ctx.fillRect(195, 80, 45, 48);
+                
+                // Draw ground
+                ctx.fillStyle = '#221100';
+                ctx.fillRect(0, 110, 256, 18);
             }
         }
 
@@ -1278,25 +1432,33 @@ class Game {
             btnReturn.parentNode.replaceChild(newBtn, btnReturn);
 
             newBtn.addEventListener('click', async () => {
-                if (window.apiCall) {
-                    try {
-                        await window.apiCall('/api/game/end-round', 'POST', {
-                            earned: 0,
-                            employee_cost: this.totalEmployeeCost,
-                            employees_killed: this.employeesKilledThisRound,
-                            lose_truck: hadTruck
-                        });
-                        window.employeesHired = 0;
-                        await window.refreshGameState();
-                        window.renderStore();
-                        
-                        // Hide defeat screen, show store screen
-                        if (screenEl) screenEl.classList.add('hidden');
-                        window.showScreen('store-screen');
-                        this._restartGame();
-                    } catch (e) {
-                        console.error("Return from defeat error:", e);
+                if (isPirateDefeat) {
+                    if (window.apiCall) {
+                        try {
+                            await window.apiCall('/api/game/end-round', 'POST', {
+                                earned: 0,
+                                employee_cost: this.totalEmployeeCost,
+                                employees_killed: this.employeesKilledThisRound,
+                                lose_truck: hadTruck,
+                                followers: this.followerManager.getFollowerCount()
+                            });
+                            window.employeesHired = 0;
+                            await window.refreshGameState();
+                            window.renderStore();
+                            
+                            // Hide defeat screen, show store screen
+                            if (screenEl) screenEl.classList.add('hidden');
+                            window.showScreen('store-screen');
+                            this._restartGame();
+                        } catch (e) {
+                            console.error("Return from defeat error:", e);
+                        }
                     }
+                } else {
+                    // Time's up scenario - use normal end round
+                    if (screenEl) screenEl.classList.add('hidden');
+                    await this._endRoundAndReturnToStore();
+                    this._restartGame();
                 }
             });
         }
@@ -1312,9 +1474,14 @@ class Game {
         }
 
         // Hide game canvas and show defeat screen
-        this.canvas.classList.add('hidden');
+        if (window.showScreen) {
+            window.showScreen('pirate-defeat-screen');
+        } else {
+            this.canvas.classList.add('hidden');
+            const screenEl = document.getElementById('pirate-defeat-screen');
+            if (screenEl) screenEl.classList.remove('hidden');
+        }
         const screenEl = document.getElementById('pirate-defeat-screen');
-        if (screenEl) screenEl.classList.remove('hidden');
 
         // Draw pixel art to defeat canvas: player run over by car
         const artCanvas = document.getElementById('defeatArtCanvas');
@@ -1357,7 +1524,8 @@ class Game {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
-                            lose_truck: false // they do NOT lose their truck from car accident!
+                            lose_truck: false, // they do NOT lose their truck from car accident!
+                            followers: this.followerManager.getFollowerCount()
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();
@@ -1384,9 +1552,14 @@ class Game {
         }
 
         // Hide game canvas and show defeat screen
-        this.canvas.classList.add('hidden');
+        if (window.showScreen) {
+            window.showScreen('pirate-defeat-screen');
+        } else {
+            this.canvas.classList.add('hidden');
+            const screenEl = document.getElementById('pirate-defeat-screen');
+            if (screenEl) screenEl.classList.remove('hidden');
+        }
         const screenEl = document.getElementById('pirate-defeat-screen');
-        if (screenEl) screenEl.classList.remove('hidden');
 
         // Draw pixel art to defeat canvas: player behind bars (jail)
         const artCanvas = document.getElementById('defeatArtCanvas');
@@ -1435,7 +1608,8 @@ class Game {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
-                            lose_truck: false // they do NOT lose their truck from arrest!
+                            lose_truck: false, // they do NOT lose their truck from arrest!
+                            followers: this.followerManager.getFollowerCount()
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();

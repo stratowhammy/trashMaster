@@ -42,7 +42,8 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 role TEXT DEFAULT 'player',
                 balance INTEGER DEFAULT 0,
-                has_truck BOOLEAN DEFAULT 0
+                has_truck BOOLEAN DEFAULT 0,
+                movement_size INTEGER DEFAULT 0
             )
         ''')
         db.execute('''
@@ -56,6 +57,10 @@ def init_db():
         ''')
         try:
             db.execute("ALTER TABLE users ADD COLUMN employee_death_penalty FLOAT DEFAULT 1.0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN movement_size INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
         db.commit()
@@ -162,7 +167,7 @@ def sync_game():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck, employee_death_penalty FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT balance, has_truck, employee_death_penalty, movement_size FROM users WHERE id=?", (user_data['user_id'],))
     user = cursor.fetchone()
     
     cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id=?", (user_data['user_id'],))
@@ -172,6 +177,7 @@ def sync_game():
         'balance': user['balance'],
         'has_truck': bool(user['has_truck']),
         'employee_death_penalty': user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0,
+        'movement_size': user['movement_size'] if user['movement_size'] else 0,
         'inventory': inv
     })
 
@@ -188,7 +194,8 @@ def buy_item():
         'Wings': 1500,
         'Protection': 1000,
         'Magic 8-Ball': 1500,
-        'Bruno The Trash Truck': 10000
+        'Bruno The Trash Truck': 10000,
+        'Fertilizer': 100
     }
     
     if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
@@ -268,6 +275,7 @@ def end_round():
     employee_cost = int(request.json.get('employee_cost', 0))
     employees_killed = int(request.json.get('employees_killed', 0))
     lose_truck = bool(request.json.get('lose_truck', False))
+    followers = int(request.json.get('followers', 0))
     
     db = get_db()
     cursor = db.cursor()
@@ -302,7 +310,7 @@ def end_round():
             
     if new_balance < 0: new_balance = 0
             
-    db.execute("UPDATE users SET balance=? WHERE id=?", (new_balance, user_data['user_id']))
+    db.execute("UPDATE users SET balance=?, movement_size = movement_size + ? WHERE id=?", (new_balance, followers, user_data['user_id']))
     db.commit()
     
     return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty, 'multiplier': multiplier})

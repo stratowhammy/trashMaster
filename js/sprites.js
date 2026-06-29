@@ -24,7 +24,11 @@ const SPRITE_CONFIG = {
         { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' },
         { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ffaa00' },
         { id: 'flower', name: 'Flower', src: 'assets/sprites/flower.png' },
-        { id: 'mud', name: 'Mud', src: 'assets/sprites/mud.png' }
+        { id: 'mud', name: 'Mud', src: 'assets/sprites/mud.png' },
+        { id: 'red_truck', name: 'Red Truck', src: 'assets/sprites/red_truck.png' },
+        { id: 'red_balloon', name: 'Red Balloon', src: 'assets/sprites/red_balloon.png' },
+        { id: 'parade', name: 'Parade', src: 'assets/sprites/parade.png' },
+        { id: 'dump', name: 'Dump', src: 'assets/sprites/dump.png' }
     ]
 };
 

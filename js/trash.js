@@ -41,6 +41,23 @@ class TrashManager {
             // Only place on walkable tiles
             if (!gameMap.isWalkable(tileX, tileY)) continue;
 
+            // Parade proximity weighting (3x density near route)
+            if (window.game && window.game.paradeActive) {
+                const route = window.game.paradeRoadIndex;
+                const dir = window.game.paradeDirection;
+                let isNear = false;
+                if (dir === 'horizontal') {
+                    let dy = Math.abs(tileY - route);
+                    if (dy > MAP_HEIGHT / 2) dy = MAP_HEIGHT - dy;
+                    isNear = (dy <= 2);
+                } else {
+                    let dx = Math.abs(tileX - route);
+                    if (dx > MAP_WIDTH / 2) dx = MAP_WIDTH - dx;
+                    isNear = (dx <= 2);
+                }
+                if (!isNear && Math.random() > 0.33) continue;
+            }
+
             // Don't stack trash
             if (this.items.some(t => t.tileX === tileX && t.tileY === tileY)) continue;
 
@@ -62,6 +79,23 @@ class TrashManager {
             attempts++;
 
             if (!gameMap.isWalkable(tileX, tileY)) continue;
+
+            // Parade proximity weighting (3x density near route)
+            if (window.game && window.game.paradeActive) {
+                const route = window.game.paradeRoadIndex;
+                const dir = window.game.paradeDirection;
+                let isNear = false;
+                if (dir === 'horizontal') {
+                    let dy = Math.abs(tileY - route);
+                    if (dy > MAP_HEIGHT / 2) dy = MAP_HEIGHT - dy;
+                    isNear = (dy <= 2);
+                } else {
+                    let dx = Math.abs(tileX - route);
+                    if (dx > MAP_WIDTH / 2) dx = MAP_WIDTH - dx;
+                    isNear = (dx <= 2);
+                }
+                if (!isNear && Math.random() > 0.33) continue;
+            }
             if (this.items.some(t => !t.collected && t.tileX === tileX && t.tileY === tileY)) continue;
 
             const type = Math.floor(Math.random() * 4);
@@ -92,11 +126,12 @@ class TrashManager {
         }
     }
 
-    checkPickup(entityX, entityY, pickupRadius, followerCount = 0) {
+    checkPickup(entityX, entityY, pickupRadius, followerCount = 0, maxToPick = Infinity) {
         const picked = [];
         const pointValue = Math.round(Math.pow(2, 1 + 0.5 * followerCount));
         for (const item of this.items) {
             if (item.collected) continue;
+            if (picked.length >= maxToPick) break;
 
             const wrapped = nearestWrap(item.x, item.y, entityX, entityY);
             const dx = entityX - wrapped.x;

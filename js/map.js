@@ -510,6 +510,9 @@ class GameMap {
             if (availableIds.length > 0) {
                 this.buildings[availableIds.pop()].type = 'hospital';
             }
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'dump';
+            }
             for (let i = 0; i < 8; i++) {
                 if (availableIds.length > 0) {
                     this.buildings[availableIds.pop()].type = 'fast_food';

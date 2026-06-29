@@ -114,7 +114,7 @@ def login():
             'token': token, 
             'role': user['role'], 
             'balance': user['balance'],
-            'has_truck': bool(user['has_truck'])
+            'has_truck': int(user['has_truck'])
         })
     return jsonify({'error': 'Invalid credentials'}), 401
 
@@ -175,7 +175,7 @@ def sync_game():
     
     return jsonify({
         'balance': user['balance'],
-        'has_truck': bool(user['has_truck']),
+        'has_truck': int(user['has_truck']),
         'employee_death_penalty': user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0,
         'movement_size': user['movement_size'] if user['movement_size'] else 0,
         'inventory': inv
@@ -195,7 +195,8 @@ def buy_item():
         'Protection': 1000,
         'Magic 8-Ball': 1500,
         'Bruno The Trash Truck': 10000,
-        'Fertilizer': 100
+        'Fertilizer': 100,
+        'Parade': 3000
     }
     
     if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
@@ -212,9 +213,7 @@ def buy_item():
     db.execute("UPDATE users SET balance = balance - ? WHERE id=?", (price, user_data['user_id']))
     
     if item_name == 'Bruno The Trash Truck':
-        if user['has_truck']:
-            return jsonify({'error': 'Already have a truck'}), 400
-        db.execute("UPDATE users SET has_truck = 1 WHERE id=?", (user_data['user_id'],))
+        db.execute("UPDATE users SET has_truck = has_truck + 1 WHERE id=?", (user_data['user_id'],))
     else:
         cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
         row = cursor.fetchone()
@@ -299,14 +298,17 @@ def end_round():
     adjusted_employee_cost = int(employee_cost * penalty)
     new_balance = user['balance'] + earned - adjusted_employee_cost
     
-    # If defeated, lose truck
+    # If defeated, lose 1 truck
     if lose_truck:
-        db.execute("UPDATE users SET has_truck = 0 WHERE id=?", (user_data['user_id'],))
-    elif user['has_truck']:
-        if new_balance < 1000:
-            db.execute("UPDATE users SET has_truck = 0 WHERE id=?", (user_data['user_id'],))
+        db.execute("UPDATE users SET has_truck = CASE WHEN has_truck > 0 THEN has_truck - 1 ELSE 0 END WHERE id=?", (user_data['user_id'],))
+    elif user['has_truck'] > 0:
+        upkeep_needed = 1000 * user['has_truck']
+        if new_balance < upkeep_needed:
+            affordable = max(0, new_balance // 1000)
+            db.execute("UPDATE users SET has_truck = ? WHERE id=?", (affordable, user_data['user_id']))
+            new_balance -= affordable * 1000
         else:
-            new_balance -= 1000
+            new_balance -= upkeep_needed
             
     if new_balance < 0: new_balance = 0
             

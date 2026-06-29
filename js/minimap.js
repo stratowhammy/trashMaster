@@ -60,6 +60,11 @@ class MiniMap {
                     }
                 }
                 
+                const bldg = gameMap.getBuildingAtTile(x, y);
+                if (bldg && bldg.type === 'dump') {
+                    color = '#8b5a2b'; // Dump: Brown
+                }
+                
                 ctx.fillStyle = color;
                 ctx.fillRect(x * s, y * s, s, s);
             }

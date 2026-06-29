@@ -144,7 +144,8 @@ const STORE_ITEMS = [
     { name: 'Magic 8-Ball', price: 1500, desc: 'Score multiplied randomly at end of round', sprite: 'magic_8_ball.png' },
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
-    { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' }
+    { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' },
+    { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' }
 ];
 
 function updateStoreUI() {
@@ -157,7 +158,7 @@ function updateStoreUI() {
     const invEl = document.getElementById('store-inventory');
     if (invEl) {
         invEl.innerHTML = '<h3>Inventory:</h3>';
-        if (playerHasTruck) invEl.innerHTML += `<div>Bruno The Trash Truck (x1)</div>`;
+        if (playerHasTruck > 0) invEl.innerHTML += `<div>Bruno The Trash Truck (x${playerHasTruck})</div>`;
         for (const [item, count] of Object.entries(playerInventory)) {
             if (count > 0) invEl.innerHTML += `<div>${item} (x${count})</div>`;
         }

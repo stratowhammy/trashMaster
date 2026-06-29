@@ -200,7 +200,7 @@ class HUD {
         // ── Follower Notification ──
         if (this.followerNotificationTimer > 0) {
             const notifAlpha = Math.min(1, this.followerNotificationTimer / 30);
-            const notifY = canvasHeight / 2 - 60;
+            const notifY = 80;
             const notifScale = this.followerNotificationTimer > 150 ?
                 1 + (180 - this.followerNotificationTimer) * 0.01 : 1;
 
@@ -270,6 +270,38 @@ class HUD {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('HUNGER', canvasWidth / 2, barY + barH / 2 + 1);
+        }
+
+        // ── Trash Truck Capacity Bar (Bottom Right) ──
+        if (window.playerHasTruck > 0 && window.game) {
+            const currentTrash = window.game.trashCollectedInTruck || 0;
+            const maxTrash = window.playerHasTruck * 50;
+            const fillPct = Math.max(0, Math.min(1, currentTrash / maxTrash));
+
+            const barW = 200;
+            const barH = 16;
+            const barX = canvasWidth - barW - 20;
+            const barY = canvasHeight - 32;
+
+            // Draw background
+            ctx.fillStyle = 'rgba(50, 30, 10, 0.6)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            // Fill (brown color)
+            ctx.fillStyle = '#8b5a2b';
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+            // Border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            // Text
+            ctx.fillStyle = '#fff';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`TRUCK: ${currentTrash}/${maxTrash}`, barX + barW / 2, barY + barH / 2 + 1);
         }
     }
 

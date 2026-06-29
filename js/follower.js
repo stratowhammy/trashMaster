@@ -219,7 +219,11 @@ class FollowerManager {
             } else {
                 let leaderHistory;
                 if (i === 0) {
-                    leaderHistory = player.positionHistory;
+                    if (window.game && window.game.truckChain && window.game.truckChain.length > 0) {
+                        leaderHistory = window.game.truckChain[window.game.truckChain.length - 1].positionHistory;
+                    } else {
+                        leaderHistory = player.positionHistory;
+                    }
                 } else {
                     leaderHistory = this.followers[i - 1].positionHistory;
                 }

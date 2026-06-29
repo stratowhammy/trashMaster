@@ -10,6 +10,75 @@ const GameState = {
     UI_OVERLAY: 'ui_overlay', // when looking at store
 };
 
+class GarbageTruckFollower {
+    constructor(x, y, index) {
+        this.x = x;
+        this.y = y;
+        this.index = index;
+        this.size = TILE_SIZE; // 64
+        this.direction = 'down';
+        this.moving = false;
+        this.followDelay = 24; // delay behind leader
+        this.positionHistory = [];
+        this.historyMaxLength = 2000;
+    }
+    
+    update(leaderHistory, gameMap) {
+        if (!leaderHistory || leaderHistory.length === 0) return;
+        
+        const delayIndex = leaderHistory.length - 1 - this.followDelay;
+        if (delayIndex >= 0 && delayIndex < leaderHistory.length) {
+            const target = leaderHistory[delayIndex];
+            const prevX = this.x;
+            const prevY = this.y;
+            
+            // Check if target is inside a building
+            const targetTX = Math.floor(target.x / TILE_SIZE);
+            const targetTY = Math.floor(target.y / TILE_SIZE);
+            if (gameMap.getBuildingAtTile(targetTX, targetTY)) {
+                this.moving = false;
+            } else {
+                this.x = target.x;
+                this.y = target.y;
+                const dx = this.x - prevX;
+                const dy = this.y - prevY;
+                this.moving = Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1;
+                if (this.moving) {
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        this.direction = dx > 0 ? 'right' : 'left';
+                    } else {
+                        this.direction = dy > 0 ? 'down' : 'up';
+                    }
+                }
+            }
+        }
+        
+        if (this.moving) {
+            this.positionHistory.push({ x: this.x, y: this.y });
+            if (this.positionHistory.length > this.historyMaxLength) {
+                this.positionHistory.shift();
+            }
+        }
+    }
+    
+    render(ctx, camera, spriteManager) {
+        if (!camera.isVisible(this.x - 50, this.y - 50, 100, 100)) return;
+        const screen = camera.worldToScreen(this.x, this.y);
+        const img = spriteManager.getImage('red_truck'); // Parade truck / chained truck is red!
+        if (img) {
+            ctx.save();
+            if (this.direction === 'left') {
+                ctx.translate(screen.x, screen.y);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, -this.size / 2, -this.size / 2, this.size, this.size);
+            } else {
+                ctx.drawImage(img, screen.x - this.size / 2, screen.y - this.size / 2, this.size, this.size);
+            }
+            ctx.restore();
+        }
+    }
+}
+
 class Game {
     constructor(canvas) {
         this.canvas = canvas;
@@ -177,6 +246,26 @@ class Game {
                                     window.triggerFastFoodOffer(this.followerManager.getFollowerCount());
                                     return;
                                 }
+                            }
+                        }
+                    }
+
+                    // Dump interaction
+                    if (window.playerHasTruck > 0) {
+                        const px = wrapWorldX(this.player.x);
+                        const py = wrapWorldY(this.player.y);
+                        const dumpBldg = this.gameMap.buildings.find(b => b.type === 'dump');
+                        if (dumpBldg && dumpBldg.doorTiles.length > 0) {
+                            const door = dumpBldg.doorTiles[0];
+                            const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
+                            if (dist < TILE_SIZE * 1.5) {
+                                if (this.trashCollectedInTruck > 0) {
+                                    this.trashCollectedInTruck = 0;
+                                    this.hud.showFollowerNotification("Unloaded garbage at the Dump!", true);
+                                } else {
+                                    this.hud.showFollowerNotification("Garbage truck is already empty.", true);
+                                }
+                                return;
                             }
                         }
                     }
@@ -480,10 +569,29 @@ class Game {
     pickupTrash() {
         if (this.state !== GameState.PLAYING || !this.player) return;
 
+        let maxToPick = Infinity;
+        if (window.playerHasTruck > 0) {
+            const maxCap = window.playerHasTruck * 50;
+            maxToPick = Math.max(0, maxCap - this.trashCollectedInTruck);
+            if (maxToPick <= 0) {
+                if (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000) {
+                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                    this.lastCapacityNotificationTime = Date.now();
+                }
+                return;
+            }
+        }
+
         const pickupRadius = TILE_SIZE * 0.8;
-        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.followerManager.getFollowerCount());
+        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.followerManager.getFollowerCount(), maxToPick);
 
         if (picked.length > 0) {
+            if (window.playerHasTruck > 0) {
+                this.trashCollectedInTruck += picked.length;
+                if (this.trashCollectedInTruck >= window.playerHasTruck * 50) {
+                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                }
+            }
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += picked.length;
             this.trashManager.spawnMore(this.gameMap, picked.length);
@@ -736,6 +844,63 @@ class Game {
             }
         }
 
+        // Update truck chain
+        if (this.truckChain && this.truckChain.length > 0) {
+            for (let i = 0; i < this.truckChain.length; i++) {
+                const truck = this.truckChain[i];
+                let leaderHistory;
+                if (i === 0) {
+                    leaderHistory = this.player.positionHistory;
+                } else {
+                    leaderHistory = this.truckChain[i - 1].positionHistory;
+                }
+                truck.update(leaderHistory, this.gameMap);
+            }
+        }
+
+        // Update parade
+        if (this.paradeActive && this.paradeSegments && this.paradeSegments.length > 0) {
+            const mapPixelMax = this.paradeDirection === 'horizontal' ? MAP_PIXEL_W : MAP_PIXEL_H;
+            this.paradePosition = (this.paradePosition + this.paradeSpeed * dt) % mapPixelMax;
+
+            // Cooldown check for collisions
+            if (!this.paradeHitCooldown || this.paradeHitCooldown <= 0) {
+                const px = this.player.x;
+                const py = this.player.y;
+                let collided = false;
+
+                for (const seg of this.paradeSegments) {
+                    let sx, sy;
+                    if (this.paradeDirection === 'horizontal') {
+                        sx = ((this.paradePosition - seg.offset) % MAP_PIXEL_W + MAP_PIXEL_W) % MAP_PIXEL_W;
+                        sy = this.paradeRoadIndex * TILE_SIZE + TILE_SIZE / 2;
+                    } else {
+                        sx = this.paradeRoadIndex * TILE_SIZE + TILE_SIZE / 2;
+                        sy = ((this.paradePosition - seg.offset) % MAP_PIXEL_H + MAP_PIXEL_H) % MAP_PIXEL_H;
+                    }
+
+                    const dx = px - sx;
+                    const dy = py - sy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < TILE_SIZE * 0.8) {
+                        collided = true;
+                        break;
+                    }
+                }
+
+                if (collided) {
+                    const count = this.followerManager.getFollowerCount();
+                    if (count > 0) {
+                        this.followerManager.removeFollower();
+                        this.hud.showFollowerNotification("A posse member was run over by the parade!", false);
+                    }
+                    this.paradeHitCooldown = 1.5; // 1.5s invincibility
+                }
+            } else {
+                this.paradeHitCooldown -= dt;
+            }
+        }
+
         // Update followers
         this.followerManager.update(this.player, this.gameMap);
 
@@ -743,11 +908,29 @@ class Game {
         const pickupRadius = TILE_SIZE * 0.7;
         let followerPicked = [];
         for (const follower of this.followerManager.followers) {
-            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.followerManager.getFollowerCount());
+            let maxToPick = Infinity;
+            if (window.playerHasTruck > 0) {
+                const maxCap = window.playerHasTruck * 50;
+                maxToPick = Math.max(0, maxCap - (this.trashCollectedInTruck + followerPicked.length));
+            }
+            if (maxToPick <= 0) {
+                if (window.playerHasTruck > 0 && (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000)) {
+                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                    this.lastCapacityNotificationTime = Date.now();
+                }
+                break; // Stop loop since truck is completely full
+            }
+            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.followerManager.getFollowerCount(), maxToPick);
             followerPicked = followerPicked.concat(picked);
         }
 
         if (followerPicked.length > 0) {
+            if (window.playerHasTruck > 0) {
+                this.trashCollectedInTruck += followerPicked.length;
+                if (this.trashCollectedInTruck >= window.playerHasTruck * 50) {
+                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                }
+            }
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += followerPicked.length;
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
@@ -1062,9 +1245,18 @@ class Game {
         this.followerManager.initialize(spriteId);
         
         // Add Truck base followers + Hired employees
-        const baseFollowers = (window.playerHasTruck ? 2 : 0) + (window.employeesHired || 0);
+        const baseFollowers = (window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0);
         for(let i=0; i<baseFollowers; i++) {
             this.followerManager.addFollower(this.player.x, this.player.y);
+        }
+
+        // Initialize truck chain & capacity tracking
+        this.truckChain = [];
+        this.trashCollectedInTruck = 0;
+        if (window.playerHasTruck > 1) {
+            for (let i = 0; i < window.playerHasTruck - 1; i++) {
+                this.truckChain.push(new GarbageTruckFollower(this.player.x, this.player.y, i));
+            }
         }
 
         this.trashManager = new TrashManager();
@@ -1078,7 +1270,43 @@ class Game {
                 console.log("Consumed Filthadelphia!");
             }).catch(e => console.error(e));
         }
-        
+
+        // Check Parade Mode
+        this.paradeActive = false;
+        this.paradeSegments = [];
+        this.paradeHitCooldown = 0;
+        if (window.playerInventory && window.playerInventory['Parade'] > 0) {
+            this.paradeActive = true;
+            initialTrash *= 2; // stack spawning with Filthadelphia
+            window.apiCall('/api/game/consume', 'POST', { item_name: 'Parade' }).then(() => {
+                window.playerInventory['Parade'] -= 1;
+                console.log("Consumed Parade!");
+            }).catch(e => console.error(e));
+
+            // Select route
+            const hRoads = [2, 3, 12, 13, 22, 23, 32, 33, 42, 43, 52, 53];
+            const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+            this.paradeDirection = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+            if (this.paradeDirection === 'horizontal') {
+                this.paradeRoadIndex = hRoads[Math.floor(Math.random() * hRoads.length)];
+            } else {
+                this.paradeRoadIndex = vRoads[Math.floor(Math.random() * vRoads.length)];
+            }
+            this.paradePosition = 0;
+            this.paradeSpeed = 120; // pixels per second
+
+            // Create segments
+            for (let i = 0; i < 40; i++) {
+                let type = 'npc';
+                if (i % 6 === 0) type = 'red_truck';
+                else if (i % 3 === 0) type = 'balloon';
+                this.paradeSegments.push({
+                    type: type,
+                    offset: i * TILE_SIZE
+                });
+            }
+        }
+
         this.trashManager.spawnInitial(this.gameMap, initialTrash);
         
         this.hud.reset();
@@ -1198,6 +1426,28 @@ class Game {
             }
         }
 
+        // Draw Dump marker
+        if (window.playerHasTruck > 0 && this.spriteManager) {
+            const dumpImg = this.spriteManager.getImage('dump');
+            const dumpBldg = this.gameMap.buildings.find(b => b.type === 'dump');
+            if (dumpBldg && dumpBldg.doorTiles && dumpBldg.doorTiles.length > 0) {
+                const door = dumpBldg.doorTiles[0];
+                const cx = door.x * TILE_SIZE + TILE_SIZE / 2;
+                const cy = door.y * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    if (dumpImg) {
+                        ctx.drawImage(dumpImg, screen.x - 32, screen.y - 64, 64, 64);
+                    }
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('DUMP', screen.x, screen.y - 70);
+                }
+            }
+        }
+
         if (window.frenzyMode) {
             this.gameMap.renderAddresses(ctx, this.camera);
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
@@ -1254,6 +1504,11 @@ class Game {
             }
         }
 
+        // Render parade
+        if (this.paradeActive) {
+            this._renderParade(ctx, this.camera);
+        }
+
         // Render traffic cars
         if (this.carManager) {
             this.carManager.render(ctx, this.camera);
@@ -1264,6 +1519,13 @@ class Game {
 
         // Render followers (behind player)
         this.followerManager.render(ctx, this.camera, this.spriteManager);
+
+        // Render truck chain (between followers and player)
+        if (this.truckChain && this.truckChain.length > 0) {
+            for (let i = this.truckChain.length - 1; i >= 0; i--) {
+                this.truckChain[i].render(ctx, this.camera, this.spriteManager);
+            }
+        }
 
         // Render player
         if (this.player) {
@@ -1318,6 +1580,57 @@ class Game {
             ctx.fillText(`Tile: (${this.player.getTileX()}, ${this.player.getTileY()})`, w - 270, h - 48);
             ctx.fillText(`Keys: U:${k.up} D:${k.down} L:${k.left} R:${k.right}`, w - 270, h - 34);
             ctx.fillText(`Arrows to move, Q to pickup`, w - 270, h - 20);
+        }
+    }
+
+    _renderParade(ctx, camera) {
+        if (!this.paradeActive || !this.paradeSegments) return;
+        
+        for (const seg of this.paradeSegments) {
+            let sx, sy;
+            if (this.paradeDirection === 'horizontal') {
+                sx = ((this.paradePosition - seg.offset) % MAP_PIXEL_W + MAP_PIXEL_W) % MAP_PIXEL_W;
+                sy = this.paradeRoadIndex * TILE_SIZE + TILE_SIZE / 2;
+            } else {
+                sx = this.paradeRoadIndex * TILE_SIZE + TILE_SIZE / 2;
+                sy = ((this.paradePosition - seg.offset) % MAP_PIXEL_H + MAP_PIXEL_H) % MAP_PIXEL_H;
+            }
+            
+            const wrapped = nearestWrap(sx, sy, camera.getCenterX(), camera.getCenterY());
+            if (!camera.isVisible(wrapped.x - 50, wrapped.y - 50, 100, 100)) continue;
+            
+            const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+            
+            if (seg.type === 'red_truck') {
+                const img = this.spriteManager.getImage('red_truck');
+                if (img) {
+                    ctx.save();
+                    ctx.drawImage(img, screen.x - 24, screen.y - 24, 48, 48);
+                    ctx.restore();
+                } else {
+                    ctx.save();
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(screen.x - 24, screen.y - 12, 48, 24);
+                    ctx.restore();
+                }
+            } else if (seg.type === 'balloon') {
+                const img = this.spriteManager.getImage('red_balloon');
+                if (img) {
+                    ctx.drawImage(img, screen.x - 16, screen.y - 24, 32, 48);
+                } else {
+                    ctx.save();
+                    ctx.fillStyle = '#ff3333';
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y - 10, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            } else {
+                const img = this.spriteManager.getCharacterImage('char_student');
+                if (img) {
+                    ctx.drawImage(img, screen.x - 16, screen.y - 16, 32, 32);
+                }
+            }
         }
     }
 

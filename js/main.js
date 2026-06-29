@@ -140,6 +140,38 @@ class Game {
                             }
                         }
                     }
+
+                    // Fast Food & Hospital interaction
+                    if (window.fastFoodMode) {
+                        const px = wrapWorldX(this.player.x);
+                        const py = wrapWorldY(this.player.y);
+                        
+                        // Check Hospital
+                        if (!this.hasHealthInsurance) {
+                            const hospital = this.gameMap.buildings.find(b => b.type === 'hospital');
+                            if (hospital && hospital.doorTiles.length > 0) {
+                                const hDoor = hospital.doorTiles[0];
+                                const dist = Math.sqrt((px - (hDoor.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (hDoor.y*TILE_SIZE + TILE_SIZE/2))**2);
+                                if (dist < TILE_SIZE * 1.5) {
+                                    window.triggerHospitalOffer();
+                                    return;
+                                }
+                            }
+                        }
+
+                        // Check Fast Food
+                        const ffBuildings = this.gameMap.buildings.filter(b => b.type === 'fast_food');
+                        for (const ffBldg of ffBuildings) {
+                            if (ffBldg && ffBldg.doorTiles.length > 0) {
+                                const door = ffBldg.doorTiles[0];
+                                const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
+                                if (dist < TILE_SIZE * 1.5) {
+                                    window.triggerFastFoodOffer(this.followerManager.getFollowerCount());
+                                    return;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // K or k to kill NPC
@@ -381,7 +413,9 @@ class Game {
             } catch (e) {
                 console.error('Game loop error:', e);
                 this.errorLog.push(e.message);
-                // Still render error overlay even if game crashes
+                if (window.onerror) {
+                    window.onerror('Game loop error: ' + e.message, 'js/main.js', 0, 0, e);
+                }
                 try { this._renderError(); } catch (_) {}
             }
             requestAnimationFrame(loop);
@@ -474,7 +508,8 @@ class Game {
         this.hud.trashInWindow = this.trashCollectedInWindow;
 
         if (this.hud.isTimeUp()) {
-            this.state = GameState.GAME_OVER;
+            this.state = GameState.UI_OVERLAY;
+            this._showSplashGameOver("TIME'S UP!", `Your shift is over! You earned $${this.trashManager.totalPoints}.`, false);
             return;
         }
 
@@ -516,7 +551,11 @@ class Game {
                                 pirate.alive = false;
                                 this.hud.showFollowerNotification('Defeated pirate!', true);
                             } else {
-                                this._triggerPlayerDefeat();
+                                const hadTruck = !!window.playerHasTruck;
+                                const msg = hadTruck 
+                                    ? "The pirates defeated you and drove off with Bruno the Trash Truck! All earnings this round were lost."
+                                    : "The pirates defeated you! All earnings this round were lost.";
+                                this._showSplashGameOver("WASTED BY PIRATES", msg, true);
                                 return;
                             }
                         }
@@ -590,7 +629,7 @@ class Game {
         }
 
         // Update player
-        this.player.update(this.gameMap);
+        this.player.update(this.gameMap, dt);
 
         // Update traffic cars
         if (this.carManager) {
@@ -647,6 +686,41 @@ class Game {
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
         }
 
+        if (window.fastFoodMode) {
+            // Hunger timer
+            this.hungerTimer -= dt;
+            if (this.hungerTimer <= 0) {
+                this.hungerTimer = 45.0;
+                const count = this.followerManager.getFollowerCount();
+                const toLose = Math.floor(count / 2);
+                for (let i = 0; i < toLose; i++) {
+                    this.followerManager.removeFollower();
+                }
+                if (toLose > 0) {
+                    this.hud.showFollowerNotification(`Starved! Lost ${toLose} posse members!`, false);
+                }
+            }
+
+            // Health Insurance timer
+            if (this.hasHealthInsurance) {
+                this.insurancePaymentTimer -= dt;
+                if (this.insurancePaymentTimer <= 0) {
+                    this.insurancePaymentTimer = 10.0;
+                    const count = this.followerManager.getFollowerCount();
+                    if (count > 0) {
+                        this.trashManager.totalPoints = Math.max(0, this.trashManager.totalPoints - (10 * count));
+                        this.hud.showFollowerNotification(`Paid $${10 * count} for health insurance.`, false);
+                        this.hud.updateScore(this.trashManager.totalPoints);
+                    }
+                }
+            }
+
+            // Fast Food Suspension Timer
+            if (this.fastFoodSuspensionTimer > 0) {
+                this.fastFoodSuspensionTimer -= dt;
+            }
+        }
+
         // Follower economy logic (10-second window)
         this.followerCheckTimer += dt;
         if (this.followerCheckTimer >= 10) {
@@ -660,8 +734,12 @@ class Game {
             } else if (this.trashCollectedInWindow < 5) {
                 // Lose follower
                 if (this.followerManager.getFollowerCount() > baseFollowers) {
-                    this.followerManager.removeFollower();
-                    this.hud.showFollowerNotification('A posse member left!', false);
+                    if (window.fastFoodMode && this.fastFoodSuspensionTimer > 0) {
+                        // Trash requirement suspended!
+                    } else {
+                        this.followerManager.removeFollower();
+                        this.hud.showFollowerNotification('A posse member left!', false);
+                    }
                 }
             }
             this.trashCollectedInWindow = 0;
@@ -961,6 +1039,12 @@ class Game {
         this.wingsTimer = 0;
         if (this.player) this.player.speedMultiplier = 1.0;
 
+        // Fast Food Mode State
+        this.hungerTimer = 45.0;
+        this.fastFoodSuspensionTimer = 0.0;
+        this.hasHealthInsurance = false;
+        this.insurancePaymentTimer = 10.0;
+
         // Snap camera to player
         this.camera.snapTo(this.player.x, this.player.y);
 
@@ -1002,6 +1086,34 @@ class Game {
     _renderGame(ctx, w, h) {
         // Render map
         this.gameMap.render(ctx, this.camera, this.player);
+
+        // Draw Fast Food & Hospital markers
+        if (window.fastFoodMode && this.spriteManager) {
+            const ffImg = this.spriteManager.getImage('fast_food_sign');
+            for (const bldg of this.gameMap.buildings) {
+                if (!bldg || bldg.tiles.length === 0) continue;
+                
+                let cx = 0, cy = 0;
+                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
+                cx = (cx / bldg.tiles.length) * TILE_SIZE + TILE_SIZE/2;
+                cy = (cy / bldg.tiles.length) * TILE_SIZE + TILE_SIZE/2;
+                
+                // Wrap the marker coordinates to the camera
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                
+                if (!this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) continue;
+                const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                
+                if (bldg.type === 'hospital') {
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(screen.x - 6, screen.y - 20, 12, 40);
+                    ctx.fillRect(screen.x - 20, screen.y - 6, 40, 12);
+                } else if (bldg.type === 'fast_food' && ffImg) {
+                    // Draw it much larger and centered
+                    ctx.drawImage(ffImg, screen.x - 64, screen.y - 64, 128, 128);
+                }
+            }
+        }
 
         if (window.frenzyMode) {
             this.gameMap.renderAddresses(ctx, this.camera);
@@ -1084,21 +1196,25 @@ class Game {
         }
     }
 
-    async _triggerPlayerDefeat() {
-        this.state = GameState.UI_OVERLAY;
-        if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
-
-        const hadTruck = !!window.playerHasTruck;
-        const msgEl = document.getElementById('defeat-message');
-        if (msgEl) {
-            if (hadTruck) {
-                msgEl.innerText = "The pirates defeated you and drove off with Bruno the Trash Truck! All earnings this round were lost.";
-            } else {
-                msgEl.innerText = "The pirates defeated you! All earnings this round were lost.";
+    async _showSplashGameOver(title, message, isPirateDefeat) {
+        if (isPirateDefeat) {
+            this.trashManager.totalPoints = 0; // Lose all points
+            if (window.playerHasTruck) {
+                window.playerHasTruck = false;
+                window.playerInventory['Bruno The Trash Truck'] = 0;
             }
         }
 
-        // Hide game canvas and show defeat screen
+        this.state = GameState.UI_OVERLAY;
+        if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
+
+        const titleEl = document.getElementById('defeat-title');
+        if (titleEl) titleEl.innerText = title;
+
+        const msgEl = document.getElementById('defeat-message');
+        if (msgEl) msgEl.innerText = message;
+
+        // Hide game canvas and show defeat screens and show defeat screen
         this.canvas.classList.add('hidden');
         const screenEl = document.getElementById('pirate-defeat-screen');
         if (screenEl) screenEl.classList.remove('hidden');
@@ -1116,33 +1232,41 @@ class Game {
 
             const pirateImg = this.spriteManager.getCharacterImage('char_pirate');
             const truckImg = this.spriteManager.getCharacterImage('char_truck');
-
-            if (hadTruck && truckImg && pirateImg) {
-                // Draw road lines
-                ctx.strokeStyle = '#444';
-                ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.moveTo(0, 108); ctx.lineTo(256, 108); ctx.stroke();
-
-                // Draw trash truck driving away
-                ctx.drawImage(truckImg, 96, 36, 64, 64);
-                
-                // Draw pirate driving
-                ctx.drawImage(pirateImg, 112, 24, 32, 32);
-                // Draw another pirate waving from the back
-                ctx.drawImage(pirateImg, 140, 28, 32, 32);
-            } else {
-                // Draw ground red blob for shapeless body
-                ctx.fillStyle = '#aa2222';
-                ctx.fillRect(96, 90, 48, 10);
-                ctx.fillStyle = '#666666';
-                ctx.fillRect(104, 84, 16, 6);
-                ctx.fillRect(124, 86, 10, 4);
-
-                if (pirateImg) {
-                    // Two pirates standing triumphantly over body
-                    ctx.drawImage(pirateImg, 90, 52, 32, 32);
-                    ctx.drawImage(pirateImg, 120, 52, 32, 32);
+            
+            if (isPirateDefeat) {
+                document.getElementById('defeat-art-container').style.display = 'block';
+                const hadTruck = title === "WASTED BY PIRATES" && message.includes("Bruno"); // A bit hacky but works based on our msg
+                if (hadTruck && truckImg && pirateImg) {
+                    // Draw road lines
+                    ctx.strokeStyle = '#444';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(0, 108); ctx.lineTo(256, 108); ctx.stroke();
+    
+                    // Draw trash truck driving away
+                    ctx.drawImage(truckImg, 96, 36, 64, 64);
+                    
+                    // Draw pirate driving
+                    ctx.drawImage(pirateImg, 112, 24, 32, 32);
+                    // Draw another pirate waving from the back
+                    ctx.drawImage(pirateImg, 140, 28, 32, 32);
+                } else {
+                    // Draw ground red blob for shapeless body
+                    ctx.fillStyle = '#aa2222';
+                    ctx.fillRect(96, 90, 48, 10);
+                    ctx.fillStyle = '#666666';
+                    ctx.fillRect(104, 84, 16, 6);
+                    ctx.fillRect(124, 86, 10, 4);
+    
+                    if (pirateImg) {
+                        // Two pirates standing triumphantly over body
+                        ctx.drawImage(pirateImg, 90, 52, 32, 32);
+                        ctx.drawImage(pirateImg, 130, 50, 32, 32);
+                    }
                 }
+            } else {
+                // Not a pirate defeat, maybe just draw player collapsing or nothing
+                // For now, let's just clear the art canvas or hide it
+                document.getElementById('defeat-art-container').style.display = 'none';
             }
         }
 
@@ -1330,6 +1454,31 @@ class Game {
 }
 
 // ── Boot ──
+
+
+window.triggerHospitalOffer = function() {
+    if (window.game) {
+        window.game.state = GameState.UI_OVERLAY;
+        window.game.player.keys = { up: false, down: false, left: false, right: false };
+    }
+    const dialog = document.getElementById('hospital-dialog');
+    if (dialog) dialog.classList.remove('hidden');
+};
+
+window.triggerFastFoodOffer = function(posseCount) {
+    if (window.game) {
+        window.game.state = GameState.UI_OVERLAY;
+        window.game.player.keys = { up: false, down: false, left: false, right: false };
+    }
+    const dialog = document.getElementById('fast-food-dialog');
+    const costText = document.getElementById('fast-food-cost-text');
+    if (dialog && costText) {
+        costText.innerText = `Cost: $${posseCount * 32}`;
+        window.currentFastFoodCost = posseCount * 32;
+        dialog.classList.remove('hidden');
+    }
+};
+
 window.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     if (!canvas) {
@@ -1350,5 +1499,69 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
             window.game.state = GameState.CHARACTER_SELECT;
         }
+        canvas.focus();
     };
+
+    // Fast Food Mode Event Listeners
+    const btnFFYes = document.getElementById('btn-fast-food-yes');
+    if (btnFFYes) btnFFYes.addEventListener('click', () => {
+        document.getElementById('fast-food-dialog').classList.add('hidden');
+        if (window.game) {
+            window.game.state = GameState.PLAYING;
+            const cost = window.currentFastFoodCost || 0;
+            window.game.trashManager.totalPoints = Math.max(0, window.game.trashManager.totalPoints - cost);
+            window.game.hud.updateScore(window.game.trashManager.totalPoints);
+            
+            window.game.hungerTimer = 45.0;
+            window.game.fastFoodSuspensionTimer = 10.0;
+            
+            if (Math.random() < 0.20) {
+                if (window.game.hasHealthInsurance) {
+                    window.game.mushroomTimer = 20.0; // Same as mushroom
+                    window.game.hud.timerSpeed = 0.5; // Actually apply the slow down
+                    window.game.hud.showFollowerNotification('Food poisoning! Luckily you had insurance. (Speed reduced)', false);
+                } else {
+                    const count = window.game.followerManager.getFollowerCount();
+                    for (let i = 0; i < count; i++) {
+                        window.game.followerManager.removeFollower();
+                    }
+                    window.game.hud.showFollowerNotification('Food poisoning! Entire posse died without insurance!', false);
+                }
+            } else {
+                window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 10s.`, true);
+            }
+        }
+        canvas.focus();
+    });
+
+    const btnFFNo = document.getElementById('btn-fast-food-no');
+    if (btnFFNo) btnFFNo.addEventListener('click', () => {
+        document.getElementById('fast-food-dialog').classList.add('hidden');
+        if (window.game) {
+            window.game.state = GameState.PLAYING;
+            window.game.followerManager.removeFollower();
+            window.game.hud.showFollowerNotification('Posse member left because they were hungry!', false);
+        }
+        canvas.focus();
+    });
+
+    const btnHospYes = document.getElementById('btn-hospital-yes');
+    if (btnHospYes) btnHospYes.addEventListener('click', () => {
+        document.getElementById('hospital-dialog').classList.add('hidden');
+        if (window.game) {
+            window.game.state = GameState.PLAYING;
+            window.game.hasHealthInsurance = true;
+            window.game.hud.showFollowerNotification('Health insurance purchased! Paying $10/person every 10s.', true);
+        }
+        canvas.focus();
+    });
+
+    const btnHospNo = document.getElementById('btn-hospital-no');
+    if (btnHospNo) btnHospNo.addEventListener('click', () => {
+        document.getElementById('hospital-dialog').classList.add('hidden');
+        if (window.game) {
+            window.game.state = GameState.PLAYING;
+        }
+        canvas.focus();
+    });
 });

@@ -339,8 +339,12 @@ class GameMap {
                     }
                 }
 
-                const ci=this.buildingMeta[ty][tx]; const c=BUILDING_COLORS[ci>=0?ci:0];
-                ctx.fillStyle=c.base; ctx.fillRect(sx,sy,s,s);
+                const ci = this.buildingMeta[ty][tx];
+                let c = BUILDING_COLORS[ci>=0?ci:0];
+                let isHospital = bldg && bldg.type === 'hospital';
+                
+                ctx.fillStyle = isHospital ? '#ffffff' : c.base;
+                ctx.fillRect(sx, sy, s, s);
                 ctx.fillStyle='#2a2a3a';
                 for(let wy=4;wy<s-4;wy+=8) for(let wx=4;wx<s-4;wx+=8){
                     ctx.fillRect(sx+wx,sy+wy,4,4);
@@ -466,11 +470,39 @@ class GameMap {
                         id: this.buildings.length,
                         address,
                         tiles,
-                        doorTiles: [doorTile]
+                        doorTiles: [doorTile],
+                        type: 'default'
                     });
                     numCounter += Math.floor(Math.random() * 20) + 10;
                     if (numCounter > 999) { numCounter = 100; letterIdx++; }
                     if (numCounter % 100 === 0) numCounter++;
+                }
+            }
+        }
+        
+        // Assign special building types randomly
+        const count = this.buildings.length;
+        if (count > 0) {
+            // ID 0: Bank, ID 1: Police Station
+            this.buildings[0].type = 'bank';
+            if (count > 1) this.buildings[1].type = 'police';
+            
+            // Randomly select indices for Hospital (1) and Fast Food (8)
+            let availableIds = [];
+            for (let i = 2; i < count; i++) availableIds.push(i);
+            
+            // Shuffle
+            for (let i = availableIds.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableIds[i], availableIds[j]] = [availableIds[j], availableIds[i]];
+            }
+            
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'hospital';
+            }
+            for (let i = 0; i < 8; i++) {
+                if (availableIds.length > 0) {
+                    this.buildings[availableIds.pop()].type = 'fast_food';
                 }
             }
         }

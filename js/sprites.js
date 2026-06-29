@@ -21,7 +21,8 @@ const SPRITE_CONFIG = {
         { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' },
         { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },
         { id: 'char_pirate', name: 'Pirate', src: 'assets/sprites/pirate.png', color: '#aa3333' },
-        { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' }
+        { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' },
+        { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ffaa00' }
     ]
 };
 
@@ -154,6 +155,10 @@ class SpriteManager {
     }
 
     getTrashImage(id) {
+        return this.images[id] || null;
+    }
+
+    getImage(id) {
         return this.images[id] || null;
     }
 

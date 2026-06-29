@@ -18,8 +18,9 @@ class MafiaDon {
 
     render(ctx, camera) {
         if (!this.alive) return;
-        const screen = camera.worldToScreen(this.x, this.y);
-        if (!camera.isVisible(this.x - 20, this.y - 20, 40, 40)) return;
+        const wrapped = typeof nearestWrap === 'function' ? nearestWrap(this.x, this.y, camera.getCenterX(), camera.getCenterY()) : {x: this.x, y: this.y};
+        const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+        if (!camera.isVisible(wrapped.x - 20, wrapped.y - 20, 40, 40)) return;
 
         ctx.save();
         // Draw Mafia Don (black suit, white shirt, red tie)
@@ -108,8 +109,9 @@ class PoliceOfficer {
 
     render(ctx, camera) {
         if (!this.alive) return;
-        const screen = camera.worldToScreen(this.x, this.y);
-        if (!camera.isVisible(this.x - 20, this.y - 20, 40, 40)) return;
+        const wrapped = typeof nearestWrap === 'function' ? nearestWrap(this.x, this.y, camera.getCenterX(), camera.getCenterY()) : {x: this.x, y: this.y};
+        const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+        if (!camera.isVisible(wrapped.x - 16, wrapped.y - 16, 32, 32)) return;
 
         ctx.save();
         // Blue uniform
@@ -213,8 +215,9 @@ class GoldBag {
 
     render(ctx, camera) {
         if (this.collected) return;
-        const screen = camera.worldToScreen(this.x, this.y);
-        if (!camera.isVisible(this.x - 16, this.y - 16, 32, 32)) return;
+        const wrapped = typeof nearestWrap === 'function' ? nearestWrap(this.x, this.y, camera.getCenterX(), camera.getCenterY()) : {x: this.x, y: this.y};
+        const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+        if (!camera.isVisible(wrapped.x - 16, wrapped.y - 16, 32, 32)) return;
 
         ctx.save();
         // Draw Gold Sack
@@ -631,8 +634,9 @@ class CrimeManager {
 
         // Render Police Chief
         if (this.madeMan && this.policeChief) {
-            const screen = camera.worldToScreen(this.policeChief.x, this.policeChief.y);
-            if (camera.isVisible(this.policeChief.x - 20, this.policeChief.y - 20, 40, 40)) {
+            const wrapped = typeof nearestWrap === 'function' ? nearestWrap(this.policeChief.x, this.policeChief.y, camera.getCenterX(), camera.getCenterY()) : {x: this.policeChief.x, y: this.policeChief.y};
+            const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+            if (camera.isVisible(wrapped.x - 20, wrapped.y - 20, 40, 40)) {
                 ctx.save();
                 ctx.fillStyle = '#1c2e4a';
                 ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);

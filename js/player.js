@@ -43,7 +43,7 @@ class Player {
         }
     }
 
-    update(gameMap) {
+    update(gameMap, dt) {
         let dx = 0, dy = 0;
         if (this.keys.up) dy -= 1;
         if (this.keys.down) dy += 1;
@@ -58,8 +58,8 @@ class Player {
             else this.direction = dy > 0 ? 'down' : 'up';
 
             const currentSpeed = this.speed * (this.speedMultiplier || 1.0);
-            const newX = this.x + dx * currentSpeed;
-            const newY = this.y + dy * currentSpeed;
+            const newX = this.x + dx * currentSpeed * 60 * dt;
+            const newY = this.y + dy * currentSpeed * 60 * dt;
 
             // Collision uses wrapping tile lookups — works for infinite world
             if (this._canMoveTo(newX, this.y, gameMap)) this.x = newX;

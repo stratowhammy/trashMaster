@@ -6,6 +6,24 @@
     <meta name="description" content="Trash Master — A 2D collection game where you clean up the city! Pick a character, collect trash, earn followers, and beat the clock.">
     <title>Trash Master — Clean Up the City!</title>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const errDiv = document.createElement('div');
+            errDiv.style.position = 'fixed';
+            errDiv.style.top = '0';
+            errDiv.style.left = '0';
+            errDiv.style.width = '100%';
+            errDiv.style.background = 'rgba(255,0,0,0.9)';
+            errDiv.style.color = 'white';
+            errDiv.style.zIndex = '10000';
+            errDiv.style.padding = '20px';
+            errDiv.style.fontFamily = 'monospace';
+            errDiv.style.whiteSpace = 'pre-wrap';
+            errDiv.innerText = `JS Error: ${msg}\nLine: ${lineNo}\nStack: ${error ? error.stack : ''}`;
+            document.body.appendChild(errDiv);
+            return false;
+        };
+    </script>
 </head>
 <body>
     <div id="ui-layer">
@@ -54,6 +72,13 @@
                         </label>
                         <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Crime Mode</span>
                     </div>
+                    <div class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="fastfood-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Fast Food Mode</span>
+                    </div>
                     <button id="btn-start-game" class="btn play-btn">Play Game</button>
                     <button id="btn-store-logout" class="btn secondary">Logout</button>
                 </div>
@@ -66,7 +91,7 @@
 
         <!-- Pirate Defeat Screen -->
         <div id="pirate-defeat-screen" class="screen hidden" style="background: #1a0505; justify-content: center; height: 100vh;">
-            <h1 style="color: #ff3333; text-shadow: 0 0 10px rgba(255, 0, 0, 0.7); font-family: 'Press Start 2P', monospace; font-size: 20px; margin-bottom: 20px; text-align: center;">WASTED BY PIRATES</h1>
+            <h1 id="defeat-title" style="color: #ff3333; text-shadow: 0 0 10px rgba(255, 0, 0, 0.7); font-family: 'Press Start 2P', monospace; font-size: 20px; margin-bottom: 20px; text-align: center;">WASTED BY PIRATES</h1>
             <div class="defeat-container" style="display: flex; flex-direction: column; align-items: center; gap: 20px; background: rgba(0,0,0,0.6); padding: 25px; border: 3px solid #ff3333; border-radius: 8px;">
                 <div style="display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap;">
                     <!-- Death Animation GIF -->
@@ -117,6 +142,32 @@
         <div style="display: flex; flex-direction: column; gap: 4px;">
             <h3 id="mafia-don-name-hud" style="color: #ff3333; font-family: 'Press Start 2P', monospace; font-size: 8px; margin: 0; padding: 0;">Don Salieri</h3>
             <p id="mafia-task-text-hud" style="color: #ffffff; font-family: 'Press Start 2P', monospace; font-size: 7px; margin: 0; padding: 0; line-height: 1.5; text-align: left;"></p>
+        </div>
+    </div>
+
+    <!-- Fast Food Dialog -->
+    <div id="fast-food-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #222; border: 4px solid #ffaa00; border-radius: 12px; padding: 25px; width: 400px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
+            <div style="font-size: 48px; margin-bottom: 15px;">🍔</div>
+            <h2 style="color: #ffaa00; margin-bottom: 15px; font-size: 16px;">Feed Your Posse?</h2>
+            <p id="fast-food-cost-text" style="color: #ddd; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">Cost: $0</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-fast-food-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px;">Yes</button>
+                <button id="btn-fast-food-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px;">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hospital Dialog -->
+    <div id="hospital-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #222; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; width: 400px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
+            <div style="font-size: 48px; margin-bottom: 15px;">🏥</div>
+            <h2 style="color: #ffffff; margin-bottom: 15px; font-size: 16px;">Buy Health Insurance?</h2>
+            <p style="color: #ddd; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">It costs $10 per posse member every 10 seconds.</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-hospital-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px;">Yes</button>
+                <button id="btn-hospital-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px;">No</button>
+            </div>
         </div>
     </div>
 

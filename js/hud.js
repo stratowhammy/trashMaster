@@ -85,20 +85,29 @@ class HUD {
         const timerX = canvasWidth - 20;
         const timerY = 20;
         
+        let boxHeight = 60;
+        let susTimer = 0;
+        let hTimer = 0;
+        if (window.fastFoodMode && window.game) {
+            hTimer = Math.ceil(window.game.hungerTimer || 0);
+            susTimer = Math.ceil(window.game.fastFoodSuspensionTimer || 0);
+            boxHeight = susTimer > 0 ? 70 : 60;
+        }
+        
         ctx.fillStyle = 'rgba(10,15,25,0.75)';
         ctx.beginPath();
-        ctx.roundRect(timerX - 120, timerY - 10, 130, 60, 8);
+        ctx.roundRect(timerX - 140, timerY - 10, 150, boxHeight, 8);
         ctx.fill();
         ctx.strokeStyle = 'rgba(100,200,255,0.2)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(timerX - 120, timerY - 10, 130, 60, 8);
+        ctx.roundRect(timerX - 140, timerY - 10, 150, boxHeight, 8);
         ctx.stroke();
 
         ctx.fillStyle = '#ff4444';
         ctx.font = '16px serif';
         ctx.textAlign = 'left';
-        ctx.fillText('⏱️', timerX - 110, timerY + 12);
+        ctx.fillText('⏱️', timerX - 130, timerY + 12);
 
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 12px "Press Start 2P", monospace';
@@ -108,6 +117,13 @@ class HUD {
         ctx.fillStyle = '#888';
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillText('TIMER', timerX - 10, timerY + 32);
+        
+        if (window.fastFoodMode && window.game) {
+            if (susTimer > 0) {
+                ctx.fillStyle = '#00ff88';
+                ctx.fillText(`No Trash Req: ${susTimer}s`, timerX - 10, timerY + 45);
+            }
+        }
 
         // ── Score Display (to the left of Timer) ──
         const scoreX = canvasWidth - 160;
@@ -213,6 +229,42 @@ class HUD {
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.textAlign = 'right';
         ctx.fillText('WASD / Arrow Keys to move', canvasWidth - 16, canvasHeight - 16);
+
+        // ── Hunger Bar (Bottom Center) ──
+        if (window.fastFoodMode && window.game) {
+            const hTimer = window.game.hungerTimer || 0;
+            const maxHunger = 45.0; // The starting hunger time
+            const fillPct = Math.max(0, Math.min(1, hTimer / maxHunger));
+            
+            const barW = Math.min(400, canvasWidth * 0.5);
+            const barH = 16;
+            const barX = canvasWidth / 2 - barW / 2;
+            const barY = canvasHeight - 32;
+            
+            // Bar Background
+            ctx.fillStyle = 'rgba(10,15,25,0.8)';
+            ctx.fillRect(barX, barY, barW, barH);
+            
+            // Fill color (green to red based on time)
+            let fillColor = '#00ff00';
+            if (fillPct < 0.25) fillColor = '#ff0000';
+            else if (fillPct < 0.5) fillColor = '#ffaa00';
+            
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+            
+            // Border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barW, barH);
+            
+            // Label
+            ctx.fillStyle = '#fff';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('HUNGER', canvasWidth / 2, barY + barH / 2 + 1);
+        }
     }
 
     renderGameOver(ctx, canvasWidth, canvasHeight) {

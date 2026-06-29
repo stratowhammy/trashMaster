@@ -41,16 +41,40 @@ class MiniMap {
                 if (window.crimeMode) {
                     const bldg = gameMap.getBuildingAtTile(x, y);
                     if (bldg) {
-                        if (bldg.id === 0) {
+                        if (bldg.type === 'bank') {
                             color = '#ffd700'; // Bank: Yellow
-                        } else if (bldg.id === 1) {
+                        } else if (bldg.type === 'police') {
                             color = '#3388ff'; // Police Station: Blue
+                        }
+                    }
+                }
+
+                if (window.fastFoodMode) {
+                    const bldg = gameMap.getBuildingAtTile(x, y);
+                    if (bldg) {
+                        if (bldg.type === 'fast_food') {
+                            color = '#ffaa00'; // Fast Food: Orange
+                        } else if (bldg.type === 'hospital') {
+                            color = '#ffffff'; // Hospital: White
                         }
                     }
                 }
                 
                 ctx.fillStyle = color;
                 ctx.fillRect(x * s, y * s, s, s);
+            }
+        }
+
+        if (window.fastFoodMode) {
+            const hospital = gameMap.buildings.find(b => b.type === 'hospital');
+            if (hospital && hospital.tiles.length > 0) {
+                let hx = 0, hy = 0;
+                for (const t of hospital.tiles) { hx += t.x; hy += t.y; }
+                hx /= hospital.tiles.length;
+                hy /= hospital.tiles.length;
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(hx * s - s, hy * s - 3 * s, 2 * s, 6 * s);
+                ctx.fillRect(hx * s - 3 * s, hy * s - s, 6 * s, 2 * s);
             }
         }
 

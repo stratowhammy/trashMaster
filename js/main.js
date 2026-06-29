@@ -1448,6 +1448,43 @@ class Game {
             }
         }
 
+        // Draw Philadelphia Landmark buildings (visible at all times)
+        if (this.spriteManager) {
+            const landmarks = {
+                'city_hall': { img: 'philly_city_hall', label: 'CITY HALL' },
+                'art_museum': { img: 'philly_art_museum', label: 'ART MUSEUM' },
+                'liberty_bell': { img: 'philly_liberty_bell', label: 'INDEPENDENCE HALL' },
+                'one_liberty': { img: 'philly_one_liberty', label: 'ONE LIBERTY' },
+                'franklin_institute': { img: 'philly_franklin_inst', label: 'FRANKLIN INST.' },
+                'station': { img: 'philly_station', label: '30TH ST STATION' }
+            };
+
+            for (const bldg of this.gameMap.buildings) {
+                if (!bldg || bldg.tiles.length === 0) continue;
+                const config = landmarks[bldg.type];
+                if (!config) continue;
+
+                let cx = 0, cy = 0;
+                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
+                cx = (cx / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
+                cy = (cy / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
+
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (!this.camera.isVisible(wrapped.x - 120, wrapped.y - 120, 240, 240)) continue;
+                const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+
+                const img = this.spriteManager.getImage(config.img);
+                if (img) {
+                    ctx.drawImage(img, screen.x - 64, screen.y - 64, 128, 128);
+                }
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(config.label, screen.x, screen.y - 70);
+            }
+        }
+
         if (window.frenzyMode) {
             this.gameMap.renderAddresses(ctx, this.camera);
             this.pirateManager.render(ctx, this.camera, this.spriteManager);

@@ -61,8 +61,14 @@ class MiniMap {
                 }
                 
                 const bldg = gameMap.getBuildingAtTile(x, y);
-                if (bldg && bldg.type === 'dump') {
-                    color = '#8b5a2b'; // Dump: Brown
+                if (bldg) {
+                    if (bldg.type === 'dump') {
+                        color = '#8b5a2b'; // Dump: Brown
+                    } else if (bldg.type === 'city_hall') {
+                        color = '#00ffff'; // City Hall: Cyan
+                    } else if (['art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station'].includes(bldg.type)) {
+                        color = '#ff88ff'; // Philly landmarks: Pink/Purple
+                    }
                 }
                 
                 ctx.fillStyle = color;

@@ -501,10 +501,37 @@ class GameMap {
             let availableIds = [];
             for (let i = 2; i < count; i++) availableIds.push(i);
             
+            // Find building closest to the center (32, 32) to be City Hall
+            let centerBldg = null;
+            let minDist = Infinity;
+            for (const bldg of this.buildings) {
+                let cx = 0, cy = 0;
+                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
+                cx /= bldg.tiles.length;
+                cy /= bldg.tiles.length;
+                const dist = Math.sqrt((cx - 32)**2 + (cy - 32)**2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    centerBldg = bldg;
+                }
+            }
+            if (centerBldg) {
+                centerBldg.type = 'city_hall';
+                availableIds = availableIds.filter(id => id !== centerBldg.id);
+            }
+            
             // Shuffle
             for (let i = availableIds.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [availableIds[i], availableIds[j]] = [availableIds[j], availableIds[i]];
+            }
+            
+            // Assign the 5 other Philadelphia landmarks
+            const phillyLandmarks = ['art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station'];
+            for (const type of phillyLandmarks) {
+                if (availableIds.length > 0) {
+                    this.buildings[availableIds.pop()].type = type;
+                }
             }
             
             if (availableIds.length > 0) {

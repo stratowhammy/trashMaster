@@ -28,7 +28,13 @@ const SPRITE_CONFIG = {
         { id: 'red_truck', name: 'Red Truck', src: 'assets/sprites/red_truck.png' },
         { id: 'red_balloon', name: 'Red Balloon', src: 'assets/sprites/red_balloon.png' },
         { id: 'parade', name: 'Parade', src: 'assets/sprites/parade.png' },
-        { id: 'dump', name: 'Dump', src: 'assets/sprites/dump.png' }
+        { id: 'dump', name: 'Dump', src: 'assets/sprites/dump.png' },
+        { id: 'philly_city_hall', name: 'City Hall', src: 'assets/sprites/philly_city_hall.png' },
+        { id: 'philly_art_museum', name: 'Art Museum', src: 'assets/sprites/philly_art_museum.png' },
+        { id: 'philly_liberty_bell', name: 'Liberty Bell', src: 'assets/sprites/philly_liberty_bell.png' },
+        { id: 'philly_one_liberty', name: 'One Liberty', src: 'assets/sprites/philly_one_liberty.png' },
+        { id: 'philly_franklin_inst', name: 'Franklin Institute', src: 'assets/sprites/philly_franklin_inst.png' },
+        { id: 'philly_station', name: '30th Street Station', src: 'assets/sprites/philly_station.png' }
     ]
 };
 

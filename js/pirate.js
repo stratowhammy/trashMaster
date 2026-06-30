@@ -12,7 +12,7 @@ class Pirate {
         this.alive = true;
         this.arrived = false;
         this.size = TILE_SIZE - 6;
-        this.speed = TILE_SIZE / 3; // 1/3 tile per second
+        this.speed = (TILE_SIZE / 3) * 0.8; // 20% slower than 1/3 tile per second
         this.direction = 'down';
         this.animFrame = 0;
         this.animTimer = 0;

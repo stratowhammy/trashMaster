@@ -52,7 +52,7 @@ class PoliceOfficer {
         this.x = tx * TILE_SIZE + TILE_SIZE / 2;
         this.y = ty * TILE_SIZE + TILE_SIZE / 2;
         this.size = 32;
-        this.speed = TILE_SIZE * 0.45; // slightly faster than 1/3 tile per second
+        this.speed = TILE_SIZE * 1.35; // 3x faster speed for police officers
         this.alive = true;
         this.temporary = temporary;
         this.ttl = temporary ? 30.0 : Infinity;

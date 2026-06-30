@@ -236,6 +236,41 @@ class HUD {
         ctx.textAlign = 'right';
         ctx.fillText('WASD / Arrow Keys to move', canvasWidth - 16, canvasHeight - 16);
 
+        let nextBarY = canvasHeight - 24;
+
+        // ── Trash Truck Capacity Bar (Bottom Center) ──
+        if (window.playerHasTruck > 0 && window.game) {
+            const currentTrash = window.game.trashCollectedInTruck || 0;
+            const maxTrash = window.playerHasTruck * 50;
+            const fillPct = Math.max(0, Math.min(1, currentTrash / maxTrash));
+
+            const barW = Math.min(400, canvasWidth * 0.5);
+            const barH = 16;
+            const barX = canvasWidth / 2 - barW / 2;
+            const barY = nextBarY;
+            nextBarY -= 20;
+
+            // Draw background
+            ctx.fillStyle = 'rgba(50, 30, 10, 0.6)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            // Fill (brown color)
+            ctx.fillStyle = '#8b5a2b';
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+            // Border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            // Text
+            ctx.fillStyle = '#fff';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`TRUCK: ${currentTrash}/${maxTrash}`, barX + barW / 2, barY + barH / 2 + 1);
+        }
+
         // ── Hunger Bar (Bottom Center) ──
         if (window.fastFoodMode && window.game) {
             const hTimer = window.game.hungerTimer || 0;
@@ -245,7 +280,7 @@ class HUD {
             const barW = Math.min(400, canvasWidth * 0.5);
             const barH = 16;
             const barX = canvasWidth / 2 - barW / 2;
-            const barY = canvasHeight - 32;
+            const barY = nextBarY;
             
             // Bar Background
             ctx.fillStyle = 'rgba(10,15,25,0.8)';
@@ -270,38 +305,6 @@ class HUD {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('HUNGER', canvasWidth / 2, barY + barH / 2 + 1);
-        }
-
-        // ── Trash Truck Capacity Bar (Bottom Right) ──
-        if (window.playerHasTruck > 0 && window.game) {
-            const currentTrash = window.game.trashCollectedInTruck || 0;
-            const maxTrash = window.playerHasTruck * 50;
-            const fillPct = Math.max(0, Math.min(1, currentTrash / maxTrash));
-
-            const barW = 200;
-            const barH = 16;
-            const barX = canvasWidth - barW - 20;
-            const barY = canvasHeight - 32;
-
-            // Draw background
-            ctx.fillStyle = 'rgba(50, 30, 10, 0.6)';
-            ctx.fillRect(barX, barY, barW, barH);
-
-            // Fill (brown color)
-            ctx.fillStyle = '#8b5a2b';
-            ctx.fillRect(barX, barY, barW * fillPct, barH);
-
-            // Border
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(barX, barY, barW, barH);
-
-            // Text
-            ctx.fillStyle = '#fff';
-            ctx.font = '8px "Press Start 2P", monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`TRUCK: ${currentTrash}/${maxTrash}`, barX + barW / 2, barY + barH / 2 + 1);
         }
     }
 

@@ -540,6 +540,33 @@ function renderTrophyRoom() {
         title.innerText = cat.name.toUpperCase();
         shelfRow.appendChild(title);
 
+        const currentVal = playerStats[cat.key] || 0;
+
+        // Find the next locked achievement
+        let nextIndex = -1;
+        for (let i = 0; i < cat.thresholds.length; i++) {
+            if (currentVal < cat.thresholds[i]) {
+                nextIndex = i;
+                break;
+            }
+        }
+
+        // List the next achievement requirement text
+        const reqText = document.createElement('div');
+        reqText.style.fontFamily = "'Press Start 2P', monospace";
+        reqText.style.fontSize = "6px";
+        reqText.style.marginBottom = "8px";
+        
+        const levelsList = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'];
+        if (nextIndex !== -1) {
+            reqText.style.color = '#00ffcc';
+            reqText.innerText = `NEXT: "${cat.names[nextIndex].toUpperCase()}" (${levelsList[nextIndex]}) - NEED ${cat.badge} ${cat.thresholds[nextIndex].toLocaleString()} (CURRENT: ${currentVal.toLocaleString()})`;
+        } else {
+            reqText.style.color = '#ffeb3b';
+            reqText.innerText = `ALL ACHIEVEMENTS UNLOCKED! 🏆`;
+        }
+        shelfRow.appendChild(reqText);
+
         const wood = document.createElement('div');
         wood.className = 'trophy-shelf-wood';
 
@@ -549,7 +576,6 @@ function renderTrophyRoom() {
             const index = level - 1;
             const threshold = cat.thresholds[index];
             const name = cat.names[index];
-            const currentVal = playerStats[cat.key] || 0;
             const unlocked = currentVal >= threshold;
 
             const slot = document.createElement('div');
@@ -572,16 +598,26 @@ function renderTrophyRoom() {
 
             const tooltip = document.createElement('div');
             tooltip.className = 'trophy-tooltip';
-            const levelsList = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'];
-            tooltip.innerHTML = `
-                <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
-                <div>LEVEL: ${levelsList[index]}</div>
-                <div>REQ: ${cat.badge} ${threshold.toLocaleString()}</div>
-                <div>YOURS: ${currentVal.toLocaleString()}</div>
-                <div style="margin-top: 4px; color: ${unlocked ? '#00ff88' : '#ff3333'}; font-weight: bold;">
-                    ${unlocked ? 'UNLOCKED' : 'LOCKED'}
-                </div>
-            `;
+            
+            if (unlocked) {
+                tooltip.innerHTML = `
+                    <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
+                    <div style="color: #00ff88; font-weight: bold;">UNLOCKED!</div>
+                `;
+            } else if (index === nextIndex) {
+                tooltip.innerHTML = `
+                    <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
+                    <div>LEVEL: ${levelsList[index]}</div>
+                    <div>REQ: ${cat.badge} ${threshold.toLocaleString()}</div>
+                    <div>YOURS: ${currentVal.toLocaleString()}</div>
+                    <div style="margin-top: 4px; color: #ff3333; font-weight: bold;">LOCKED (NEXT TARGET)</div>
+                `;
+            } else {
+                tooltip.innerHTML = `
+                    <div style="color: #888; font-weight: bold; font-size: 8px; margin-bottom: 4px;">???</div>
+                    <div style="color: #ff3333; font-weight: bold;">LOCKED</div>
+                `;
+            }
             slot.appendChild(tooltip);
             wood.appendChild(slot);
         });

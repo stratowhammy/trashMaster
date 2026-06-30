@@ -63,6 +63,14 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN movement_size INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN unlocked_fastfood INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN unlocked_crime INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         db.commit()
         
         # Create default admin if not exists
@@ -167,7 +175,7 @@ def sync_game():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck, employee_death_penalty, movement_size FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime FROM users WHERE id=?", (user_data['user_id'],))
     user = cursor.fetchone()
     
     cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id=?", (user_data['user_id'],))
@@ -178,6 +186,8 @@ def sync_game():
         'has_truck': int(user['has_truck']),
         'employee_death_penalty': user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0,
         'movement_size': user['movement_size'] if user['movement_size'] else 0,
+        'unlocked_fastfood': int(user['unlocked_fastfood'] or 0),
+        'unlocked_crime': int(user['unlocked_crime'] or 0),
         'inventory': inv
     })
 
@@ -204,17 +214,34 @@ def buy_item():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT balance, has_truck, movement_size FROM users WHERE id=?", (user_data['user_id'],))
     user = cursor.fetchone()
     
     if user['balance'] < price:
         return jsonify({'error': 'Insufficient funds'}), 400
         
-    db.execute("UPDATE users SET balance = balance - ? WHERE id=?", (price, user_data['user_id']))
-    
     if item_name == 'Bruno The Trash Truck':
+        current_trucks = user['has_truck']
+        if current_trucks >= 4:
+            return jsonify({'error': 'Maximum of 4 trash trucks allowed'}), 400
+            
+        next_truck_num = current_trucks + 1
+        reqs = {1: 0, 2: 27, 3: 81, 4: 343}
+        req_followers = reqs[next_truck_num]
+        
+        if user['movement_size'] < req_followers:
+            return jsonify({'error': f'Requires {req_followers} followers for truck #{next_truck_num}'}), 400
+            
+        db.execute("UPDATE users SET balance = balance - ? WHERE id=?", (price, user_data['user_id']))
         db.execute("UPDATE users SET has_truck = has_truck + 1 WHERE id=?", (user_data['user_id'],))
     else:
+        db.execute("UPDATE users SET balance = balance - ? WHERE id=?", (price, user_data['user_id']))
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+        row = cursor.fetchone()
+        if row:
+            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+        else:
+            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], item_name))
         cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
         row = cursor.fetchone()
         if row:
@@ -316,6 +343,38 @@ def end_round():
     db.commit()
     
     return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty, 'multiplier': multiplier})
+
+@app.route('/api/game/unlock-mode', methods=['POST'])
+def unlock_mode():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    mode = request.json.get('mode')
+    if mode not in ['fastfood', 'crime']:
+        return jsonify({'error': 'Invalid mode'}), 400
+        
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance, movement_size, unlocked_fastfood, unlocked_crime FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    
+    cost = 20000 if mode == 'fastfood' else 35000
+    req_followers = 25 if mode == 'fastfood' else 50
+    col_name = 'unlocked_fastfood' if mode == 'fastfood' else 'unlocked_crime'
+    
+    if user[col_name]:
+        return jsonify({'error': 'Already unlocked'}), 400
+        
+    if user['movement_size'] < req_followers:
+        return jsonify({'error': f'Requires {req_followers} followers'}), 400
+        
+    if user['balance'] < cost:
+        return jsonify({'error': 'Insufficient funds'}), 400
+        
+    db.execute(f"UPDATE users SET balance = balance - ?, {col_name} = 1 WHERE id=?", (cost, user_data['user_id']))
+    db.commit()
+    
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)

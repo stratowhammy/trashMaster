@@ -197,6 +197,39 @@ class HUD {
         ctx.textAlign = 'left';
         ctx.fillText(`Posse: ${this.followerCount}`, fX + 28, fY + 12);
 
+        // ── Politics Mode Votes Display (top-left, below Posse) ──
+        if (window.politicsMode && window.game) {
+            const pvX = 20;
+            const pvY = 70;
+            ctx.fillStyle = 'rgba(10,15,25,0.75)';
+            ctx.beginPath();
+            ctx.roundRect(pvX - 10, pvY - 10, 160, 40, 8);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,255,200,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(pvX - 10, pvY - 10, 160, 40, 8);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ff8844';
+            ctx.font = '16px serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('🤝', pvX, pvY + 12);
+
+            const office = window.politicalOffice || 'citizen';
+            let targetVotes = 25;
+            if (office === 'candidate_mayor') targetVotes = 40;
+            else if (office === 'candidate_senator') targetVotes = 60;
+            else if (office === 'candidate_president') targetVotes = 100;
+            
+            const count = window.game.handshakesShaken || 0;
+
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = 'bold 10px "Press Start 2P", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Votes:${count}/${targetVotes}`, pvX + 28, pvY + 12);
+        }
+
         // ── Follower Notification ──
         if (this.followerNotificationTimer > 0) {
             const notifAlpha = Math.min(1, this.followerNotificationTimer / 30);

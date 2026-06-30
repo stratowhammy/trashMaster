@@ -82,6 +82,13 @@
                         </label>
                         <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Fast Food Mode</span>
                     </div>
+                    <div id="politics-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="politics-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Politics Mode</span>
+                    </div>
                     <div class="toggle-container" style="margin-bottom: 12px;">
                         <label class="switch">
                             <input type="checkbox" id="flowers-toggle">
@@ -166,6 +173,21 @@
             <div style="display: flex; justify-content: center; gap: 20px;">
                 <button id="btn-made-man-yes" class="btn play-btn" style="background: #00aa00; border-color: #006600; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">YES</button>
                 <button id="btn-made-man-no" class="btn secondary" style="padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">NO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Council Nomination Dialog -->
+    <div id="political-candidate-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div class="dialog-box" style="background: #111; border: 4px solid #00ffcc; padding: 30px; border-radius: 8px; text-align: center; max-width: 400px;">
+            <h2 style="color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 16px; margin-bottom: 20px;">RUN FOR OFFICE?</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: center;">
+                <div style="width: 64px; height: 64px; border: 2px solid #00ffcc; background: #222; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px;">🗳️</div>
+                <p style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #aaffaa; text-align: left; line-height: 1.6; margin: 0;">The Trash Party wants YOU to run for City Council! Represent clean streets and shake hands to win votes. Do you accept the nomination?</p>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 20px;">
+                <button id="btn-political-yes" class="btn play-btn" style="background: #00aa00; border-color: #006600; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">YES</button>
+                <button id="btn-political-no" class="btn secondary" style="padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">NO</button>
             </div>
         </div>
     </div>

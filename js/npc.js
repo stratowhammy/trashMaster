@@ -34,6 +34,7 @@ class NPC {
         this.size = TILE_SIZE - 6;
         this.direction = 'down';
         this.animTimer = 0;
+        this.shaken = false;
     }
 
     isPlayerNear(playerX, playerY) {
@@ -100,6 +101,16 @@ class NPC {
         ctx.font = '6px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.fillText(this.name, screen.x, screen.y - drawSize / 2 - 6);
+
+        if (window.politicsMode && !this.shaken) {
+            ctx.save();
+            ctx.font = '12px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const bobY = Math.sin(Date.now() / 200) * 3;
+            ctx.fillText('🤝', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+            ctx.restore();
+        }
 
         // "E to talk" prompt when player is near (set externally)
         if (this._showPrompt) {
@@ -346,5 +357,26 @@ class NPCManager {
         for (let i = 0; i < lines.length; i++) {
             ctx.fillText(lines[i], canvasWidth / 2, boxY + 32 + i * 16);
         }
+    }
+
+    spawnSingleNPC(gameMap) {
+        let tx = 0, ty = 0;
+        for (let attempt = 0; attempt < 500; attempt++) {
+            tx = Math.floor(Math.random() * MAP_WIDTH);
+            ty = Math.floor(Math.random() * MAP_HEIGHT);
+            if (gameMap.getTile(tx, ty) === TileType.SIDEWALK) {
+                break;
+            }
+        }
+        const nameList = [
+            'Tony', 'Paulie', 'Vinny', 'Silvio', 'Carmela', 'Adriana', 'Christopher', 'Vito', 
+            'Clemenza', 'Tessio', 'Fredo', 'Sonny', 'Tom', 'Michael', 'Frank', 'Joe', 
+            'Donnie', 'Lefty', 'Henry', 'Tommy', 'Jimmy', 'Nicky', 'Bobby', 'Phil'
+        ];
+        const npcName = nameList[Math.floor(Math.random() * nameList.length)];
+        const npc = new NPC(tx, ty, 'char1', ["Go Trash Party!", "Vote for the Council!"], npcName);
+        npc.shaken = false;
+        this.npcs.push(npc);
+        return npc;
     }
 }

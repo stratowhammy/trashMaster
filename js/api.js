@@ -114,13 +114,16 @@ function initUI() {
             
             const fastfoodToggle = document.getElementById('fastfood-toggle');
             window.fastFoodMode = fastfoodToggle ? fastfoodToggle.checked : false;
+
+            const politicsToggle = document.getElementById('politics-toggle');
+            window.politicsMode = politicsToggle ? politicsToggle.checked : false;
             
             const flowersToggle = document.getElementById('flowers-toggle');
             window.flowersMode = flowersToggle ? flowersToggle.checked : false;
 
-            showScreen('game-layer'); // This hides UI and shows canvas
+            showScreen('game-layer');
             if (window.startGameFromStore) {
-                window.startGameFromStore(); // Custom method we will add
+                window.startGameFromStore();
             }
         });
     }
@@ -141,11 +144,16 @@ function initUI() {
     }
     if (btnPlus) {
         btnPlus.addEventListener('click', () => {
-            if (tempHiresCount < 5) {
+            const followers = playerStats.total_followers || 0;
+            let maxAllowed = 5;
+            if (followers >= 40) {
+                maxAllowed = 2 * (playerHasTruck || 0);
+            }
+            if (tempHiresCount < maxAllowed) {
                 tempHiresCount++;
                 updateHireDialogUI();
             } else {
-                alert("Maximum 5 posse members allowed!");
+                alert(`Maximum ${maxAllowed} posse members allowed!`);
             }
         });
     }
@@ -177,6 +185,64 @@ function initUI() {
             document.getElementById('trophy-dialog').classList.add('hidden');
         });
     }
+
+    // ── Made Man Dialog Buttons ──
+    const btnMadeManYes = document.getElementById('btn-made-man-yes');
+    const btnMadeManNo = document.getElementById('btn-made-man-no');
+
+    if (btnMadeManYes) {
+        btnMadeManYes.addEventListener('click', async () => {
+            try {
+                await apiCall('/api/game/made-man-choice', 'POST', { choice: 'accepted' });
+                document.getElementById('made-man-dialog').classList.add('hidden');
+                alert("Welcome to the family. Crime Mode is now unlocked!");
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+    if (btnMadeManNo) {
+        btnMadeManNo.addEventListener('click', async () => {
+            try {
+                await apiCall('/api/game/made-man-choice', 'POST', { choice: 'declined' });
+                document.getElementById('made-man-dialog').classList.add('hidden');
+                alert("You declined the Don's offer.");
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+
+    // ── Council Nomination Dialog Buttons ──
+    const btnPoliticalYes = document.getElementById('btn-political-yes');
+    const btnPoliticalNo = document.getElementById('btn-political-no');
+
+    if (btnPoliticalYes) {
+        btnPoliticalYes.addEventListener('click', async () => {
+            try {
+                await apiCall('/api/game/political-choice', 'POST', { choice: 'accepted' });
+                document.getElementById('political-candidate-dialog').classList.add('hidden');
+                alert("Nomination accepted! Politics Mode is now unlocked. Go shake 25 hands to win!");
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+    if (btnPoliticalNo) {
+        btnPoliticalNo.addEventListener('click', async () => {
+            try {
+                await apiCall('/api/game/political-choice', 'POST', { choice: 'declined' });
+                document.getElementById('political-candidate-dialog').classList.add('hidden');
+                alert("You declined the nomination.");
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
 }
 
 async function refreshGameState() {
@@ -189,6 +255,8 @@ async function refreshGameState() {
         playerMovementSize = data.movement_size || 0;
         playerUnlockedFastFood = data.unlocked_fastfood || 0;
         playerUnlockedCrime = data.unlocked_crime || 0;
+        window.madeManStatus = data.made_man_status || 'none';
+        window.politicalOffice = data.political_office || 'citizen';
         playerStats = data.stats || {};
         
         // Notify player when reaching requirements
@@ -206,6 +274,13 @@ async function refreshGameState() {
 
         updateStoreUI();
         updateModeToggles();
+
+        const followers = playerStats.total_followers || 0;
+        if (followers >= 10 && window.madeManStatus === 'none') {
+            document.getElementById('made-man-dialog').classList.remove('hidden');
+        } else if (followers >= 40 && window.madeManStatus === 'declined' && window.politicalOffice === 'citizen') {
+            document.getElementById('political-candidate-dialog').classList.remove('hidden');
+        }
     } catch (e) {
         console.error("Failed to sync state", e);
     }
@@ -332,6 +407,25 @@ function updateHireDialogUI() {
     const upkeepEl = document.getElementById('hire-upkeep-val');
     if (qtyEl) qtyEl.innerText = tempHiresCount;
     if (upkeepEl) upkeepEl.innerText = `$${(tempHiresCount * 200).toLocaleString()}`;
+    
+    // Update limit text
+    const limitTextEl = document.querySelector('#hire-dialog div[style*="font-size: 8px"]');
+    if (limitTextEl) {
+        const followers = playerStats.total_followers || 0;
+        let maxAllowed = 5;
+        if (followers >= 40) {
+            maxAllowed = 2 * (playerHasTruck || 0);
+            limitTextEl.innerHTML = `
+                Upkeep: <span id="hire-upkeep-val">$${(tempHiresCount * 200).toLocaleString()}</span>/15s<br>
+                Limit: ${maxAllowed} members max (2 per truck).
+            `;
+        } else {
+            limitTextEl.innerHTML = `
+                Upkeep: <span id="hire-upkeep-val">$${(tempHiresCount * 200).toLocaleString()}</span>/15s<br>
+                Limit: 5 members max.
+            `;
+        }
+    }
 }
 
 function updateModeToggles() {
@@ -412,50 +506,45 @@ function updateModeToggles() {
         const crimeToggle = document.getElementById('crime-toggle');
         const label = crimeContainer.querySelector('.toggle-label');
         
-        const oldBtn = crimeContainer.querySelector('.unlock-mode-btn');
-        if (oldBtn) oldBtn.remove();
-        
-        if (playerUnlockedCrime === 0) {
-            crimeContainer.querySelector('.switch').style.display = 'none';
-            label.style.display = 'none';
+        if (window.madeManStatus !== 'accepted') {
+            crimeContainer.style.display = 'none';
             crimeToggle.checked = false;
-            
-            const btn = document.createElement('button');
-            btn.className = 'btn unlock-mode-btn';
-            btn.innerText = `Unlock Crime ($35k + 50 Followers)`;
-            btn.style.fontFamily = "'Press Start 2P', monospace";
-            btn.style.fontSize = "6px";
-            btn.style.padding = "6px 8px";
-            btn.style.marginTop = "4px";
-            btn.style.width = "100%";
-            btn.style.cursor = "pointer";
-            
-            if (playerMovementSize >= 50 && playerBalance >= 35000) {
-                btn.style.background = '#00cc66';
-                btn.style.border = '2px solid #008844';
-                btn.disabled = false;
-                btn.addEventListener('click', async () => {
-                    try {
-                        await apiCall('/api/game/unlock-mode', 'POST', { mode: 'crime' });
-                        await refreshGameState();
-                    } catch (e) {
-                        alert(e.message);
-                    }
-                });
-            } else {
-                btn.style.background = '#333';
-                btn.style.border = '2px solid #222';
-                btn.style.color = '#888';
-                btn.disabled = true;
-                btn.style.cursor = "not-allowed";
-            }
-            crimeContainer.appendChild(btn);
         } else {
+            crimeContainer.style.display = 'block';
             crimeContainer.querySelector('.switch').style.display = 'inline-block';
             label.style.display = 'inline-block';
             crimeToggle.disabled = false;
             label.innerText = `Crime Mode`;
             label.style.color = '#fff';
+        }
+    }
+
+    // 4. Politics Mode
+    const politicsContainer = document.getElementById('politics-toggle-container');
+    if (politicsContainer) {
+        const politicsToggle = document.getElementById('politics-toggle');
+        const label = politicsContainer.querySelector('.toggle-label');
+        const office = window.politicalOffice || 'citizen';
+        
+        if (office === 'citizen') {
+            politicsContainer.style.display = 'none';
+            politicsToggle.checked = false;
+        } else {
+            politicsContainer.style.display = 'block';
+            politicsToggle.disabled = false;
+            
+            const officeLabels = {
+                'candidate_council': 'Run for Council',
+                'council': 'Councilman',
+                'candidate_mayor': 'Run for Mayor',
+                'mayor': 'Mayor',
+                'candidate_senator': 'Run for Senator',
+                'senator': 'Senator',
+                'candidate_president': 'Run for President',
+                'president': 'President'
+            };
+            label.innerText = officeLabels[office] || 'Politics Mode';
+            label.style.color = '#00ffcc';
         }
     }
 }

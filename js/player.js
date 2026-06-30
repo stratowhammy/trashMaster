@@ -127,19 +127,37 @@ class Player {
 
     render(ctx, camera, spriteManager) {
         const screen = camera.worldToScreen(this.x, this.y);
-        const drawSize = this.size + 8;
-        const img = spriteManager.getCharacterImage(this.spriteId);
+        let drawSize = this.size + 8;
+        
+        let imgId = this.spriteId;
+        if (window.crimeMode) {
+            imgId = 'black_cadillac';
+            drawSize = 48; // Compact car size fitting the tiles
+        } else if (window.politicsMode) {
+            imgId = 'white_cadillac';
+            drawSize = 48;
+        }
+        
+        const img = spriteManager.getImage(imgId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
-            let bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
+            let bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 1.5 : 0;
             ctx.save();
-            if (this.direction === 'left') {
-                ctx.translate(screen.x, screen.y + bobY);
-                ctx.scale(-1, 1);
-                ctx.drawImage(img, -drawSize/2, -drawSize/2, drawSize, drawSize);
+            ctx.translate(screen.x, screen.y + bobY);
+            
+            if (window.crimeMode || window.politicsMode) {
+                let angle = 0;
+                if (this.direction === 'down') angle = Math.PI;
+                else if (this.direction === 'left') angle = -Math.PI / 2;
+                else if (this.direction === 'right') angle = Math.PI / 2;
+                ctx.rotate(angle);
             } else {
-                ctx.drawImage(img, screen.x-drawSize/2, screen.y-drawSize/2+bobY, drawSize, drawSize);
+                if (this.direction === 'left') {
+                    ctx.scale(-1, 1);
+                }
             }
+            
+            ctx.drawImage(img, -drawSize/2, -drawSize/2, drawSize, drawSize);
             ctx.restore();
         } else {
             this._drawFallback(ctx, screen.x, screen.y);

@@ -23,6 +23,60 @@ class Follower {
     }
 
     update(leaderHistory, gameMap) {
+        if ((window.crimeMode || window.politicsMode) && window.playerStats && (window.playerStats.total_followers >= 40)) {
+            // Autonomous trash-collecting employee movement
+            if (!this.moveTimer) this.moveTimer = 0;
+            if (!this.vx) this.vx = 0;
+            if (!this.vy) this.vy = 0;
+
+            this.moveTimer--;
+            
+            // Pick new direction if timer expired or not moving
+            if (this.moveTimer <= 0 || (this.vx === 0 && this.vy === 0)) {
+                this.moveTimer = 60 + Math.floor(Math.random() * 120);
+                const dirs = [
+                    { x: 1, y: 0, d: 'right' },
+                    { x: -1, y: 0, d: 'left' },
+                    { x: 0, y: 1, d: 'down' },
+                    { x: 0, y: -1, d: 'up' }
+                ];
+                const choice = dirs[Math.floor(Math.random() * dirs.length)];
+                
+                const speed = 1.0; 
+                this.vx = choice.x * speed;
+                this.vy = choice.y * speed;
+                this.direction = choice.d;
+            }
+
+            const MAP_PIXEL_W = MAP_WIDTH * TILE_SIZE;
+            const MAP_PIXEL_H = MAP_HEIGHT * TILE_SIZE;
+            const nextX = (this.x + this.vx + MAP_PIXEL_W) % MAP_PIXEL_W;
+            const nextY = (this.y + this.vy + MAP_PIXEL_H) % MAP_PIXEL_H;
+
+            const tx = Math.floor(nextX / TILE_SIZE);
+            const ty = Math.floor(nextY / TILE_SIZE);
+
+            if (gameMap.isWalkable(tx, ty)) {
+                this.x = nextX;
+                this.y = nextY;
+                this.moving = true;
+            } else {
+                this.vx = 0;
+                this.vy = 0;
+                this.moveTimer = 0;
+                this.moving = false;
+            }
+
+            // Update animation
+            this.animTimer++;
+            if (this.animTimer >= 8) {
+                this.animTimer = 0;
+                this.animFrame = (this.animFrame + 1) % 4;
+            }
+            
+            return;
+        }
+
         // Follow the leader by replaying their position history with a delay
         const delayIndex = leaderHistory.length - 1 - this.followDelay;
 

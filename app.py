@@ -82,6 +82,14 @@ def init_db():
                 db.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
                 pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN made_man_status TEXT DEFAULT 'none'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN political_office TEXT DEFAULT 'citizen'")
+        except sqlite3.OperationalError:
+            pass
         db.commit()
         
         # Create default admin if not exists
@@ -188,6 +196,7 @@ def sync_game():
     cursor = db.cursor()
     cursor.execute("""
         SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime,
+               made_man_status, political_office,
                stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
         FROM users WHERE id=?
     """, (user_data['user_id'],))
@@ -203,6 +212,8 @@ def sync_game():
         'movement_size': user['movement_size'] if user['movement_size'] else 0,
         'unlocked_fastfood': int(user['unlocked_fastfood'] or 0),
         'unlocked_crime': int(user['unlocked_crime'] or 0),
+        'made_man_status': user['made_man_status'] or 'none',
+        'political_office': user['political_office'] or 'citizen',
         'inventory': inv,
         'stats': {
             'max_single_trash': user['stat_max_single_trash'] or 0,
@@ -334,11 +345,12 @@ def end_round():
     lose_truck = bool(request.json.get('lose_truck', False))
     followers = int(request.json.get('followers', 0))
     trash_collected = int(request.json.get('trash_collected', 0))
+    handshakes = int(request.json.get('handshakes', 0))
     
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        SELECT balance, has_truck, employee_death_penalty, movement_size,
+        SELECT balance, has_truck, employee_death_penalty, movement_size, political_office,
                stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
         FROM users WHERE id=?
     """, (user_data['user_id'],))
@@ -380,12 +392,36 @@ def end_round():
     new_cumulative_trash = (user['stat_cumulative_trash'] or 0) + trash_collected
     new_max_single_money = max(user['stat_max_single_money'] or 0, earned)
     new_cumulative_money = (user['stat_cumulative_money'] or 0) + earned
+    
+    new_movement_size = (user['movement_size'] or 0) + followers
     new_max_single_followers = max(user['stat_max_single_followers'] or 0, followers)
+
+    # Political Office Promotion Logic
+    current_office = user['political_office'] or 'citizen'
+    new_office = current_office
+
+    if current_office == 'candidate_council' and handshakes >= 25:
+        new_office = 'council'
+    elif current_office == 'candidate_mayor' and handshakes >= 40:
+        new_office = 'mayor'
+    elif current_office == 'candidate_senator' and handshakes >= 60:
+        new_office = 'senator'
+    elif current_office == 'candidate_president' and handshakes >= 100:
+        new_office = 'president'
+
+    # Auto-candidacy transitions for the next follower milestones
+    if new_office == 'council' and new_movement_size >= 160:
+        new_office = 'candidate_mayor'
+    elif new_office == 'mayor' and new_movement_size >= 640:
+        new_office = 'candidate_senator'
+    elif new_office == 'senator' and new_movement_size >= 2560:
+        new_office = 'candidate_president'
 
     db.execute("""
         UPDATE users SET 
             balance=?, 
-            movement_size = movement_size + ?,
+            movement_size = ?,
+            political_office = ?,
             stat_max_single_trash=?,
             stat_cumulative_trash=?,
             stat_max_single_money=?,
@@ -394,7 +430,8 @@ def end_round():
         WHERE id=?
     """, (
         new_balance, 
-        followers, 
+        new_movement_size,
+        new_office,
         new_max_single_trash,
         new_cumulative_trash,
         new_max_single_money,
@@ -404,7 +441,13 @@ def end_round():
     ))
     db.commit()
     
-    return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty, 'multiplier': multiplier})
+    return jsonify({
+        'success': True, 
+        'balance': new_balance, 
+        'employee_death_penalty': penalty, 
+        'multiplier': multiplier,
+        'political_office': new_office
+    })
 
 @app.route('/api/game/unlock-mode', methods=['POST'])
 def unlock_mode():
@@ -437,6 +480,44 @@ def unlock_mode():
     db.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/game/made-man-choice', methods=['POST'])
+def made_man_choice():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    choice = request.json.get('choice')
+    if choice not in ['accepted', 'declined']:
+        return jsonify({'error': 'Invalid choice'}), 400
+        
+    db = get_db()
+    unlocked_crime = 1 if choice == 'accepted' else 0
+    db.execute("""
+        UPDATE users 
+        SET made_man_status = ?, unlocked_crime = ?
+        WHERE id = ?
+    """, (choice, unlocked_crime, user_data['user_id']))
+    db.commit()
+    return jsonify({'success': True, 'made_man_status': choice})
+
+@app.route('/api/game/political-choice', methods=['POST'])
+def political_choice():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    choice = request.json.get('choice')
+    if choice not in ['accepted', 'declined']:
+        return jsonify({'error': 'Invalid choice'}), 400
+        
+    db = get_db()
+    office = 'candidate_council' if choice == 'accepted' else 'citizen'
+    db.execute("""
+        UPDATE users 
+        SET political_office = ?
+        WHERE id = ?
+    """, (office, user_data['user_id']))
+    db.commit()
+    return jsonify({'success': True, 'political_office': office})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)

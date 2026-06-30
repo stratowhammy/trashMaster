@@ -253,6 +253,7 @@ class CrimeManager {
         this.activeFamily = -1; // 0: Salieri, 1: Morello
         
         this.activeTask = null;
+        this.completedJobsCount = 0;
         this.taskStartClock = 0;
         this.taskTimeElapsed = 0;
         
@@ -340,6 +341,7 @@ class CrimeManager {
         this.madeMan = false;
         this.activeFamily = -1;
         this.activeTask = null;
+        this.completedJobsCount = 0;
         this.bankRobbed = false;
         this.policeActive = false;
         this.police = [];
@@ -386,13 +388,20 @@ class CrimeManager {
     }
 
     assignNextTask(gameMap) {
+        const alliedDonId = this.activeFamily;
+        const rivalDonId = 1 - this.activeFamily;
+        const rivalName = rivalDonId === 0 ? "Don Salieri" : "Don Morello";
+        const alliedName = alliedDonId === 0 ? "Don Salieri" : "Don Morello";
+
         const tasks = [
             { type: 'collect_gold', desc: 'Collect gold from the target building.', targetBldgId: 2 + Math.floor(Math.random() * 8) },
             { type: 'intimidate', desc: 'Find and Intimidate [I] the rival mafia NPC.', targetNPCIndex: Math.floor(Math.random() * 10) },
             { type: 'rob_npc', desc: 'Find and Rob [R] the target citizen NPC.', targetNPCIndex: Math.floor(Math.random() * 10) },
             { type: 'steal_car', desc: 'Steal [S] a car at any street intersection.' },
             { type: 'rob_bank', desc: 'Rob the city BANK. Get to the entrance!' },
-            { type: 'hit_npc_indoor', desc: 'Eliminate the target hiding inside the building.' }
+            { type: 'hit_npc_indoor', desc: 'Eliminate the target hiding inside the building.' },
+            { type: 'talk_don', desc: `Deliver a briefcase to ${alliedName} [E].`, targetDonId: alliedDonId },
+            { type: 'kill_don', desc: `Locate and Eliminate [K] rival ${rivalName}.`, targetDonId: rivalDonId }
         ];
 
         this.activeTask = tasks[Math.floor(Math.random() * tasks.length)];
@@ -445,6 +454,15 @@ class CrimeManager {
                 }
             }
         }
+    }
+
+    completeTask(game) {
+        const reward = 2000 * Math.pow(2, this.completedJobsCount);
+        this.completedJobsCount++;
+        game.trashManager.totalPoints += reward;
+        game.hud.updateScore(game.trashManager.totalPoints);
+        game.hud.showFollowerNotification(`Favor completed! Earned $${reward.toLocaleString()}!`, true);
+        this.assignNextTask(game.gameMap);
     }
 
     triggerBribeChief() {
@@ -617,7 +635,7 @@ class CrimeManager {
             if (dist < TILE_SIZE * 1.5 && game.player.keys.k) {
                 this.indoorTarget.alive = false;
                 game.hud.showFollowerNotification('Target eliminated!', true);
-                this.assignNextTask(game.gameMap);
+                this.completeTask(game);
                 // Turn off k so it doesn't trigger multiple times in one frame
                 game.player.keys.k = false;
             }
@@ -627,9 +645,17 @@ class CrimeManager {
     render(ctx, camera) {
         if (!window.crimeMode) return;
 
-        // Render alive Mafia Dons
+        // Render alive Mafia Dons if they are the current task targets
         for (const don of this.dons) {
-            if (don.alive) don.render(ctx, camera);
+            if (don.alive) {
+                let shouldRender = false;
+                if (this.activeTask) {
+                    if ((this.activeTask.type === 'talk_don' || this.activeTask.type === 'kill_don' || this.activeTask.type === 'intimidate_don') && this.activeTask.targetDonId === don.id) {
+                        shouldRender = true;
+                    }
+                }
+                if (shouldRender) don.render(ctx, camera);
+            }
         }
 
         // Render Police Chief

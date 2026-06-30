@@ -165,7 +165,9 @@ class Game {
                             }
                         }
                         if (nearDon) {
-                            this.crimeManager.triggerMadeManOffer(nearDon.id);
+                            if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'talk_don' && nearDon.id === this.crimeManager.activeTask.targetDonId) {
+                                this.crimeManager.completeTask(this);
+                            }
                             return;
                         }
 
@@ -359,17 +361,30 @@ class Game {
 
                                 if (this.crimeManager.activeTask && 
                                     (this.crimeManager.activeTask.type === 'collect_gold' || this.crimeManager.activeTask.type === 'intimidate' || this.crimeManager.activeTask.type === 'rob_npc')) {
-                                    this.hud.showFollowerNotification('Favor completed for the Don!', true);
-                                    this.crimeManager.assignNextTask(this.gameMap);
+                                    this.crimeManager.completeTask(this);
                                 }
                             }
                         }
                     }
                 }
 
-                // I or i to intimidate NPC
+                // I or i to intimidate NPC or Don
                 if (e.key === 'i' || e.key === 'I') {
                     if (window.crimeMode) {
+                        // Check Don intimidate first
+                        if (this.crimeManager && this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate_don') {
+                            const px = wrapWorldX(this.player.x);
+                            const py = wrapWorldY(this.player.y);
+                            const don = this.crimeManager.dons.find(d => d.id === this.crimeManager.activeTask.targetDonId);
+                            if (don && don.alive) {
+                                const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                                if (dist < TILE_SIZE * 1.5) {
+                                    this.crimeManager.completeTask(this);
+                                    return;
+                                }
+                            }
+                        }
+
                         const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
                         if (npc) {
                             this.npcManager.activeDialogue = {
@@ -379,8 +394,7 @@ class Game {
                             };
                             this.hud.showFollowerNotification('NPC Intimidated!', true);
                             if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate') {
-                                this.hud.showFollowerNotification('Favor completed for the Don!', true);
-                                this.crimeManager.assignNextTask(this.gameMap);
+                                this.crimeManager.completeTask(this);
                             }
                         }
                     }
@@ -426,8 +440,7 @@ class Game {
                             }
                             
                             if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'rob_npc') {
-                                this.hud.showFollowerNotification('Favor completed for the Don!', true);
-                                this.crimeManager.assignNextTask(this.gameMap);
+                                this.crimeManager.completeTask(this);
                             }
                         } else if (npc && npc.robbed) {
                             this.hud.showFollowerNotification('This NPC has already been robbed!', false);
@@ -435,7 +448,7 @@ class Game {
                     }
                 }
 
-                // S or s to steal car
+                // S or s to steal car (Crime) or shake hands (Politics)
                 if (e.key === 's' || e.key === 'S') {
                     if (window.crimeMode) {
                         let targetCar = null;
@@ -464,8 +477,7 @@ class Game {
                                     this.hud.showFollowerNotification('Car stolen! Posse member drove off. +$1,000', true);
 
                                     if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'steal_car') {
-                                        this.hud.showFollowerNotification('Favor completed for the Don!', true);
-                                        this.crimeManager.assignNextTask(this.gameMap);
+                                        this.crimeManager.completeTask(this);
                                     }
                                 } else {
                                     this.hud.showFollowerNotification('You need a posse member to drive off with the stolen car!', true);
@@ -473,6 +485,18 @@ class Game {
                             } else {
                                 this.hud.showFollowerNotification('You can only steal cars on roads or intersections!', true);
                             }
+                        }
+                    } else if (window.politicsMode) {
+                        const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                        if (npc && !npc.shaken) {
+                            npc.shaken = true;
+                            this.handshakesShaken = (this.handshakesShaken || 0) + 1;
+                            this.hud.showFollowerNotification(`Shook hands with ${npc.name}! (+1 Vote)`, true);
+                            
+                            // Spawn a new candidate NPC
+                            this.npcManager.spawnSingleNPC(this.gameMap);
+                        } else if (npc && npc.shaken) {
+                            this.hud.showFollowerNotification(`Already shook hands with ${npc.name}!`, false);
                         }
                     }
                 }
@@ -775,8 +799,7 @@ class Game {
                             // Check complete
                             const remaining = this.crimeManager.goldBags.filter(b => !b.collected).length;
                             if (remaining === 0) {
-                                this.hud.showFollowerNotification('Favor completed for the Don!', true);
-                                this.crimeManager.assignNextTask(this.gameMap);
+                                this.crimeManager.completeTask(this);
                             }
                         }
                     }
@@ -1323,6 +1346,7 @@ class Game {
             this.crimeManager.initialize(this.gameMap);
         }
         this.buildingInterior = null;
+        this.handshakesShaken = 0;
         this.protectionTimer = 0;
         this.protectionBonus = 0;
         this.employeesKilledThisRound = 0;
@@ -1375,7 +1399,8 @@ class Game {
                 employee_cost: this.totalEmployeeCost,
                 employees_killed: this.employeesKilledThisRound,
                 followers: this.followerManager.getFollowerCount(),
-                trash_collected: this.trashCollectedInRound || 0
+                trash_collected: this.trashCollectedInRound || 0,
+                handshakes: this.handshakesShaken || 0
             });
             window.employeesHired = 0;
             await window.refreshGameState();
@@ -1794,7 +1819,8 @@ class Game {
                                 employee_cost: this.totalEmployeeCost,
                                 employees_killed: this.employeesKilledThisRound,
                                 lose_truck: hadTruck,
-                                followers: this.followerManager.getFollowerCount()
+                                followers: this.followerManager.getFollowerCount(),
+                                handshakes: this.handshakesShaken || 0
                             });
                             window.employeesHired = 0;
                             await window.refreshGameState();
@@ -1879,7 +1905,8 @@ class Game {
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
                             lose_truck: false, // they do NOT lose their truck from car accident!
-                            followers: this.followerManager.getFollowerCount()
+                            followers: this.followerManager.getFollowerCount(),
+                            handshakes: this.handshakesShaken || 0
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();
@@ -1963,7 +1990,8 @@ class Game {
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
                             lose_truck: false, // they do NOT lose their truck from arrest!
-                            followers: this.followerManager.getFollowerCount()
+                            followers: this.followerManager.getFollowerCount(),
+                            handshakes: this.handshakesShaken || 0
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();

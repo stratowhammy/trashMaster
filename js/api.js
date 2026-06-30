@@ -473,6 +473,19 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         showScreen('login-screen');
     }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const trophyDialog = document.getElementById('trophy-dialog');
+            if (trophyDialog && !trophyDialog.classList.contains('hidden')) {
+                trophyDialog.classList.add('hidden');
+            }
+            const hireDialog = document.getElementById('hire-dialog');
+            if (hireDialog && !hireDialog.classList.contains('hidden')) {
+                hireDialog.classList.add('hidden');
+            }
+        }
+    });
 });
 
 const TROPHY_CATEGORIES = [

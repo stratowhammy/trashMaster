@@ -475,8 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-}
-
 const TROPHY_CATEGORIES = [
     {
         key: 'max_single_trash',

@@ -190,7 +190,7 @@ class GameMap {
     }
 
     // ── Wrapping tile access ──
-    isWalkable(tileX, tileY, curTX, curTY) {
+    isWalkable(tileX, tileY, curTX, curTY, lenient = false) {
         const wx = wrapTileX(tileX);
         const wy = wrapTileY(tileY);
         const t = this.tiles[wy][wx];
@@ -223,6 +223,7 @@ class GameMap {
         // Scenario 2: Outside trying to enter building B
         if (!bldgA && bldgB) {
             const isOpen = this.openDoors.has(bldgB.id);
+            if (lenient) return isOpen;
             const isDoor = bldgB.doorTiles.some(d => d.x === wx && d.y === wy) || 
                            bldgB.doorTiles.some(d => d.x === curWX && d.y === curWY);
             return isOpen && isDoor;
@@ -231,6 +232,7 @@ class GameMap {
         // Scenario 3: Inside building A trying to exit
         if (bldgA && !bldgB) {
             const isOpen = this.openDoors.has(bldgA.id);
+            if (lenient) return isOpen;
             const isDoor = bldgA.doorTiles.some(d => d.x === wx && d.y === wy) || 
                            bldgA.doorTiles.some(d => d.x === curWX && d.y === curWY);
             return isOpen && isDoor;

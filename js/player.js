@@ -95,13 +95,26 @@ class Player {
         
         if (!bldgA && bldgB) {
             // Trying to enter building B
-            // Entry allowed (checked later via map.isWalkable)
+            if (window.game && window.game.followerManager.getFollowerCount() < 6) {
+                // Throttle the notification to avoid spamming every frame
+                if (!this.lastEntryDenyTime || Date.now() - this.lastEntryDenyTime > 2000) {
+                    window.game.hud.showFollowerNotification('You need a posse of 6+ to enter this building!', false);
+                    this.lastEntryDenyTime = Date.now();
+                }
+                return false;
+            }
         }
 
+        // 1. Check center tile transition strictly!
+        if (!gameMap.isWalkable(targetWX, targetWY, curTX, curTY, false)) {
+            return false;
+        }
+
+        // 2. Check corners transition leniently!
         for (const c of corners) {
             const targetTX = Math.floor(c.x / TILE_SIZE);
             const targetTY = Math.floor(c.y / TILE_SIZE);
-            if (!gameMap.isWalkable(targetTX, targetTY, curTX, curTY))
+            if (!gameMap.isWalkable(targetTX, targetTY, curTX, curTY, true))
                 return false;
         }
         return true;

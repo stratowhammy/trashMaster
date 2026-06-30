@@ -10,6 +10,7 @@ var playerMovementSize = 0;
 var playerUnlockedFastFood = 0;
 var playerUnlockedCrime = 0;
 var tempHiresCount = 0;
+var playerStats = {};
 
 async function apiCall(endpoint, method = 'GET', body = null) {
     const headers = { 'Content-Type': 'application/json' };
@@ -160,6 +161,22 @@ function initUI() {
             document.getElementById('hire-dialog').classList.add('hidden');
         });
     }
+
+    // ── Trophy Dialog Buttons ──
+    const btnViewTrophies = document.getElementById('btn-view-trophies');
+    const btnTrophyClose = document.getElementById('btn-trophy-close');
+
+    if (btnViewTrophies) {
+        btnViewTrophies.addEventListener('click', () => {
+            renderTrophyRoom();
+            document.getElementById('trophy-dialog').classList.remove('hidden');
+        });
+    }
+    if (btnTrophyClose) {
+        btnTrophyClose.addEventListener('click', () => {
+            document.getElementById('trophy-dialog').classList.add('hidden');
+        });
+    }
 }
 
 async function refreshGameState() {
@@ -172,6 +189,7 @@ async function refreshGameState() {
         playerMovementSize = data.movement_size || 0;
         playerUnlockedFastFood = data.unlocked_fastfood || 0;
         playerUnlockedCrime = data.unlocked_crime || 0;
+        playerStats = data.stats || {};
         
         // Notify player when reaching requirements
         if (oldFollowers > 0) {
@@ -255,6 +273,16 @@ function renderStore() {
                     btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
                     btnText = 'Locked';
                 }
+            }
+        }
+
+        const limitedItems = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection'];
+        if (limitedItems.includes(item.name)) {
+            const count = playerInventory[item.name] || 0;
+            descOverride = `${item.desc} (Owned: ${count}/10)`;
+            if (count >= 10) {
+                btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
+                btnText = 'Limit Reached';
             }
         }
 
@@ -446,6 +474,204 @@ document.addEventListener('DOMContentLoaded', () => {
         showScreen('login-screen');
     }
 });
+
+}
+
+const TROPHY_CATEGORIES = [
+    {
+        key: 'max_single_trash',
+        name: 'Single Game Trash',
+        color: '#4caf50',
+        badge: '🗑️',
+        thresholds: [10, 30, 100, 300, 1000],
+        names: ['Trash Collector', 'Garbage Patrol', 'Sanitation Officer', 'City Cleaner', 'Trash Overlord']
+    },
+    {
+        key: 'cumulative_trash',
+        name: 'Cumulative Trash',
+        color: '#8bc34a',
+        badge: '📦',
+        thresholds: [50, 250, 1250, 6250, 31250],
+        names: ['Litter Sweep', 'Clean Streets', 'Neighborhood Hero', 'Eco Warrior', 'Saviour of Philly']
+    },
+    {
+        key: 'max_single_money',
+        name: 'Single Round Money',
+        color: '#ffeb3b',
+        badge: '💵',
+        thresholds: [500, 2500, 12500, 62500, 312500],
+        names: ['Pennies Count', 'Dollar Bill', 'Big Earner', 'Wealth Generator', 'Money Magnet']
+    },
+    {
+        key: 'cumulative_money',
+        name: 'Total Earnings',
+        color: '#ffc107',
+        badge: '💰',
+        thresholds: [2000, 10000, 50000, 250000, 1250000],
+        names: ['Thrifty Hustler', 'Local Business', 'Philly Tycoon', 'Billionaire Club', 'Infinite Wealth']
+    },
+    {
+        key: 'max_single_followers',
+        name: 'Single Round Followers',
+        color: '#00bcd4',
+        badge: '👥',
+        thresholds: [5, 15, 45, 135, 400],
+        names: ['Posse Spark', 'Crowd Puller', 'Local Leader', 'Trendsetter', 'Revolutionary']
+    },
+    {
+        key: 'total_followers',
+        name: 'Total Followers',
+        color: '#009688',
+        badge: '👑',
+        thresholds: [10, 40, 160, 640, 2560],
+        names: ['Small Crew', 'Active Movement', 'Rising Leader', 'Mass Movement', 'Philly Emperor']
+    }
+];
+
+function renderTrophyRoom() {
+    const shelvesEl = document.getElementById('trophy-case-shelves');
+    if (!shelvesEl) return;
+    shelvesEl.innerHTML = '';
+
+    TROPHY_CATEGORIES.forEach(cat => {
+        const shelfRow = document.createElement('div');
+        shelfRow.className = 'trophy-shelf-row';
+
+        const title = document.createElement('div');
+        title.className = 'trophy-shelf-title';
+        title.innerText = cat.name.toUpperCase();
+        shelfRow.appendChild(title);
+
+        const wood = document.createElement('div');
+        wood.className = 'trophy-shelf-wood';
+
+        const order = [2, 4, 5, 3, 1];
+        
+        order.forEach(level => {
+            const index = level - 1;
+            const threshold = cat.thresholds[index];
+            const name = cat.names[index];
+            const currentVal = playerStats[cat.key] || 0;
+            const unlocked = currentVal >= threshold;
+
+            const slot = document.createElement('div');
+            slot.className = 'trophy-slot';
+
+            const size = 16 + level * 8;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size}px`;
+            
+            if (unlocked) {
+                drawTrophy(canvas, level, cat.color);
+            } else {
+                drawSilhouetteTrophy(canvas, level);
+            }
+
+            slot.appendChild(canvas);
+
+            const tooltip = document.createElement('div');
+            tooltip.className = 'trophy-tooltip';
+            const levelsList = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'];
+            tooltip.innerHTML = `
+                <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
+                <div>LEVEL: ${levelsList[index]}</div>
+                <div>REQ: ${cat.badge} ${threshold.toLocaleString()}</div>
+                <div>YOURS: ${currentVal.toLocaleString()}</div>
+                <div style="margin-top: 4px; color: ${unlocked ? '#00ff88' : '#ff3333'}; font-weight: bold;">
+                    ${unlocked ? 'UNLOCKED' : 'LOCKED'}
+                </div>
+            `;
+            slot.appendChild(tooltip);
+            wood.appendChild(slot);
+        });
+
+        shelfRow.appendChild(wood);
+        shelvesEl.appendChild(shelfRow);
+    });
+}
+
+function drawTrophy(canvas, level, categoryColor) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const w = canvas.width;
+    ctx.imageRendering = 'pixelated';
+    
+    let metalColor = '#8c5a3c';
+    let strokeColor = '#3e2417';
+    let lightColor = '#b88663';
+    
+    if (level === 2) {
+        metalColor = '#a0a0a8';
+        strokeColor = '#484850';
+        lightColor = '#e0e0e8';
+    } else if (level === 3) {
+        metalColor = '#e0a000';
+        strokeColor = '#604000';
+        lightColor = '#ffe060';
+    } else if (level === 4) {
+        metalColor = '#00b8b8';
+        strokeColor = '#004c4c';
+        lightColor = '#80ffff';
+    } else if (level === 5) {
+        metalColor = '#60a0ff';
+        strokeColor = '#103080';
+        lightColor = '#e0f0ff';
+    }
+    
+    const scale = w / 16;
+    
+    ctx.fillStyle = strokeColor;
+    ctx.fillRect(4 * scale, 13 * scale, 8 * scale, 2 * scale);
+    ctx.fillRect(7 * scale, 9 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(3 * scale, 2 * scale, 10 * scale, 7 * scale);
+    ctx.fillRect(1 * scale, 3 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(13 * scale, 3 * scale, 2 * scale, 4 * scale);
+    
+    ctx.fillStyle = metalColor;
+    ctx.fillRect(5 * scale, 13 * scale, 6 * scale, 1 * scale);
+    ctx.fillRect(7.5 * scale, 9 * scale, 1 * scale, 4 * scale);
+    ctx.fillRect(4 * scale, 3 * scale, 8 * scale, 5 * scale);
+    
+    ctx.fillStyle = lightColor;
+    ctx.fillRect(5 * scale, 3 * scale, 1 * scale, 4 * scale);
+    ctx.fillRect(8 * scale, 13 * scale, 1 * scale, 1 * scale);
+    
+    ctx.fillStyle = '#0c0804';
+    ctx.fillRect(2 * scale, 4 * scale, 1 * scale, 2 * scale);
+    ctx.fillRect(13 * scale, 4 * scale, 1 * scale, 2 * scale);
+    
+    ctx.fillStyle = categoryColor;
+    ctx.fillRect(7 * scale, 5 * scale, 2 * scale, 2 * scale);
+}
+
+function drawSilhouetteTrophy(canvas, level) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageRendering = 'pixelated';
+
+    const w = canvas.width;
+    const scale = w / 16;
+    
+    ctx.fillStyle = '#222225';
+    ctx.fillRect(4 * scale, 13 * scale, 8 * scale, 2 * scale);
+    ctx.fillRect(7 * scale, 9 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(3 * scale, 2 * scale, 10 * scale, 7 * scale);
+    ctx.fillRect(1 * scale, 3 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(13 * scale, 3 * scale, 2 * scale, 4 * scale);
+    
+    ctx.fillStyle = '#44444a';
+    ctx.fillRect(5 * scale, 13 * scale, 6 * scale, 1 * scale);
+    ctx.fillRect(7.5 * scale, 9 * scale, 1 * scale, 4 * scale);
+    ctx.fillRect(4 * scale, 3 * scale, 8 * scale, 5 * scale);
+    
+    ctx.fillStyle = '#0c0804';
+    ctx.fillRect(2 * scale, 4 * scale, 1 * scale, 2 * scale);
+    ctx.fillRect(13 * scale, 4 * scale, 1 * scale, 2 * scale);
+}
 
 window.apiCall = apiCall;
 window.refreshGameState = refreshGameState;

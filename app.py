@@ -71,6 +71,17 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN unlocked_crime INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        for col in [
+            'stat_max_single_trash',
+            'stat_cumulative_trash',
+            'stat_max_single_money',
+            'stat_cumulative_money',
+            'stat_max_single_followers'
+        ]:
+            try:
+                db.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
         db.commit()
         
         # Create default admin if not exists
@@ -175,7 +186,11 @@ def sync_game():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("""
+        SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime,
+               stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
+        FROM users WHERE id=?
+    """, (user_data['user_id'],))
     user = cursor.fetchone()
     
     cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id=?", (user_data['user_id'],))
@@ -188,7 +203,15 @@ def sync_game():
         'movement_size': user['movement_size'] if user['movement_size'] else 0,
         'unlocked_fastfood': int(user['unlocked_fastfood'] or 0),
         'unlocked_crime': int(user['unlocked_crime'] or 0),
-        'inventory': inv
+        'inventory': inv,
+        'stats': {
+            'max_single_trash': user['stat_max_single_trash'] or 0,
+            'cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'max_single_money': user['stat_max_single_money'] or 0,
+            'cumulative_money': user['stat_cumulative_money'] or 0,
+            'max_single_followers': user['stat_max_single_followers'] or 0,
+            'total_followers': user['movement_size'] or 0
+        }
     })
 
 @app.route('/api/game/buy', methods=['POST'])
@@ -219,6 +242,14 @@ def buy_item():
     
     if user['balance'] < price:
         return jsonify({'error': 'Insufficient funds'}), 400
+        
+    limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
+    if item_name in limited_items:
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+        row = cursor.fetchone()
+        qty = row['quantity'] if row else 0
+        if qty >= 10:
+            return jsonify({'error': f'Maximum limit of 10 reached for {item_name}'}), 400
         
     if item_name == 'Bruno The Trash Truck':
         current_trucks = user['has_truck']
@@ -302,10 +333,15 @@ def end_round():
     employees_killed = int(request.json.get('employees_killed', 0))
     lose_truck = bool(request.json.get('lose_truck', False))
     followers = int(request.json.get('followers', 0))
+    trash_collected = int(request.json.get('trash_collected', 0))
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, has_truck, employee_death_penalty FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("""
+        SELECT balance, has_truck, employee_death_penalty, movement_size,
+               stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
+        FROM users WHERE id=?
+    """, (user_data['user_id'],))
     user = cursor.fetchone()
     
     penalty = user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0
@@ -339,7 +375,33 @@ def end_round():
             
     if new_balance < 0: new_balance = 0
             
-    db.execute("UPDATE users SET balance=?, movement_size = movement_size + ? WHERE id=?", (new_balance, followers, user_data['user_id']))
+    # Calculate stat updates
+    new_max_single_trash = max(user['stat_max_single_trash'] or 0, trash_collected)
+    new_cumulative_trash = (user['stat_cumulative_trash'] or 0) + trash_collected
+    new_max_single_money = max(user['stat_max_single_money'] or 0, earned)
+    new_cumulative_money = (user['stat_cumulative_money'] or 0) + earned
+    new_max_single_followers = max(user['stat_max_single_followers'] or 0, followers)
+
+    db.execute("""
+        UPDATE users SET 
+            balance=?, 
+            movement_size = movement_size + ?,
+            stat_max_single_trash=?,
+            stat_cumulative_trash=?,
+            stat_max_single_money=?,
+            stat_cumulative_money=?,
+            stat_max_single_followers=?
+        WHERE id=?
+    """, (
+        new_balance, 
+        followers, 
+        new_max_single_trash,
+        new_cumulative_trash,
+        new_max_single_money,
+        new_cumulative_money,
+        new_max_single_followers,
+        user_data['user_id']
+    ))
     db.commit()
     
     return jsonify({'success': True, 'balance': new_balance, 'employee_death_penalty': penalty, 'multiplier': multiplier})

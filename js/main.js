@@ -594,6 +594,7 @@ class Game {
             }
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += picked.length;
+            this.trashCollectedInRound = (this.trashCollectedInRound || 0) + picked.length;
             this.trashManager.spawnMore(this.gameMap, picked.length);
         }
     }
@@ -933,6 +934,7 @@ class Game {
             }
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += followerPicked.length;
+            this.trashCollectedInRound = (this.trashCollectedInRound || 0) + followerPicked.length;
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
         }
 
@@ -1253,6 +1255,7 @@ class Game {
         // Initialize truck chain & capacity tracking
         this.truckChain = [];
         this.trashCollectedInTruck = 0;
+        this.trashCollectedInRound = 0;
         if (window.playerHasTruck > 1) {
             for (let i = 0; i < window.playerHasTruck - 1; i++) {
                 this.truckChain.push(new GarbageTruckFollower(this.player.x, this.player.y, i));
@@ -1371,7 +1374,8 @@ class Game {
                 earned, 
                 employee_cost: this.totalEmployeeCost,
                 employees_killed: this.employeesKilledThisRound,
-                followers: this.followerManager.getFollowerCount()
+                followers: this.followerManager.getFollowerCount(),
+                trash_collected: this.trashCollectedInRound || 0
             });
             window.employeesHired = 0;
             await window.refreshGameState();

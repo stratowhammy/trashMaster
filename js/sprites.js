@@ -59,7 +59,20 @@ class SpriteManager {
             this.totalToLoad = allSprites.length;
             this.totalLoaded = 0;
 
+            const timeout = setTimeout(() => {
+                console.warn(`Sprite loading timed out (${this.totalLoaded}/${this.totalToLoad} loaded). Continuing...`);
+                // Create fallbacks for any sprites that failed to load
+                for (const sprite of allSprites) {
+                    if (!this.images[sprite.id]) {
+                        this.images[sprite.id] = this._createFallbackSprite(sprite);
+                    }
+                }
+                this.loaded = true;
+                resolve();
+            }, 3000);
+
             if (this.totalToLoad === 0) {
+                clearTimeout(timeout);
                 this.loaded = true;
                 resolve();
                 return;
@@ -71,6 +84,7 @@ class SpriteManager {
                     this.images[sprite.id] = img;
                     this.totalLoaded++;
                     if (this.totalLoaded >= this.totalToLoad) {
+                        clearTimeout(timeout);
                         this.loaded = true;
                         resolve();
                     }
@@ -81,6 +95,7 @@ class SpriteManager {
                     this.images[sprite.id] = this._createFallbackSprite(sprite);
                     this.totalLoaded++;
                     if (this.totalLoaded >= this.totalToLoad) {
+                        clearTimeout(timeout);
                         this.loaded = true;
                         resolve();
                     }

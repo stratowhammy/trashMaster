@@ -251,13 +251,19 @@ async function refreshGameState() {
         const data = await apiCall('/api/game/sync');
         playerBalance = data.balance;
         playerHasTruck = data.has_truck;
+        window.playerHasTruck = playerHasTruck;
         playerInventory = data.inventory;
+        window.playerInventory = playerInventory;
         playerMovementSize = data.movement_size || 0;
+        window.playerMovementSize = playerMovementSize;
         playerUnlockedFastFood = data.unlocked_fastfood || 0;
+        window.playerUnlockedFastFood = playerUnlockedFastFood;
         playerUnlockedCrime = data.unlocked_crime || 0;
+        window.playerUnlockedCrime = playerUnlockedCrime;
         window.madeManStatus = data.made_man_status || 'none';
         window.politicalOffice = data.political_office || 'citizen';
         playerStats = data.stats || {};
+        window.playerStats = playerStats;
         
         // Notify player when reaching requirements
         if (oldFollowers > 0) {

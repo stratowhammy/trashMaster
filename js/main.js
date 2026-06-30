@@ -713,8 +713,8 @@ class Game {
             return;
         }
 
-        // Frenzy Mode updates
-        if (window.frenzyMode || window.flowersMode) {
+        // Frenzy/Politics/Flowers Mode updates
+        if (window.frenzyMode || window.flowersMode || window.politicsMode) {
             this.npcManager.update();
         }
         
@@ -1519,7 +1519,7 @@ class Game {
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
         }
         
-        if (window.frenzyMode || window.flowersMode) {
+        if (window.frenzyMode || window.flowersMode || window.politicsMode) {
             this.npcManager.render(ctx, this.camera, this.spriteManager);
         }
 
@@ -1601,9 +1601,11 @@ class Game {
         // Render HUD
         this.hud.render(ctx, w, h);
 
-        if (window.frenzyMode) {
+        if (window.frenzyMode || window.politicsMode) {
             this.npcManager.renderDialogue(ctx, w, h);
-            this.pirateManager.renderCombatResults(ctx, w, h);
+            if (window.frenzyMode) {
+                this.pirateManager.renderCombatResults(ctx, w, h);
+            }
         }
 
         if (window.crimeMode) {

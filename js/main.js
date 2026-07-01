@@ -1449,6 +1449,13 @@ class Game {
         // Render map
         this.gameMap.render(ctx, this.camera, this.player);
 
+        // Sanity Check: Draw a massive red rectangle in the middle of the screen
+        ctx.fillStyle = 'red';
+        ctx.fillRect(w/2 - 100, h/2 - 100, 200, 200);
+        ctx.fillStyle = 'white';
+        ctx.font = '20px sans-serif';
+        ctx.fillText('If you see this, canvas works!', w/2 - 90, h/2);
+
         // Draw Fast Food & Hospital markers
         if (window.fastFoodMode && this.spriteManager) {
             const ffImg = this.spriteManager.getImage('fast_food_sign');

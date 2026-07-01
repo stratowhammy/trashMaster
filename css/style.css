@@ -27,6 +27,10 @@ html, body {
     height: 100vh;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
 }
 #gameCanvas.hidden {
     display: none;

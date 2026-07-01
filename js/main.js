@@ -2427,6 +2427,14 @@ class GameOrganizer {
         this.positionHistory = [{ x: this.x, y: this.y }];
     }
 
+    getTileX() {
+        return Math.floor(this.x / TILE_SIZE);
+    }
+
+    getTileY() {
+        return Math.floor(this.y / TILE_SIZE);
+    }
+
     update(dt) {
         // Find nearest uncollected trash
         if (!this.targetTrash || this.targetTrash.collected) {

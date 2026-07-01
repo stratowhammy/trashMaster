@@ -414,7 +414,7 @@ def end_round():
     current_office = user['political_office'] or 'citizen'
     new_office = current_office
 
-    rival_handshakes = int(data.get('rival_handshakes', 0))
+    rival_handshakes = int(request.json.get('rival_handshakes', 0))
     if current_office in ['candidate_council', 'candidate_mayor', 'candidate_senator', 'candidate_president']:
         if handshakes > rival_handshakes:
             promotions = {

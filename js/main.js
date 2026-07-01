@@ -2291,23 +2291,24 @@ class Game {
                         window.employeesHired = 0;
                         await window.refreshGameState();
                         window.renderStore();
-                        
-                        // Restore overlays
-                        if (gifEl) {
-                            gifEl.src = "assets/sprites/defeat_animation.gif";
-                            gifEl.style.width = "128px";
-                            gifEl.style.height = "128px";
-                        }
-                        if (artContainer) artContainer.style.display = "block";
-                        if (titleEl) titleEl.innerText = "WASTED BY PIRATES";
-
-                        if (screenEl) screenEl.classList.add('hidden');
-                        window.showScreen('store-screen');
-                        this._restartGame();
                     } catch (e) {
                         console.error("Return from defeat error:", e);
                     }
                 }
+                
+                // Restore overlays and show store screen anyway to avoid black screen freeze
+                if (gifEl) {
+                    gifEl.src = "assets/sprites/defeat_animation.gif";
+                    gifEl.style.width = "128px";
+                    gifEl.style.height = "128px";
+                    gifEl.style.display = "block";
+                }
+                if (artContainer) artContainer.style.display = "block";
+                if (titleEl) titleEl.innerText = "WASTED BY PIRATES";
+
+                if (screenEl) screenEl.classList.add('hidden');
+                window.showScreen('store-screen');
+                this._restartGame();
             });
         }
     }

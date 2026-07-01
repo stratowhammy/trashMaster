@@ -297,7 +297,11 @@ class GameMap {
         const s = TILE_SIZE;
         switch (tile) {
             case TileType.ROAD:
-                ctx.fillStyle = TILE_COLORS[TileType.ROAD]; ctx.fillRect(sx,sy,s,s);
+            case TileType.ROAD_UP:
+            case TileType.ROAD_DOWN:
+            case TileType.ROAD_LEFT:
+            case TileType.ROAD_RIGHT:
+                ctx.fillStyle = TILE_COLORS[tile]; ctx.fillRect(sx,sy,s,s);
                 if ((tx+ty)%4<2) { ctx.fillStyle='#666';
                     if(ty%2===0) ctx.fillRect(sx+s/2-1,sy+2,2,s-4);
                     else ctx.fillRect(sx+2,sy+s/2-1,s-4,2);

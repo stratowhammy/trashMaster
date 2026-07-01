@@ -715,7 +715,18 @@ class Game {
 
         if (this.hud.isTimeUp()) {
             this.state = GameState.UI_OVERLAY;
-            this._showSplashGameOver("TIME'S UP!", `Your shift is over! You earned $${this.trashManager.totalPoints}.`, false);
+            if (window.politicsMode) {
+                const playerVotes = this.handshakesShaken || 0;
+                const rivalVotes = this.rivalCandidate ? this.rivalCandidate.votes : 0;
+                const isWin = playerVotes > rivalVotes;
+                const title = isWin ? "CONGRATULATIONS!" : "BETTER LUCK NEXT TIME!";
+                const message = isWin 
+                    ? `You won the campaign! You got ${playerVotes} votes against the rival's ${rivalVotes}!` 
+                    : `Campaign failed! The rival won with ${rivalVotes} votes against your ${playerVotes}.`;
+                this._showSplashGameOver(title, message, false);
+            } else {
+                this._showSplashGameOver("TIME'S UP!", `Your shift is over! You earned $${this.trashManager.totalPoints}.`, false);
+            }
             return;
         }
 
@@ -1489,26 +1500,14 @@ class Game {
             await window.refreshGameState();
             window.renderStore();
 
-            // Show result alerts for campaigns
-            if (window.politicsMode && this.rivalCandidate) {
-                const playerVotes = this.handshakesShaken || 0;
-                const rivalVotes = this.rivalCandidate.votes;
-                if (playerVotes > rivalVotes) {
-                    alert(`Election victory! You won with ${playerVotes} votes against the rival's ${rivalVotes} votes!`);
-                } else {
-                    alert(`Election defeat! The rival candidate won with ${rivalVotes} votes against your ${playerVotes} votes.`);
-                }
-            }
-
-            window.showScreen('store-screen');
-            this.state = GameState.UI_OVERLAY;
-            
             if (result && result.multiplier && result.multiplier > 1) {
                 alert(`🎱 Magic 8-Ball Activated! Your score was multiplied by ${result.multiplier}x!`);
             }
         } catch(e) {
             console.error("End round sync failed:", e);
         }
+        window.showScreen('store-screen');
+        this.state = GameState.UI_OVERLAY;
     }
 
     _restartGame() {
@@ -1860,9 +1859,15 @@ class Game {
         }
         const screenEl = document.getElementById('pirate-defeat-screen');
 
-        // Always show the GIF on the splash screen as requested
+        // Always show the GIF on the splash screen as requested (except in Politics Mode)
         const gifEl = document.getElementById('defeat-gif');
-        if (gifEl) gifEl.style.display = 'block';
+        if (gifEl) {
+            if (window.politicsMode) {
+                gifEl.style.display = 'none';
+            } else {
+                gifEl.style.display = 'block';
+            }
+        }
 
         // Draw pixel art to defeat canvas
         const artCanvas = document.getElementById('defeatArtCanvas');
@@ -1906,6 +1911,136 @@ class Game {
                         ctx.drawImage(pirateImg, 90, 52, 32, 32);
                         ctx.drawImage(pirateImg, 130, 50, 32, 32);
                     }
+                }
+            } else if (window.politicsMode) {
+                // Politics campaign result pixel art
+                const playerVotes = this.handshakesShaken || 0;
+                const rivalVotes = this.rivalCandidate ? this.rivalCandidate.votes : 0;
+                const isWinner = playerVotes > rivalVotes;
+
+                ctx.fillStyle = '#0f172a'; // Deep dark slate background
+                ctx.fillRect(0, 0, 256, 128);
+
+                // Draw ground
+                ctx.fillStyle = '#1e293b'; // Slate ground
+                ctx.fillRect(0, 100, 256, 28);
+
+                if (isWinner) {
+                    // Victorious person standing with hands up
+                    // Confetti particles
+                    for (let i = 0; i < 24; i++) {
+                        ctx.fillStyle = ['#ff0055', '#00ffcc', '#ffaa00', '#0088ff', '#ffff00'][i % 5];
+                        ctx.fillRect(Math.floor(Math.random() * 256), Math.floor(Math.random() * 95), 3, 3);
+                    }
+
+                    // Torso/Shirt (green)
+                    ctx.fillStyle = '#10b981';
+                    ctx.fillRect(120, 72, 16, 28);
+
+                    // Head (skin)
+                    ctx.fillStyle = '#fbcfe8';
+                    ctx.beginPath();
+                    ctx.arc(128, 58, 9, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Happy Eyes
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(124, 56, 2, 2);
+                    ctx.fillRect(130, 56, 2, 2);
+                    
+                    // Smile
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(128, 60, 4, 0, Math.PI, false);
+                    ctx.stroke();
+
+                    // Victorious Raised Arms
+                    ctx.strokeStyle = '#fbcfe8';
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    // Left raised arm
+                    ctx.beginPath();
+                    ctx.moveTo(120, 76);
+                    ctx.lineTo(110, 52);
+                    ctx.stroke();
+                    // Right raised arm
+                    ctx.beginPath();
+                    ctx.moveTo(136, 76);
+                    ctx.lineTo(146, 52);
+                    ctx.stroke();
+
+                    // Pants (blue)
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fillRect(121, 100, 6, 12);
+                    ctx.fillRect(129, 100, 6, 12);
+                } else {
+                    // Dejected sad loser wearing a party hat
+                    // Rain drops
+                    ctx.strokeStyle = '#60a5fa';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i < 15; i++) {
+                        const rx = Math.floor(Math.random() * 256);
+                        const ry = Math.floor(Math.random() * 100);
+                        ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 2, ry + 6); ctx.stroke();
+                    }
+
+                    // Torso/Shirt (slouched red)
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(122, 76, 14, 24);
+
+                    // Head (sad tilted skin)
+                    ctx.fillStyle = '#fbcfe8';
+                    ctx.beginPath();
+                    ctx.arc(128, 64, 9, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Sad slouched eyes
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    // Left eye (slanted down)
+                    ctx.beginPath(); ctx.moveTo(122, 61); ctx.lineTo(125, 63); ctx.stroke();
+                    // Right eye (slanted down)
+                    ctx.beginPath(); ctx.moveTo(134, 61); ctx.lineTo(131, 63); ctx.stroke();
+                    
+                    // Frown
+                    ctx.beginPath();
+                    ctx.arc(128, 69, 3, Math.PI, 0, true);
+                    ctx.stroke();
+
+                    // Party Hat (yellow/gold cone)
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.moveTo(121, 56);
+                    ctx.lineTo(128, 32); // apex
+                    ctx.lineTo(135, 56);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Pom pom on top of hat
+                    ctx.fillStyle = '#ec4899';
+                    ctx.beginPath();
+                    ctx.arc(128, 32, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Slouched Arms
+                    ctx.strokeStyle = '#fbcfe8';
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    // Left arm hanging down
+                    ctx.beginPath();
+                    ctx.moveTo(122, 78);
+                    ctx.lineTo(118, 92);
+                    ctx.stroke();
+                    // Right arm hanging down
+                    ctx.beginPath();
+                    ctx.moveTo(136, 78);
+                    ctx.lineTo(140, 92);
+                    ctx.stroke();
+
+                    // Pants (dark gray)
+                    ctx.fillStyle = '#4b5563';
+                    ctx.fillRect(123, 100, 5, 10);
+                    ctx.fillRect(129, 100, 5, 10);
                 }
             } else {
                 // Time's Up art
@@ -1958,6 +2093,7 @@ class Game {
                             
                             // Hide defeat screen, show store screen
                             if (screenEl) screenEl.classList.add('hidden');
+                            if (gifEl) gifEl.style.display = 'block';
                             window.showScreen('store-screen');
                             this._restartGame();
                         } catch (e) {
@@ -1967,6 +2103,7 @@ class Game {
                 } else {
                     // Time's up scenario - use normal end round
                     if (screenEl) screenEl.classList.add('hidden');
+                    if (gifEl) gifEl.style.display = 'block';
                     await this._endRoundAndReturnToStore();
                     this._restartGame();
                 }

@@ -160,7 +160,7 @@
                     <button id="hire-plus-btn" class="btn" style="background: #00cc66; border: 2px solid #008844; color: #fff; width: 40px; height: 40px; font-size: 18px; cursor: pointer; padding: 0; font-family: 'Press Start 2P', monospace;">+</button>
                 </div>
                 
-                <div style="font-size: 8px; color: #888; margin-bottom: 10px; line-height: 1.6;">
+                <div id="hire-limit-text" style="font-size: 8px; color: #888; margin-bottom: 10px; line-height: 1.6;">
                     Upkeep: <span id="hire-upkeep-val">$0</span>/15s<br>
                     Limit: 5 members max.
                 </div>
@@ -224,14 +224,29 @@
     <!-- Council Nomination Dialog -->
     <div id="political-candidate-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
         <div class="dialog-box" style="background: #111; border: 4px solid #00ffcc; padding: 30px; border-radius: 8px; text-align: center; max-width: 400px;">
-            <h2 style="color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 16px; margin-bottom: 20px;">RUN FOR OFFICE?</h2>
+            <h2 id="political-candidate-title" style="color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 16px; margin-bottom: 20px;">RUN FOR OFFICE?</h2>
             <div style="display: flex; gap: 15px; margin-bottom: 25px; align-items: center;">
                 <div style="width: 64px; height: 64px; border: 2px solid #00ffcc; background: #222; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px;">🗳️</div>
-                <p style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #aaffaa; text-align: left; line-height: 1.6; margin: 0;">The Trash Party wants YOU to run for City Council! Represent clean streets and shake hands to win votes. Do you accept the nomination?</p>
+                <p id="political-candidate-text" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #aaffaa; text-align: left; line-height: 1.6; margin: 0;">The Trash Party wants YOU to run for City Council! Represent clean streets and shake hands to win votes. Do you accept the nomination?</p>
             </div>
             <div style="display: flex; justify-content: center; gap: 20px;">
                 <button id="btn-political-yes" class="btn play-btn" style="background: #00aa00; border-color: #006600; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">YES</button>
                 <button id="btn-political-no" class="btn secondary" style="padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">NO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mafia Votes Dialog -->
+    <div id="mafia-votes-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #222; border: 4px solid #cc0000; border-radius: 12px; padding: 25px; width: 400px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
+            <div style="font-size: 48px; margin-bottom: 15px;">🕶️</div>
+            <h2 style="color: #ff3333; margin-bottom: 15px; font-size: 16px; font-family: 'Press Start 2P', monospace;">MAFIA DEAL</h2>
+            <p style="color: #ddd; font-size: 8px; line-height: 1.6; margin-bottom: 25px; font-family: 'Press Start 2P', monospace; text-align: left;">
+                "Need some help with the campaign, kid? We can find you some votes (20% - 60% boost). But the feds might get suspicious..."
+            </p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-mafia-votes-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">ACCEPT</button>
+                <button id="btn-mafia-votes-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">DECLINE</button>
             </div>
         </div>
     </div>
@@ -277,7 +292,7 @@
         <div style="background: #222; border: 4px solid #ffffff; border-radius: 12px; padding: 25px; width: 400px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
             <div style="font-size: 48px; margin-bottom: 15px;">🏥</div>
             <h2 style="color: #ffffff; margin-bottom: 15px; font-size: 16px;">Buy Health Insurance?</h2>
-            <p style="color: #ddd; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">It costs $10 per posse member every 10 seconds.</p>
+            <p id="hospital-insurance-text" style="color: #ddd; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">It costs $10 per posse member every 10 seconds.</p>
             <div style="display: flex; gap: 15px; justify-content: center;">
                 <button id="btn-hospital-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px;">Yes</button>
                 <button id="btn-hospital-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px;">No</button>

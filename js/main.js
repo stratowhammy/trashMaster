@@ -498,10 +498,9 @@ class Game {
                             this.handshakesShaken = (this.handshakesShaken || 0) + 1;
                             this.hud.showFollowerNotification(`Shook hands with ${npc.name}! (+1 Vote)`, true);
                             
-                            // Spawn a new candidate NPC
+                            // Remove the shaken NPC from list and spawn a new one
+                            this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== npc);
                             this.npcManager.spawnSingleNPC(this.gameMap);
-                        } else if (npc && npc.shaken) {
-                            this.hud.showFollowerNotification(`Already shook hands with ${npc.name}!`, false);
                         }
                     }
                 }
@@ -771,10 +770,12 @@ class Game {
             }
         }
 
-        // Crime Mode updates
-        if (window.crimeMode && this.crimeManager) {
-            this.npcManager.update();
-            this.npcManager.checkInteraction(this.player.x, this.player.y);
+        // Crime or Politics (with mafia votes) updates
+        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes)) && this.crimeManager) {
+            if (window.crimeMode) {
+                this.npcManager.update();
+                this.npcManager.checkInteraction(this.player.x, this.player.y);
+            }
             this.crimeManager.update(dt, this);
 
             // Check gold bags interaction
@@ -990,8 +991,9 @@ class Game {
                     this.insurancePaymentTimer = 10.0;
                     const count = this.followerManager.getFollowerCount();
                     if (count > 0) {
-                        this.trashManager.totalPoints = Math.max(0, this.trashManager.totalPoints - (10 * count));
-                        this.hud.showFollowerNotification(`Paid $${10 * count} for health insurance.`, false);
+                        const insCost = 10 * Math.max(1, window.playerHasTruck || 0) * count;
+                        this.trashManager.totalPoints = Math.max(0, this.trashManager.totalPoints - insCost);
+                        this.hud.showFollowerNotification(`Paid $${insCost} for health insurance.`, false);
                         this.hud.updateScore(this.trashManager.totalPoints);
                     }
                 }
@@ -1386,9 +1388,17 @@ class Game {
         this.camera.snapTo(this.player.x, this.player.y);
         if (window.gameLog) window.gameLog(`_startGame: camera snapped to x=${this.camera.x}, y=${this.camera.y}, size: w=${this.camera.width}, h=${this.camera.height}`);
 
-        this.state = GameState.PLAYING;
-        if (window.gameLog) window.gameLog(`_startGame: state set to ${this.state}. Canvas size: w=${this.canvas.width}, h=${this.canvas.height}`);
-        console.log('Game state set to PLAYING. Player:', this.player);
+        if (window.politicsMode) {
+            this.state = GameState.UI_OVERLAY;
+            this.acceptedMafiaVotes = false;
+            const dialog = document.getElementById('mafia-votes-dialog');
+            if (dialog) dialog.classList.remove('hidden');
+            if (window.gameLog) window.gameLog(`_startGame: politics mode active, pausing for mafia bribe dialog`);
+        } else {
+            this.state = GameState.PLAYING;
+            if (window.gameLog) window.gameLog(`_startGame: state set to ${this.state}. Canvas size: w=${this.canvas.width}, h=${this.canvas.height}`);
+        }
+        console.log('Game state set. Player:', this.player);
     }
 
     async _endRoundAndReturnToStore() {
@@ -1584,9 +1594,11 @@ class Game {
             }
         }
 
-        if (window.crimeMode) {
-            this.gameMap.renderAddresses(ctx, this.camera);
-            this.npcManager.render(ctx, this.camera, this.spriteManager);
+        if (window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes)) {
+            if (window.crimeMode) {
+                this.gameMap.renderAddresses(ctx, this.camera);
+                this.npcManager.render(ctx, this.camera, this.spriteManager);
+            }
             if (this.crimeManager) {
                 this.crimeManager.render(ctx, this.camera);
             }
@@ -1947,13 +1959,37 @@ class Game {
         }
     }
 
-    async _triggerArrestDefeat() {
+    async _triggerArrestDefeat(isMafiaArrest = false) {
         this.state = GameState.UI_OVERLAY;
         if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
 
         const msgEl = document.getElementById('defeat-message');
-        if (msgEl) {
-            msgEl.innerText = "You were arrested by the police! All earnings this round were lost.";
+        const titleEl = document.getElementById('defeat-title');
+        const gifEl = document.getElementById('defeat-gif');
+        const artContainer = document.getElementById('defeat-art-container');
+
+        if (isMafiaArrest) {
+            if (titleEl) titleEl.innerText = "BUSTED BY THE FEDS";
+            if (gifEl) {
+                gifEl.src = "assets/sprites/arrest_crying.gif";
+                gifEl.style.width = "256px";
+                gifEl.style.height = "256px";
+            }
+            if (artContainer) artContainer.style.display = "none";
+            if (msgEl) {
+                msgEl.innerText = "You were caught by the police for accepting bribe votes from the mafia! All trash trucks were confiscated, you lost 75% of your followers, and you paid a scaling fine.";
+            }
+        } else {
+            if (titleEl) titleEl.innerText = "WASTED BY POLICE";
+            if (gifEl) {
+                gifEl.src = "assets/sprites/defeat_animation.gif";
+                gifEl.style.width = "128px";
+                gifEl.style.height = "128px";
+            }
+            if (artContainer) artContainer.style.display = "block";
+            if (msgEl) {
+                msgEl.innerText = "You were arrested by the police! All earnings this round were lost.";
+            }
         }
 
         // Hide game canvas and show defeat screen
@@ -1966,41 +2002,43 @@ class Game {
         }
         const screenEl = document.getElementById('pirate-defeat-screen');
 
-        // Draw pixel art to defeat canvas: player behind bars (jail)
-        const artCanvas = document.getElementById('defeatArtCanvas');
-        if (artCanvas) {
-            const ctx = artCanvas.getContext('2d');
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 256, 128);
+        // Draw pixel art to defeat canvas: player behind bars (jail) if not mafia arrest
+        if (!isMafiaArrest) {
+            const artCanvas = document.getElementById('defeatArtCanvas');
+            if (artCanvas) {
+                const ctx = artCanvas.getContext('2d');
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, 256, 128);
 
-            // Draw prison bars
-            ctx.strokeStyle = '#888888';
-            ctx.lineWidth = 4;
-            for (let x = 20; x < 256; x += 30) {
+                // Draw prison bars
+                ctx.strokeStyle = '#888888';
+                ctx.lineWidth = 4;
+                for (let x = 20; x < 256; x += 30) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, 128);
+                    ctx.stroke();
+                }
+
+                // Draw player head looking sad through bars
+                ctx.fillStyle = '#ffdbac';
                 ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, 128);
+                ctx.arc(128, 64, 16, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Sad eyes
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.fillText('o', 120, 62);
+                ctx.fillText('o', 132, 62);
+                // Sad mouth
+                ctx.beginPath();
+                ctx.arc(128, 76, 6, Math.PI, 0, false);
                 ctx.stroke();
             }
-
-            // Draw player head looking sad through bars
-            ctx.fillStyle = '#ffdbac';
-            ctx.beginPath();
-            ctx.arc(128, 64, 16, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Sad eyes
-            ctx.fillStyle = '#000';
-            ctx.font = '12px Arial';
-            ctx.fillText('o', 120, 62);
-            ctx.fillText('o', 132, 62);
-            // Sad mouth
-            ctx.beginPath();
-            ctx.arc(128, 76, 6, Math.PI, 0, false);
-            ctx.stroke();
         }
 
-        // Setup the return button listener (no lose_truck!)
+        // Setup the return button listener
         const btnReturn = document.getElementById('btn-defeat-return');
         if (btnReturn) {
             const newBtn = btnReturn.cloneNode(true);
@@ -2013,14 +2051,24 @@ class Game {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
-                            lose_truck: false, // they do NOT lose their truck from arrest!
-                            followers: this.followerManager.getFollowerCount(),
-                            handshakes: this.handshakesShaken || 0
+                            lose_truck: isMafiaArrest, 
+                            followers: 0, // lost anyway
+                            handshakes: this.handshakesShaken || 0,
+                            mafia_arrest: isMafiaArrest
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();
                         window.renderStore();
                         
+                        // Restore overlays
+                        if (gifEl) {
+                            gifEl.src = "assets/sprites/defeat_animation.gif";
+                            gifEl.style.width = "128px";
+                            gifEl.style.height = "128px";
+                        }
+                        if (artContainer) artContainer.style.display = "block";
+                        if (titleEl) titleEl.innerText = "WASTED BY PIRATES";
+
                         if (screenEl) screenEl.classList.add('hidden');
                         window.showScreen('store-screen');
                         this._restartGame();
@@ -2041,6 +2089,11 @@ window.triggerHospitalOffer = function() {
         window.game.state = GameState.UI_OVERLAY;
         window.game.player.keys = { up: false, down: false, left: false, right: false };
     }
+    const costPerMember = 10 * Math.max(1, window.playerHasTruck || 0);
+    const textEl = document.getElementById('hospital-insurance-text');
+    if (textEl) {
+        textEl.innerText = `It costs $${costPerMember} per posse member every 10 seconds.`;
+    }
     const dialog = document.getElementById('hospital-dialog');
     if (dialog) dialog.classList.remove('hidden');
 };
@@ -2053,8 +2106,10 @@ window.triggerFastFoodOffer = function(posseCount) {
     const dialog = document.getElementById('fast-food-dialog');
     const costText = document.getElementById('fast-food-cost-text');
     if (dialog && costText) {
-        costText.innerText = `Cost: $${posseCount * 32}`;
-        window.currentFastFoodCost = posseCount * 32;
+        const trashWorth = Math.round(Math.pow(2, 1 + 0.5 * posseCount));
+        const cost = posseCount * trashWorth;
+        costText.innerText = `Cost: $${cost.toLocaleString()}`;
+        window.currentFastFoodCost = cost;
         dialog.classList.remove('hidden');
     }
 };
@@ -2149,4 +2204,57 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         canvas.focus();
     });
+
+    const btnMafiaVotesYes = document.getElementById('btn-mafia-votes-yes');
+    if (btnMafiaVotesYes) {
+        btnMafiaVotesYes.addEventListener('click', () => {
+            document.getElementById('mafia-votes-dialog').classList.add('hidden');
+            if (window.game) {
+                window.game.state = GameState.PLAYING;
+                window.game.acceptedMafiaVotes = true;
+                
+                // Determine requirements based on current political office
+                let required = 25;
+                const office = window.politicalOffice || 'citizen';
+                if (office === 'candidate_council' || office === 'citizen') required = 25;
+                else if (office === 'candidate_mayor' || office === 'council') required = 40;
+                else if (office === 'candidate_senator' || office === 'mayor') required = 60;
+                else if (office === 'candidate_president' || office === 'senator') required = 100;
+                
+                const minPct = 0.20;
+                const maxPct = 0.60;
+                const pct = minPct + Math.random() * (maxPct - minPct);
+                const boost = Math.floor(required * pct);
+                
+                window.game.handshakesShaken = (window.game.handshakesShaken || 0) + boost;
+                window.game.hud.showFollowerNotification(`Mafia delivered ${boost} votes! Police are now chasing you!`, true);
+                
+                // Spawn 4 police officers at the station
+                if (window.game.crimeManager) {
+                    // Clear out old police just in case
+                    window.game.crimeManager.police = [];
+                    const station = window.game.gameMap.buildings[1];
+                    if (station && station.doorTiles.length > 0) {
+                        const door = station.doorTiles[0];
+                        for (let i = 0; i < 4; i++) {
+                            window.game.crimeManager.police.push(new PoliceOfficer(door.x, door.y));
+                        }
+                    }
+                }
+            }
+            canvas.focus();
+        });
+    }
+
+    const btnMafiaVotesNo = document.getElementById('btn-mafia-votes-no');
+    if (btnMafiaVotesNo) {
+        btnMafiaVotesNo.addEventListener('click', () => {
+            document.getElementById('mafia-votes-dialog').classList.add('hidden');
+            if (window.game) {
+                window.game.state = GameState.PLAYING;
+                window.game.acceptedMafiaVotes = false;
+            }
+            canvas.focus();
+        });
+    }
 });

@@ -144,7 +144,7 @@ function initUI() {
     }
     if (btnPlus) {
         btnPlus.addEventListener('click', () => {
-            const followers = playerStats.total_followers || 0;
+            const followers = playerMovementSize || 0;
             let maxAllowed = 5;
             if (followers >= 40) {
                 maxAllowed = 2 * (playerHasTruck || 0);
@@ -224,7 +224,17 @@ function initUI() {
             try {
                 await apiCall('/api/game/political-choice', 'POST', { choice: 'accepted' });
                 document.getElementById('political-candidate-dialog').classList.add('hidden');
-                alert("Nomination accepted! Politics Mode is now unlocked. Go shake 25 hands to win!");
+                let alertMsg = "Nomination accepted! ";
+                if (window.currentNominationTarget === 'candidate_council') {
+                    alertMsg += "Politics Mode is now unlocked. Go shake 25 hands to win!";
+                } else if (window.currentNominationTarget === 'candidate_mayor') {
+                    alertMsg += "You are now running for Mayor! Shake 40 hands to win!";
+                } else if (window.currentNominationTarget === 'candidate_senator') {
+                    alertMsg += "You are now running for Senate! Shake 60 hands to win!";
+                } else if (window.currentNominationTarget === 'candidate_president') {
+                    alertMsg += "You are now running for President! Shake 100 hands to win!";
+                }
+                alert(alertMsg);
                 await refreshGameState();
             } catch (err) {
                 alert(err.message);
@@ -236,6 +246,9 @@ function initUI() {
             try {
                 await apiCall('/api/game/political-choice', 'POST', { choice: 'declined' });
                 document.getElementById('political-candidate-dialog').classList.add('hidden');
+                if (window.currentNominationTarget) {
+                    localStorage.setItem('declined_nomination_' + window.currentNominationTarget, 'true');
+                }
                 alert("You declined the nomination.");
                 await refreshGameState();
             } catch (err) {
@@ -284,8 +297,37 @@ async function refreshGameState() {
         const followers = playerStats.total_followers || 0;
         if (followers >= 10 && window.madeManStatus === 'none') {
             document.getElementById('made-man-dialog').classList.remove('hidden');
-        } else if (followers >= 40 && window.madeManStatus === 'declined' && window.politicalOffice === 'citizen') {
-            document.getElementById('political-candidate-dialog').classList.remove('hidden');
+        } else if (window.madeManStatus !== 'accepted') {
+            let nextOffice = null;
+            let promptText = "";
+            let promptTitle = "";
+            
+            if (window.politicalOffice === 'citizen' && followers >= 40 && window.madeManStatus === 'declined') {
+                nextOffice = 'candidate_council';
+                promptTitle = "RUN FOR COUNCIL?";
+                promptText = "The machine has taken interest in you. Mayor Barker has personally endorsed you for city council, will you run?";
+            } else if (window.politicalOffice === 'council' && followers >= 160) {
+                nextOffice = 'candidate_mayor';
+                promptTitle = "RUN FOR MAYOR?";
+                promptText = "City council doesn't have enough power to clean up the city. Your followers are urging you to run for mayor, will you run?";
+            } else if (window.politicalOffice === 'mayor' && followers >= 640) {
+                nextOffice = 'candidate_senator';
+                promptTitle = "RUN FOR SENATE?";
+                promptText = "Filthadelphia isn't big enough to contain you. Your movement is demanding national action. A Senate seat is open in the next election, will you run?";
+            } else if (window.politicalOffice === 'senator' && followers >= 2560) {
+                nextOffice = 'candidate_president';
+                promptTitle = "RUN FOR PRESIDENT?";
+                promptText = "Your ambitions to clean up the trash have gotten you to this point. Your followers think you've got the stuff to take you to the top. A top campaign manager has approached you about running for president, will you run?";
+            }
+            
+            if (nextOffice && localStorage.getItem('declined_nomination_' + nextOffice) !== 'true') {
+                window.currentNominationTarget = nextOffice;
+                const titleEl = document.getElementById('political-candidate-title');
+                const textEl = document.getElementById('political-candidate-text');
+                if (titleEl) titleEl.innerText = promptTitle;
+                if (textEl) textEl.innerText = promptText;
+                document.getElementById('political-candidate-dialog').classList.remove('hidden');
+            }
         }
     } catch (e) {
         console.error("Failed to sync state", e);
@@ -415,9 +457,9 @@ function updateHireDialogUI() {
     if (upkeepEl) upkeepEl.innerText = `$${(tempHiresCount * 200).toLocaleString()}`;
     
     // Update limit text
-    const limitTextEl = document.querySelector('#hire-dialog div[style*="font-size: 8px"]');
+    const limitTextEl = document.getElementById('hire-limit-text');
     if (limitTextEl) {
-        const followers = playerStats.total_followers || 0;
+        const followers = playerMovementSize || 0;
         let maxAllowed = 5;
         if (followers >= 40) {
             maxAllowed = 2 * (playerHasTruck || 0);

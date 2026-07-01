@@ -148,11 +148,13 @@ class NPCManager {
             [sidewalks[i], sidewalks[j]] = [sidewalks[j], sidewalks[i]];
         }
 
+        const maxPositions = window.politicsMode ? 50 : 20;
         const positions = [];
         for (const pos of sidewalks) {
             let tooClose = false;
             for (const p of positions) {
-                if (Math.hypot(pos.x - p.x, pos.y - p.y) < 10) {
+                const minDist = window.politicsMode ? 5 : 10;
+                if (Math.hypot(pos.x - p.x, pos.y - p.y) < minDist) {
                     tooClose = true;
                     break;
                 }
@@ -160,13 +162,13 @@ class NPCManager {
             if (!tooClose) {
                 positions.push(pos);
             }
-            if (positions.length >= 20) break; // We need at most ~15 NPCs
+            if (positions.length >= maxPositions) break;
         }
 
         const informantIndices = new Set();
         const flowerIndices = new Set();
 
-        const numNPCsToSpawn = Math.min(10, positions.length);
+        const numNPCsToSpawn = window.politicsMode ? Math.min(25, positions.length) : Math.min(10, positions.length);
 
         if (frenzyMode && buildings && buildings.length >= 5) {
             // Pick 5 random NPCs to be informants
@@ -199,7 +201,7 @@ class NPCManager {
             const pos = positions[i];
             const isInformant = informantIndices.has(i);
             const isFlower = flowerIndices.has(i);
-            const npcName = availableNames.pop() || "Citizen";
+            const npcName = availableNames[i % availableNames.length];
 
             let dialogue;
             let npcType = 'normal';

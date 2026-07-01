@@ -90,6 +90,10 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN political_office TEXT DEFAULT 'citizen'")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN times_caught INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         db.commit()
         
         # Create default admin if not exists
@@ -122,8 +126,6 @@ def serve_index():
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory('.', path)
-
-# --- API ROUTES ---
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -346,11 +348,12 @@ def end_round():
     followers = int(request.json.get('followers', 0))
     trash_collected = int(request.json.get('trash_collected', 0))
     handshakes = int(request.json.get('handshakes', 0))
+    mafia_arrest = bool(request.json.get('mafia_arrest', False))
     
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        SELECT balance, has_truck, employee_death_penalty, movement_size, political_office,
+        SELECT balance, has_truck, employee_death_penalty, movement_size, political_office, times_caught,
                stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
         FROM users WHERE id=?
     """, (user_data['user_id'],))
@@ -371,19 +374,31 @@ def end_round():
         earned = earned * multiplier
 
     adjusted_employee_cost = int(employee_cost * penalty)
-    new_balance = user['balance'] + earned - adjusted_employee_cost
     
-    # If defeated, lose 1 truck
-    if lose_truck:
-        db.execute("UPDATE users SET has_truck = CASE WHEN has_truck > 0 THEN has_truck - 1 ELSE 0 END WHERE id=?", (user_data['user_id'],))
-    elif user['has_truck'] > 0:
-        upkeep_needed = 1000 * user['has_truck']
-        if new_balance < upkeep_needed:
-            affordable = max(0, new_balance // 1000)
-            db.execute("UPDATE users SET has_truck = ? WHERE id=?", (affordable, user_data['user_id']))
-            new_balance -= affordable * 1000
-        else:
-            new_balance -= upkeep_needed
+    if mafia_arrest:
+        times_caught = (user['times_caught'] or 0) + 1
+        db.execute("UPDATE users SET times_caught=? WHERE id=?", (times_caught, user_data['user_id']))
+        fine_amount = times_caught * 50000
+        actual_fine = min(fine_amount, user['balance'] or 0)
+        new_balance = max(0, user['balance'] - actual_fine - adjusted_employee_cost)
+        
+        db.execute("UPDATE users SET has_truck=0 WHERE id=?", (user_data['user_id'],))
+        new_movement_size = int((user['movement_size'] or 0) * 0.25)
+    else:
+        new_balance = user['balance'] + earned - adjusted_employee_cost
+        
+        # If defeated, lose 1 truck
+        if lose_truck:
+            db.execute("UPDATE users SET has_truck = CASE WHEN has_truck > 0 THEN has_truck - 1 ELSE 0 END WHERE id=?", (user_data['user_id'],))
+        elif user['has_truck'] > 0:
+            upkeep_needed = 1000 * user['has_truck']
+            if new_balance < upkeep_needed:
+                affordable = max(0, new_balance // 1000)
+                db.execute("UPDATE users SET has_truck = ? WHERE id=?", (affordable, user_data['user_id']))
+                new_balance -= affordable * 1000
+            else:
+                new_balance -= upkeep_needed
+        new_movement_size = (user['movement_size'] or 0) + followers
             
     if new_balance < 0: new_balance = 0
             
@@ -393,7 +408,6 @@ def end_round():
     new_max_single_money = max(user['stat_max_single_money'] or 0, earned)
     new_cumulative_money = (user['stat_cumulative_money'] or 0) + earned
     
-    new_movement_size = (user['movement_size'] or 0) + followers
     new_max_single_followers = max(user['stat_max_single_followers'] or 0, followers)
 
     # Political Office Promotion Logic
@@ -408,14 +422,6 @@ def end_round():
         new_office = 'senator'
     elif current_office == 'candidate_president' and handshakes >= 100:
         new_office = 'president'
-
-    # Auto-candidacy transitions for the next follower milestones
-    if new_office == 'council' and new_movement_size >= 160:
-        new_office = 'candidate_mayor'
-    elif new_office == 'mayor' and new_movement_size >= 640:
-        new_office = 'candidate_senator'
-    elif new_office == 'senator' and new_movement_size >= 2560:
-        new_office = 'candidate_president'
 
     db.execute("""
         UPDATE users SET 
@@ -510,7 +516,25 @@ def political_choice():
         return jsonify({'error': 'Invalid choice'}), 400
         
     db = get_db()
-    office = 'candidate_council' if choice == 'accepted' else 'citizen'
+    cursor = db.cursor()
+    cursor.execute("SELECT political_office FROM users WHERE id=?", (user_data['user_id'],))
+    row = cursor.fetchone()
+    current_office = row['political_office'] if row else 'citizen'
+    
+    if choice == 'accepted':
+        if current_office == 'citizen':
+            office = 'candidate_council'
+        elif current_office == 'council':
+            office = 'candidate_mayor'
+        elif current_office == 'mayor':
+            office = 'candidate_senator'
+        elif current_office == 'senator':
+            office = 'candidate_president'
+        else:
+            office = current_office
+    else:
+        office = current_office
+        
     db.execute("""
         UPDATE users 
         SET political_office = ?

@@ -528,7 +528,7 @@ class CrimeManager {
     }
 
     update(dt, game) {
-        if (!window.crimeMode) return;
+        if (!window.crimeMode && !(window.politicsMode && game.acceptedMafiaVotes)) return;
 
         // If robbing the bank, decay gold bags over time
         if (this.activeTask && this.activeTask.type === 'rob_bank' && this.goldBags.length > 0) {
@@ -585,6 +585,10 @@ class CrimeManager {
         const arrivedCops = this.police.filter(c => c.alive && Math.sqrt((c.x - wpx)**2 + (c.y - wpy)**2) < TILE_SIZE * 0.6);
         if (arrivedCops.length > 0) {
             for (const cop of arrivedCops) {
+                if (window.politicsMode && game.acceptedMafiaVotes) {
+                    game._triggerArrestDefeat(true);
+                    return;
+                }
                 const posseCount = game.followerManager.getFollowerCount();
                 if (posseCount > 0) {
                     const roll = Math.random();
@@ -643,7 +647,7 @@ class CrimeManager {
     }
 
     render(ctx, camera) {
-        if (!window.crimeMode) return;
+        if (!window.crimeMode && !(window.politicsMode && window.game && window.game.acceptedMafiaVotes)) return;
 
         // Render alive Mafia Dons if they are the current task targets
         for (const don of this.dons) {

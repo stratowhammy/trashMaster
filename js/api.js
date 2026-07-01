@@ -276,9 +276,6 @@ async function refreshGameState() {
             if (oldFollowers < 25 && playerMovementSize >= 25) {
                 alert("🔓 Level Unlocked: Fast Food Mode is now available for purchase! (Needs 25 followers + $20,000)");
             }
-            if (oldFollowers < 50 && playerMovementSize >= 50) {
-                alert("🔓 Level Unlocked: Crime Mode is now available for purchase! (Needs 50 followers + $35,000)");
-            }
         }
 
         updateStoreUI();

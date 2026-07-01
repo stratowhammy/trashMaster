@@ -723,6 +723,44 @@ class Game {
         if (window.frenzyMode || window.flowersMode || window.politicsMode) {
             this.npcManager.update();
         }
+
+        // Rival Candidate update logic
+        if (window.politicsMode && this.rivalCandidate) {
+            if (!this.rivalCandidate.targetNPC || !this.npcManager.npcs.includes(this.rivalCandidate.targetNPC) || this.rivalCandidate.targetNPC.shaken) {
+                let nearest = null;
+                let minDist = Infinity;
+                for (const npc of this.npcManager.npcs) {
+                    if (!npc.shaken) {
+                        const dx = npc.x - this.rivalCandidate.x;
+                        const dy = npc.y - this.rivalCandidate.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = npc;
+                        }
+                    }
+                }
+                this.rivalCandidate.targetNPC = nearest;
+            }
+
+            if (this.rivalCandidate.targetNPC) {
+                const target = this.rivalCandidate.targetNPC;
+                const dx = target.x - this.rivalCandidate.x;
+                const dy = target.y - this.rivalCandidate.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > 5) {
+                    const rSpeed = this.rivalCandidate.speed;
+                    this.rivalCandidate.x += (dx / dist) * rSpeed * 60 * dt;
+                    this.rivalCandidate.y += (dy / dist) * rSpeed * 60 * dt;
+                } else {
+                    this.rivalCandidate.votes++;
+                    this.hud.showFollowerNotification(`Rival shook hands with ${target.name}! (+1 Rival Vote)`, false);
+                    this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== target);
+                    this.npcManager.spawnSingleNPC(this.gameMap);
+                    this.rivalCandidate.targetNPC = null;
+                }
+            }
+        }
         
         if (window.frenzyMode) {
             this.pirateManager.update(dt, this);
@@ -1358,6 +1396,23 @@ class Game {
         this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
         this.pirateManager = new PirateManager();
         this.carManager.spawnCars();
+        if (window.politicsMode) {
+            let speed = 2.0; // Council (slow)
+            const office = window.politicalOffice || 'citizen';
+            if (office === 'candidate_mayor') speed = 4.0;
+            else if (office === 'candidate_senator') speed = 5.5;
+            else if (office === 'candidate_president') speed = 7.0;
+
+            this.rivalCandidate = {
+                x: 20 * TILE_SIZE + TILE_SIZE / 2,
+                y: 20 * TILE_SIZE + TILE_SIZE / 2,
+                speed: speed,
+                targetNPC: null,
+                votes: 0
+            };
+        } else {
+            this.rivalCandidate = null;
+        }
         if (this.crimeManager) {
             this.crimeManager.initialize(this.gameMap);
         }
@@ -1427,11 +1482,24 @@ class Game {
                 employees_killed: this.employeesKilledThisRound,
                 followers: this.followerManager.getFollowerCount(),
                 trash_collected: this.trashCollectedInRound || 0,
-                handshakes: this.handshakesShaken || 0
+                handshakes: this.handshakesShaken || 0,
+                rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0
             });
             window.employeesHired = 0;
             await window.refreshGameState();
             window.renderStore();
+
+            // Show result alerts for campaigns
+            if (window.politicsMode && this.rivalCandidate) {
+                const playerVotes = this.handshakesShaken || 0;
+                const rivalVotes = this.rivalCandidate.votes;
+                if (playerVotes > rivalVotes) {
+                    alert(`Election victory! You won with ${playerVotes} votes against the rival's ${rivalVotes} votes!`);
+                } else {
+                    alert(`Election defeat! The rival candidate won with ${rivalVotes} votes against your ${playerVotes} votes.`);
+                }
+            }
+
             window.showScreen('store-screen');
             this.state = GameState.UI_OVERLAY;
             
@@ -1554,6 +1622,31 @@ class Game {
         
         if (window.frenzyMode || window.flowersMode || window.politicsMode) {
             this.npcManager.render(ctx, this.camera, this.spriteManager);
+        }
+
+        // Render rival Candidate in politics mode
+        if (window.politicsMode && this.rivalCandidate) {
+            const screen = this.camera.worldToScreen(this.rivalCandidate.x, this.rivalCandidate.y);
+            if (this.camera.isVisible(this.rivalCandidate.x - 20, this.rivalCandidate.y - 20, 40, 40)) {
+                ctx.save();
+                // Draw rival body
+                ctx.fillStyle = '#b000b0'; // Magenta suit
+                ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);
+                // Head
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
+                ctx.fill();
+                // Hair/Tie
+                ctx.fillStyle = '#00ffff';
+                ctx.fillRect(screen.x - 5, screen.y - 24, 10, 4);
+                // Label
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('RIVAL', screen.x, screen.y - 28);
+                ctx.restore();
+            }
         }
 
         if (window.flowersMode) {
@@ -2055,6 +2148,7 @@ class Game {
                             lose_truck: isMafiaArrest, 
                             followers: 0, // lost anyway
                             handshakes: this.handshakesShaken || 0,
+                            rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
                             mafia_arrest: isMafiaArrest
                         });
                         window.employeesHired = 0;
@@ -2230,17 +2324,19 @@ window.addEventListener('DOMContentLoaded', () => {
                 window.game.handshakesShaken = (window.game.handshakesShaken || 0) + boost;
                 window.game.hud.showFollowerNotification(`Mafia delivered ${boost} votes! Police are now chasing you!`, true);
                 
-                // Spawn 4 police officers at the station
+                // Spawn 4 police officers at all four corners of the map
                 if (window.game.crimeManager) {
                     // Clear out old police just in case
                     window.game.crimeManager.police = [];
-                    const station = window.game.gameMap.buildings[1];
-                    if (station && station.doorTiles.length > 0) {
-                        const door = station.doorTiles[0];
-                        for (let i = 0; i < 4; i++) {
-                            window.game.crimeManager.police.push(new PoliceOfficer(door.x, door.y));
-                        }
-                    }
+                    const corners = [
+                        {x: 0, y: 0},
+                        {x: MAP_WIDTH - 1, y: 0},
+                        {x: 0, y: MAP_HEIGHT - 1},
+                        {x: MAP_WIDTH - 1, y: MAP_HEIGHT - 1}
+                    ];
+                    corners.forEach(c => {
+                        window.game.crimeManager.police.push(new PoliceOfficer(c.x, c.y));
+                    });
                 }
             }
             canvas.focus();

@@ -414,14 +414,16 @@ def end_round():
     current_office = user['political_office'] or 'citizen'
     new_office = current_office
 
-    if current_office == 'candidate_council' and handshakes >= 25:
-        new_office = 'council'
-    elif current_office == 'candidate_mayor' and handshakes >= 40:
-        new_office = 'mayor'
-    elif current_office == 'candidate_senator' and handshakes >= 60:
-        new_office = 'senator'
-    elif current_office == 'candidate_president' and handshakes >= 100:
-        new_office = 'president'
+    rival_handshakes = int(data.get('rival_handshakes', 0))
+    if current_office in ['candidate_council', 'candidate_mayor', 'candidate_senator', 'candidate_president']:
+        if handshakes > rival_handshakes:
+            promotions = {
+                'candidate_council': 'council',
+                'candidate_mayor': 'mayor',
+                'candidate_senator': 'senator',
+                'candidate_president': 'president'
+            }
+            new_office = promotions[current_office]
 
     db.execute("""
         UPDATE users SET 

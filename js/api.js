@@ -331,6 +331,7 @@ const STORE_ITEMS = [
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
     { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' },
+    { name: 'Organizer', price: 250, desc: 'Splits followers to collect trash simultaneously across the map. Costs $250/round.', sprite: 'employee.png' },
     { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' }
 ];
 
@@ -393,6 +394,22 @@ function renderStore() {
             if (count >= 10) {
                 btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
                 btnText = 'Limit Reached';
+            }
+        }
+
+        if (item.name === 'Organizer') {
+            const followers = playerMovementSize || 0;
+            const maxAllowed = Math.floor(followers / 50);
+            const count = playerInventory['Organizer'] || 0;
+            descOverride = `${item.desc} (Owned: ${count}/${maxAllowed})`;
+            if (followers < 50) {
+                btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
+                btnText = 'Locked';
+                descOverride = 'Requires 50 followers to hire organizers.';
+            } else if (count >= maxAllowed) {
+                btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
+                btnText = 'Limit Reached';
+                descOverride = `Follower limit reached! You can only hire ${maxAllowed} organizers.`;
             }
         }
 

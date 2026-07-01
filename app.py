@@ -242,7 +242,8 @@ def buy_item():
         'Magic 8-Ball': 1500,
         'Bruno The Trash Truck': 10000,
         'Fertilizer': 100,
-        'Parade': 3000
+        'Parade': 3000,
+        'Organizer': 250
     }
     
     if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
@@ -263,6 +264,17 @@ def buy_item():
         qty = row['quantity'] if row else 0
         if qty >= 10:
             return jsonify({'error': f'Maximum limit of 10 reached for {item_name}'}), 400
+            
+    if item_name == 'Organizer':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
+        row = cursor.fetchone()
+        qty = row['quantity'] if row else 0
+        followers = user['movement_size'] or 0
+        max_allowed = followers // 50
+        if followers < 50:
+            return jsonify({'error': 'Requires at least 50 followers to hire an organizer!'}), 400
+        if qty >= max_allowed:
+            return jsonify({'error': f'Follower limit reached! You can only hire {max_allowed} organizers.'}), 400
         
     if item_name == 'Bruno The Trash Truck':
         current_trucks = user['has_truck']
@@ -447,6 +459,7 @@ def end_round():
         new_max_single_followers,
         user_data['user_id']
     ))
+    db.execute("DELETE FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
     db.commit()
     
     return jsonify({

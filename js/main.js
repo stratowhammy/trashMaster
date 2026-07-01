@@ -250,7 +250,7 @@ class Game {
                                 const door = ffBldg.doorTiles[0];
                                 const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
                                 if (dist < TILE_SIZE * 1.5) {
-                                    window.triggerFastFoodOffer(this.followerManager.getFollowerCount());
+                                    window.triggerFastFoodOffer(this.getRoundTotalFollowers());
                                     return;
                                 }
                             }
@@ -613,7 +613,7 @@ class Game {
         }
 
         const pickupRadius = TILE_SIZE * 0.8;
-        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.followerManager.getFollowerCount(), maxToPick);
+        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.getRoundTotalFollowers(), maxToPick);
 
         if (picked.length > 0) {
             if (window.playerHasTruck > 0) {
@@ -970,9 +970,9 @@ class Game {
                 }
 
                 if (collided) {
-                    const count = this.followerManager.getFollowerCount();
+                    const count = this.getRoundTotalFollowers();
                     if (count > 0) {
-                        this.followerManager.removeFollower();
+                        this._removeSequentialFollower();
                         this.hud.showFollowerNotification("A posse member was run over by the parade!", false);
                     }
                     this.paradeHitCooldown = 1.5; // 1.5s invincibility
@@ -1001,7 +1001,7 @@ class Game {
                 }
                 break; // Stop loop since truck is completely full
             }
-            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.followerManager.getFollowerCount(), maxToPick);
+            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowers(), maxToPick);
             followerPicked = followerPicked.concat(picked);
         }
 
@@ -1018,15 +1018,33 @@ class Game {
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
         }
 
+        // Update Organizers and their followers' autonomous trash pickup
+        if (this.organizers) {
+            for (const org of this.organizers) {
+                org.update(dt);
+                let orgFollowerPicked = [];
+                for (const follower of org.followerManager.followers) {
+                    const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowers(), Infinity);
+                    orgFollowerPicked = orgFollowerPicked.concat(picked);
+                }
+                if (orgFollowerPicked.length > 0) {
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                    this.trashCollectedInWindow += orgFollowerPicked.length;
+                    this.trashCollectedInRound = (this.trashCollectedInRound || 0) + orgFollowerPicked.length;
+                    this.trashManager.spawnMore(this.gameMap, orgFollowerPicked.length);
+                }
+            }
+        }
+
         if (window.fastFoodMode) {
             // Hunger timer
             this.hungerTimer -= dt;
             if (this.hungerTimer <= 0) {
                 this.hungerTimer = 45.0;
-                const count = this.followerManager.getFollowerCount();
+                const count = this.getRoundTotalFollowers();
                 const toLose = Math.floor(count / 2);
                 for (let i = 0; i < toLose; i++) {
-                    this.followerManager.removeFollower();
+                    this._removeSequentialFollower();
                 }
                 if (toLose > 0) {
                     this.hud.showFollowerNotification(`Starved! Lost ${toLose} posse members!`, false);
@@ -1038,7 +1056,7 @@ class Game {
                 this.insurancePaymentTimer -= dt;
                 if (this.insurancePaymentTimer <= 0) {
                     this.insurancePaymentTimer = 10.0;
-                    const count = this.followerManager.getFollowerCount();
+                    const count = this.getRoundTotalFollowers();
                     if (count > 0) {
                         const insCost = 10 * Math.max(1, window.playerHasTruck || 0) * count;
                         this.trashManager.totalPoints = Math.max(0, this.trashManager.totalPoints - insCost);
@@ -1058,25 +1076,21 @@ class Game {
         this.followerCheckTimer += dt;
         if (this.followerCheckTimer >= 10) {
             this.followerCheckTimer -= 10;
-            const baseFollowers = (window.playerHasTruck ? 2 : 0) + (window.employeesHired || 0);
+            const baseFollowers = (window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0);
             if (this.trashCollectedInWindow >= 7) {
-                // Add follower
-                const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
-                const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
-                this.hud.showFollowerNotification(charConfig ? charConfig.name : 'New posse member!', true);
+                this._addSequentialFollower();
             } else if (this.trashCollectedInWindow < 5) {
-                // Lose follower
-                if (this.followerManager.getFollowerCount() > baseFollowers) {
+                const totalCurrent = this.getRoundTotalFollowers();
+                if (totalCurrent > baseFollowers) {
                     if (window.fastFoodMode && this.fastFoodSuspensionTimer > 0) {
                         // Trash requirement suspended!
                     } else {
-                        this.followerManager.removeFollower();
-                        this.hud.showFollowerNotification('A posse member left!', false);
+                        this._removeSequentialFollower();
                     }
                 }
             }
             this.trashCollectedInWindow = 0;
-            this.hud.followerCount = this.followerManager.getFollowerCount();
+            this.hud.followerCount = this.getRoundTotalFollowers();
         }
 
         // Check if player is near any trash to display a "Press P" hint
@@ -1401,12 +1415,40 @@ class Game {
         this.trashManager.spawnNear(this.gameMap, spawnX, spawnY, 8, Math.floor(initialTrash * 0.5));
         
         this.hud.reset();
-        this.hud.followerCount = this.followerManager.getFollowerCount();
+        this.hud.followerCount = this.getRoundTotalFollowers ? this.getRoundTotalFollowers() : this.followerManager.getFollowerCount();
         
         this.npcManager = new NPCManager();
         this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
         this.pirateManager = new PirateManager();
         this.carManager.spawnCars();
+        // Retrieve and spawn organizers
+        this.organizers = [];
+        const organizersCount = window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0;
+        for (let i = 0; i < organizersCount; i++) {
+            this.organizers.push(new GameOrganizer(this, i));
+        }
+
+        // Split starting followers!
+        const totalFollowersCount = this.followerManager.getFollowerCount();
+        if (organizersCount > 0 && totalFollowersCount > 0) {
+            const allStarting = [...this.followerManager.followers];
+            this.followerManager.followers = [];
+            
+            let gIdx = 0;
+            const totalGroups = organizersCount + 1;
+            allStarting.forEach((f) => {
+                if (gIdx === 0) {
+                    f.index = this.followerManager.followers.length;
+                    this.followerManager.followers.push(f);
+                } else {
+                    const org = this.organizers[gIdx - 1];
+                    f.index = org.followerManager.followers.length;
+                    org.followerManager.followers.push(f);
+                }
+                gIdx = (gIdx + 1) % totalGroups;
+            });
+        }
+        this.nextFollowerGroupIndex = 0;
         if (window.politicsMode) {
             let speed = 2.0; // Council (slow)
             const office = window.politicalOffice || 'citizen';
@@ -1491,7 +1533,7 @@ class Game {
                 earned, 
                 employee_cost: this.totalEmployeeCost,
                 employees_killed: this.employeesKilledThisRound,
-                followers: this.followerManager.getFollowerCount(),
+                followers: this.getRoundTotalFollowers(),
                 trash_collected: this.trashCollectedInRound || 0,
                 handshakes: this.handshakesShaken || 0,
                 rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0
@@ -1723,6 +1765,11 @@ class Game {
         // Render player
         if (this.player) {
             this.player.render(ctx, this.camera, this.spriteManager);
+        }
+
+        // Render Organizers
+        if (this.organizers) {
+            this.organizers.forEach(org => org.render(ctx, this.camera));
         }
 
         // Render HUD
@@ -2084,7 +2131,7 @@ class Game {
                                 employee_cost: this.totalEmployeeCost,
                                 employees_killed: this.employeesKilledThisRound,
                                 lose_truck: hadTruck,
-                                followers: this.followerManager.getFollowerCount(),
+                                followers: this.getRoundTotalFollowers(),
                                 handshakes: this.handshakesShaken || 0
                             });
                             window.employeesHired = 0;
@@ -2171,21 +2218,21 @@ class Game {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
-                            lose_truck: false, // they do NOT lose their truck from car accident!
-                            followers: this.followerManager.getFollowerCount(),
+                            lose_truck: false, 
+                            followers: this.getRoundTotalFollowers(),
                             handshakes: this.handshakesShaken || 0
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();
                         window.renderStore();
-                        
-                        if (screenEl) screenEl.classList.add('hidden');
-                        window.showScreen('store-screen');
-                        this._restartGame();
                     } catch (e) {
                         console.error("Return from defeat error:", e);
                     }
                 }
+                
+                if (screenEl) screenEl.classList.add('hidden');
+                window.showScreen('store-screen');
+                this._restartGame();
             });
         }
     }
@@ -2311,6 +2358,196 @@ class Game {
                 this._restartGame();
             });
         }
+    }
+
+    getRoundTotalFollowers() {
+        let total = this.followerManager.getFollowerCount();
+        if (this.organizers) {
+            this.organizers.forEach(org => {
+                total += org.followerManager.getFollowerCount();
+            });
+        }
+        return total;
+    }
+
+    _addSequentialFollower() {
+        const organizersCount = this.organizers ? this.organizers.length : 0;
+        const totalGroups = organizersCount + 1;
+        
+        let newFollower;
+        if (this.nextFollowerGroupIndex === 0) {
+            newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
+            const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined you!` : 'New posse member!', true);
+        } else {
+            const org = this.organizers[this.nextFollowerGroupIndex - 1];
+            newFollower = org.followerManager.addFollower(org.x, org.y);
+            const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined Organizer ${this.nextFollowerGroupIndex}!` : `New member joined Organizer ${this.nextFollowerGroupIndex}!`, true);
+        }
+        this.nextFollowerGroupIndex = (this.nextFollowerGroupIndex + 1) % totalGroups;
+    }
+
+    _removeSequentialFollower() {
+        const organizersCount = this.organizers ? this.organizers.length : 0;
+        if (this.followerManager.followers.length > 0) {
+            this.followerManager.removeFollower();
+            this.hud.showFollowerNotification('A posse member left you!', false);
+        } else if (organizersCount > 0) {
+            for (let i = 0; i < organizersCount; i++) {
+                const org = this.organizers[i];
+                if (org.followerManager.followers.length > 0) {
+                    org.followerManager.removeFollower();
+                    this.hud.showFollowerNotification(`A posse member left Organizer ${i + 1}!`, false);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+class GameOrganizer {
+    constructor(game, index) {
+        this.game = game;
+        this.index = index;
+        // Spawn near the player
+        this.x = game.player.x + (Math.random() - 0.5) * TILE_SIZE * 3;
+        this.y = game.player.y + (Math.random() - 0.5) * TILE_SIZE * 3;
+        this.speed = 4.5;
+        this.followerManager = new FollowerManager();
+        this.followerManager.initialize(game.player.spriteId);
+        
+        this.targetTrash = null;
+        this.direction = 'down';
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.moving = false;
+        
+        // Position history for followers
+        this.positionHistory = [{ x: this.x, y: this.y }];
+    }
+
+    update(dt) {
+        // Find nearest uncollected trash
+        if (!this.targetTrash || this.targetTrash.collected) {
+            let nearest = null;
+            let minDist = Infinity;
+            for (const item of this.game.trashManager.items) {
+                if (!item.collected) {
+                    const dx = item.x - this.x;
+                    const dy = item.y - this.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = item;
+                    }
+                }
+            }
+            this.targetTrash = nearest;
+        }
+
+        if (this.targetTrash) {
+            const target = this.targetTrash;
+            const dx = target.x - this.x;
+            const dy = target.y - this.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > 5) {
+                this.moving = true;
+                const vx = (dx / dist) * this.speed;
+                const vy = (dy / dist) * this.speed;
+                
+                const nextX = this.x + vx * 60 * dt;
+                const nextY = this.y + vy * 60 * dt;
+                
+                // Simple wall collision check
+                const tx = Math.floor(nextX / TILE_SIZE);
+                const ty = Math.floor(nextY / TILE_SIZE);
+                if (this.game.gameMap.isWalkable(tx, ty)) {
+                    this.x = nextX;
+                    this.y = nextY;
+                } else {
+                    const txX = Math.floor(nextX / TILE_SIZE);
+                    const tyX = Math.floor(this.y / TILE_SIZE);
+                    if (this.game.gameMap.isWalkable(txX, tyX)) {
+                        this.x = nextX;
+                    } else {
+                        const txY = Math.floor(this.x / TILE_SIZE);
+                        const tyY = Math.floor(nextY / TILE_SIZE);
+                        if (this.game.gameMap.isWalkable(txY, tyY)) {
+                            this.y = nextY;
+                        }
+                    }
+                }
+
+                // Determine direction
+                if (Math.abs(vx) > Math.abs(vy)) {
+                    this.direction = vx > 0 ? 'right' : 'left';
+                } else {
+                    this.direction = vy > 0 ? 'down' : 'up';
+                }
+            } else {
+                // Collect the trash!
+                const pickupRadius = TILE_SIZE;
+                const maxToPick = 1;
+                const totalFollowers = this.game.getRoundTotalFollowers();
+                const picked = this.game.trashManager.checkPickup(this.x, this.y, pickupRadius, totalFollowers, maxToPick);
+                if (picked.length > 0) {
+                    this.game.trashCollectedInWindow += picked.length;
+                    this.game.trashCollectedInRound += picked.length;
+                }
+                this.targetTrash = null;
+            }
+        } else {
+            this.moving = false;
+        }
+
+        // Animation update
+        if (this.moving) {
+            this.animTimer++;
+            if (this.animTimer >= 8) {
+                this.animTimer = 0;
+                this.animFrame = (this.animFrame + 1) % 4;
+            }
+        }
+
+        // Record history for followers
+        this.positionHistory.push({ x: this.x, y: this.y });
+        if (this.positionHistory.length > 1000) {
+            this.positionHistory.shift();
+        }
+
+        // Update followers
+        this.followerManager.update(this, this.game.gameMap);
+    }
+
+    render(ctx, camera) {
+        const screen = camera.worldToScreen(this.x, this.y);
+        if (!camera.isVisible(this.x - 32, this.y - 32, 64, 64)) return;
+
+        ctx.save();
+        // Body (Blue shirt)
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(screen.x - 10, screen.y - 12, 20, 24);
+        
+        // Head
+        ctx.fillStyle = '#ffdbac';
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y - 16, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hair/Cap (distinct gold/orange cap)
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(screen.x - 6, screen.y - 23, 12, 4);
+
+        // Label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 26);
+        ctx.restore();
+
+        // Render its followers
+        this.followerManager.render(ctx, camera, this.game.spriteManager);
     }
 }
 

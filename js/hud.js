@@ -4,7 +4,7 @@
 
 class HUD {
     constructor() {
-        this.gameDuration = 180;  // 180 seconds in seconds
+        this.gameDuration = 120;  // 120 seconds in seconds
         this.timeRemaining = this.gameDuration;
         this.timerSpeed = 1.0;
         this.score = 0;

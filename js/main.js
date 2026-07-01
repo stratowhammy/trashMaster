@@ -2107,7 +2107,7 @@ window.triggerFastFoodOffer = function(posseCount) {
     const dialog = document.getElementById('fast-food-dialog');
     const costText = document.getElementById('fast-food-cost-text');
     if (dialog && costText) {
-        const trashWorth = Math.round(Math.pow(2, 1 + 0.5 * posseCount));
+        const trashWorth = Math.max(1, Math.round(Math.sqrt(8 * posseCount)));
         const cost = posseCount * trashWorth;
         costText.innerText = `Cost: $${cost.toLocaleString()}`;
         window.currentFastFoodCost = cost;

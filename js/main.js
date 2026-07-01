@@ -585,6 +585,7 @@ class Game {
                 this._render();
             } catch (e) {
                 console.error('Game loop error:', e);
+                if (window.gameLog) window.gameLog(`GAME LOOP EXCEPTION: ${e.message}\nStack: ${e.stack}`);
                 this.errorLog.push(e.message);
                 if (window.onerror) {
                     window.onerror('Game loop error: ' + e.message, 'js/main.js', 0, 0, e);
@@ -1050,6 +1051,11 @@ class Game {
         const ctx = this.ctx;
         const w = this.canvas.width;
         const h = this.canvas.height;
+
+        if (this.lastLoggedState !== this.state) {
+            this.lastLoggedState = this.state;
+            if (window.gameLog) window.gameLog(`_render: state is now: ${this.state}`);
+        }
 
         // Clear
         ctx.fillStyle = '#1a1a2e';

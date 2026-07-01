@@ -128,47 +128,37 @@ function initUI() {
         });
     }
 
-    // ── Hire Dialog Buttons ──
-    const btnMinus = document.getElementById('hire-minus-btn');
-    const btnPlus = document.getElementById('hire-plus-btn');
-    const btnConfirm = document.getElementById('btn-hire-confirm');
-    const btnCancel = document.getElementById('btn-hire-cancel');
+    // ── Hire Dialog Buttons (Wired to window for HTML onclick compatibility) ──
+    window.handleHireMinus = function() {
+        if (tempHiresCount > 0) {
+            tempHiresCount--;
+            updateHireDialogUI();
+        }
+    };
 
-    if (btnMinus) {
-        btnMinus.addEventListener('click', () => {
-            if (tempHiresCount > 0) {
-                tempHiresCount--;
-                updateHireDialogUI();
-            }
-        });
-    }
-    if (btnPlus) {
-        btnPlus.addEventListener('click', () => {
-            const followers = playerMovementSize || 0;
-            let maxAllowed = 5;
-            if (followers >= 40) {
-                maxAllowed = 2 * (playerHasTruck || 0);
-            }
-            if (tempHiresCount < maxAllowed) {
-                tempHiresCount++;
-                updateHireDialogUI();
-            } else {
-                alert(`Maximum ${maxAllowed} posse members allowed!`);
-            }
-        });
-    }
-    if (btnConfirm) {
-        btnConfirm.addEventListener('click', () => {
-            window.employeesHired = tempHiresCount;
-            document.getElementById('hire-dialog').classList.add('hidden');
-            alert(`Confirmed posse size: ${window.employeesHired}`);
-        });
-    }
-    if (btnCancel) {
-        btnCancel.addEventListener('click', () => {
-            document.getElementById('hire-dialog').classList.add('hidden');
-        });
-    }
+    window.handleHirePlus = function() {
+        const followers = playerMovementSize || 0;
+        let maxAllowed = 5;
+        if (followers >= 40) {
+            maxAllowed = 2 * (playerHasTruck || 0);
+        }
+        if (tempHiresCount < maxAllowed) {
+            tempHiresCount++;
+            updateHireDialogUI();
+        } else {
+            alert(`Maximum ${maxAllowed} posse members allowed!`);
+        }
+    };
+
+    window.handleHireConfirm = function() {
+        window.employeesHired = tempHiresCount;
+        document.getElementById('hire-dialog').classList.add('hidden');
+        alert(`Confirmed posse size: ${window.employeesHired}`);
+    };
+
+    window.handleHireCancel = function() {
+        document.getElementById('hire-dialog').classList.add('hidden');
+    };
 
     // ── Trophy Dialog Buttons ──
     const btnViewTrophies = document.getElementById('btn-view-trophies');

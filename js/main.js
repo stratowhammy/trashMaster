@@ -81,6 +81,7 @@ class GarbageTruckFollower {
 
 class Game {
     constructor(canvas) {
+        if (window.gameLog) window.gameLog("Game class instantiation starting");
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.state = GameState.LOADING;
@@ -127,13 +128,17 @@ class Game {
 
     async _load() {
         this.state = GameState.LOADING;
+        if (window.gameLog) window.gameLog("Game._load() starting spriteManager.loadAll()");
         try {
             await this.spriteManager.loadAll();
+            if (window.gameLog) window.gameLog("Game._load() sprite loading finished successfully");
         } catch (e) {
             console.error('Sprite loading failed:', e);
+            if (window.gameLog) window.gameLog("Game._load() sprite loading threw error: " + e.message);
         }
         this.miniMap.buildStatic(this.gameMap);
         this.state = GameState.CHARACTER_SELECT;
+        if (window.gameLog) window.gameLog("Game._load() state set to CHARACTER_SELECT, starting animation loop");
         this._startLoop();
     }
 
@@ -568,6 +573,7 @@ class Game {
     }
 
     _startLoop() {
+        if (window.gameLog) window.gameLog("Game._startLoop() starting requestAnimationFrame loop");
         this.lastTime = performance.now();
         const loop = (timestamp) => {
             try {
@@ -1238,6 +1244,7 @@ class Game {
     }
 
     _startGame(spriteId) {
+        if (window.gameLog) window.gameLog(`Game._startGame() called with spriteId: ${spriteId}`);
         this.gameMap = new GameMap();
         this.miniMap.buildStatic(this.gameMap);
         // Find a walkable spawn point — start on a road near center
@@ -2049,15 +2056,20 @@ window.addEventListener('DOMContentLoaded', () => {
     
     // Expose start game function to api.js UI logic
     window.startGameFromStore = () => {
+        if (window.gameLog) window.gameLog(`window.startGameFromStore invoked. playerHasTruck=${window.playerHasTruck}`);
         if (!window.game.gameMap) {
+            if (window.gameLog) window.gameLog("GameMap not defined, calling _restartGame()");
             window.game._restartGame();
         }
         if (window.playerHasTruck) {
+            if (window.gameLog) window.gameLog("Starting game with truck ('char_truck')");
             window.game._startGame('char_truck');
         } else {
+            if (window.gameLog) window.gameLog("Setting state to CHARACTER_SELECT");
             window.game.state = GameState.CHARACTER_SELECT;
         }
         canvas.focus();
+        if (window.gameLog) window.gameLog(`startGameFromStore finished. Game state: ${window.game.state}`);
     };
 
     // Fast Food Mode Event Listeners

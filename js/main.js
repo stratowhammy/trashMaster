@@ -2436,7 +2436,57 @@ class GameOrganizer {
     }
 
     update(dt) {
-        // Find nearest uncollected trash
+        // Collect timer
+        if (this.collectTimer === undefined) this.collectTimer = 0;
+        this.collectTimer += dt;
+        if (this.collectTimer >= 2.0) {
+            this.collectTimer -= 2.0;
+            
+            // Find nearest uncollected trash
+            let nearest = null;
+            let minDist = Infinity;
+            for (const item of this.game.trashManager.items) {
+                if (!item.collected) {
+                    const dx = item.x - this.x;
+                    const dy = item.y - this.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = item;
+                    }
+                }
+            }
+            
+            if (nearest) {
+                nearest.collected = true;
+                this.game.trashManager.totalCollected++;
+                
+                const totalFollowers = this.game.getRoundTotalFollowers();
+                const pointValue = Math.max(1, Math.round(Math.sqrt(8 * totalFollowers)));
+                this.game.trashManager.totalPoints += pointValue;
+                
+                // Create pickup effect
+                const wrapped = nearestWrap(nearest.x, nearest.y, this.game.camera.getCenterX(), this.game.camera.getCenterY());
+                this.game.trashManager.pickupEffects.push({
+                    x: wrapped.x,
+                    y: wrapped.y,
+                    text: `+${pointValue}`,
+                    timer: 0,
+                    alpha: 1,
+                    color: '#00ff88',
+                });
+                
+                this.game.trashCollectedInWindow++;
+                this.game.trashCollectedInRound = (this.game.trashCollectedInRound || 0) + 1;
+                this.game.hud.updateScore(this.game.trashManager.totalPoints);
+                this.game.trashManager.spawnMore(this.game.gameMap, 1);
+                
+                // Clear target so we pick a new one
+                this.targetTrash = null;
+            }
+        }
+
+        // Find nearest uncollected trash for visual pathing
         if (!this.targetTrash || this.targetTrash.collected) {
             let nearest = null;
             let minDist = Infinity;
@@ -2494,16 +2544,7 @@ class GameOrganizer {
                     this.direction = vy > 0 ? 'down' : 'up';
                 }
             } else {
-                // Collect the trash!
-                const pickupRadius = TILE_SIZE;
-                const maxToPick = 1;
-                const totalFollowers = this.game.getRoundTotalFollowers();
-                const picked = this.game.trashManager.checkPickup(this.x, this.y, pickupRadius, totalFollowers, maxToPick);
-                if (picked.length > 0) {
-                    this.game.trashCollectedInWindow += picked.length;
-                    this.game.trashCollectedInRound += picked.length;
-                }
-                this.targetTrash = null;
+                this.moving = false;
             }
         } else {
             this.moving = false;

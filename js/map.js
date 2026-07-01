@@ -290,10 +290,6 @@ class GameMap {
     }
 
     _drawTile(ctx, tile, sx, sy, tx, ty) {
-        if (!window.hasLoggedDrawTile) {
-            window.hasLoggedDrawTile = true;
-            if (window.gameLog) window.gameLog(`_drawTile FIRST: tile=${tile}, sx=${sx}, sy=${sy}, color=${TILE_COLORS[tile]}`);
-        }
         const s = TILE_SIZE;
         switch (tile) {
             case TileType.ROAD:

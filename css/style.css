@@ -22,21 +22,14 @@ html, body {
 }
 
 #gameCanvas {
-    display: block !important;
+    display: block;
     width: 100vw;
     height: 100vh;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    z-index: 999999 !important;
-    background-color: pink !important;
-    opacity: 1 !important;
-    visibility: visible !important;
 }
 #gameCanvas.hidden {
-    /* Ignoring hidden class for this debug test */
+    display: none;
 }
 
 /* ============================================================

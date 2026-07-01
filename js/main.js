@@ -1376,9 +1376,12 @@ class Game {
         this.insurancePaymentTimer = 10.0;
 
         // Snap camera to player
+        if (window.gameLog) window.gameLog(`_startGame: snapping camera to player x=${this.player.x}, y=${this.player.y}`);
         this.camera.snapTo(this.player.x, this.player.y);
+        if (window.gameLog) window.gameLog(`_startGame: camera snapped to x=${this.camera.x}, y=${this.camera.y}, size: w=${this.camera.width}, h=${this.camera.height}`);
 
         this.state = GameState.PLAYING;
+        if (window.gameLog) window.gameLog(`_startGame: state set to ${this.state}. Canvas size: w=${this.canvas.width}, h=${this.canvas.height}`);
         console.log('Game state set to PLAYING. Player:', this.player);
     }
 
@@ -1431,6 +1434,12 @@ class Game {
     }
 
     _renderGame(ctx, w, h) {
+        if (!this.hasLoggedRender) {
+            this.hasLoggedRender = true;
+            if (window.gameLog) {
+                window.gameLog(`_renderGame FIRST call: w=${w}, h=${h}, player.x=${this.player ? this.player.x : 'null'}, camera.x=${this.camera ? this.camera.x : 'null'}, camera size: w=${this.camera ? this.camera.width : 'null'}, h=${this.camera ? this.camera.height : 'null'}`);
+            }
+        }
         // Render map
         this.gameMap.render(ctx, this.camera, this.player);
 

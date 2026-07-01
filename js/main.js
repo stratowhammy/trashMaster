@@ -1349,6 +1349,7 @@ class Game {
         }
 
         this.trashManager.spawnInitial(this.gameMap, initialTrash);
+        this.trashManager.spawnNear(this.gameMap, spawnX, spawnY, 8, Math.floor(initialTrash * 0.5));
         
         this.hud.reset();
         this.hud.followerCount = this.followerManager.getFollowerCount();

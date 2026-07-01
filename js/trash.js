@@ -104,6 +104,27 @@ class TrashManager {
         }
     }
 
+    spawnNear(gameMap, centerX, centerY, radius, count) {
+        let placed = 0;
+        let attempts = 0;
+        const maxAttempts = count * 10;
+        while (placed < count && attempts < maxAttempts) {
+            attempts++;
+            const rx = Math.floor((Math.random() * 2 - 1) * radius);
+            const ry = Math.floor((Math.random() * 2 - 1) * radius);
+            const tileX = centerX + rx;
+            const tileY = centerY + ry;
+
+            if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) continue;
+            if (!gameMap.isWalkable(tileX, tileY)) continue;
+            if (this.items.some(t => !t.collected && t.tileX === tileX && t.tileY === tileY)) continue;
+
+            const type = Math.floor(Math.random() * 4);
+            this.items.push(new TrashItem(tileX, tileY, type));
+            placed++;
+        }
+    }
+
     update(gameMap) {
         // Periodic respawn
         this.respawnTimer++;

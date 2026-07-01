@@ -11,7 +11,7 @@ class Player {
             this.speed = 8;
         } else {
             this.spriteId = spriteId;
-            this.speed = 4;
+            this.speed = 6;
         }
         this.size = TILE_SIZE - 4;
         this.direction = 'down';

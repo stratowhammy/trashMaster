@@ -165,11 +165,11 @@ function initUI() {
         // Welcome / Introduction
         activeSlides.push({
             title: "WELCOME TO FILTHADELPHIA!",
-            desc: "Filthadelphia is covered in trash. As the Trash Master, your mission is to clean up the streets, gather a posse of followers, and rise from citizen to President of the United States!",
+            desc: "Use the arrow keys to move. (WASD does not work)",
             controls: [
-                "Move: WASD / Arrow Keys",
-                "Pick Up Trash: Walk over it",
-                "Deposit Trash: Walk onto the Green DUMP zone to deposit truck trash and earn cash."
+                "When you're on your own, use Q to pick up trash.",
+                "When you've got followers, they'll pick up the trash, you lead!",
+                "If playing with a trash truck, find the brown tile on the minimap, this is the dump. Your truck is fast, but it fills up fast, press 'e' at the entrance to empty your load."
             ]
         });
 
@@ -198,10 +198,10 @@ function initUI() {
         if (window.fastFoodMode) {
             activeSlides.push({
                 title: "FAST FOOD MODE",
-                desc: "Your posse members get hungry! You must periodically feed them, and health insurance premiums apply.",
+                desc: "At the door of a fast food restaurant press 'e' to get munchies for your muchachos. When you feed your crew, they'll do more for you!",
                 controls: [
-                    "Feed Posse: Walk to Fast Food joints and purchase food, otherwise your posse size is cut in half!",
-                    "Health Insurance: Costs $10 per posse member per truck every 10 seconds."
+                    "Greasy food will fill you up, but it can also bring you down.",
+                    "Find the hospital and get healthcare for your posse or your next meal might be their last."
                 ]
             });
         }
@@ -232,8 +232,10 @@ function initUI() {
         // Keys & Items Summary
         activeSlides.push({
             title: "KEYS & KEYBINDINGS",
-            desc: "Use the following hotkeys to interact and use purchased store items during the round:",
+            desc: "Press 'E' for Everything! Q to pick up trash.",
             controls: [
+                "E: Interact with anything (Dump, Fast Food joints, Hospital, NPCs, Cars, Mafia Don)",
+                "Q: Pick up trash (when alone on foot)",
                 "F: Plant Flower (Flowers Mode)",
                 "T: Use Borrowed Time (+20s to timer)",
                 "M: Use Mushrooms (Slow timer for 20s)",

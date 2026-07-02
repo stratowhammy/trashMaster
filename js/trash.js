@@ -149,7 +149,7 @@ class TrashManager {
 
     checkPickup(entityX, entityY, pickupRadius, followerCount = 0, maxToPick = Infinity) {
         const picked = [];
-        const pointValue = Math.max(1, Math.round(Math.sqrt(8 * followerCount)));
+        const pointValue = Math.max(1, Math.round(Math.sqrt(16 * followerCount)));
         for (const item of this.items) {
             if (item.collected) continue;
             if (picked.length >= maxToPick) break;

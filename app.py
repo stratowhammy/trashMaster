@@ -308,6 +308,24 @@ def buy_item():
     db.commit()
     return jsonify({'success': True})
     
+@app.route('/api/game/sell-truck', methods=['POST'])
+def sell_truck():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance, has_truck FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    
+    if user['has_truck'] <= 0:
+        return jsonify({'error': 'You do not own any trash trucks to sell'}), 400
+        
+    db.execute("UPDATE users SET balance = balance + 5000, has_truck = has_truck - 1 WHERE id=?", (user_data['user_id'],))
+    db.commit()
+    
+    return jsonify({'success': True, 'message': 'Trash truck sold for $5,000!'})
+
 @app.route('/api/game/consume', methods=['POST'])
 def consume_item():
     user_data = verify_token(request)

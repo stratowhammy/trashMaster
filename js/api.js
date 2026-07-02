@@ -567,12 +567,18 @@ function renderStore() {
             }
         }
 
+        let sellBtnHtml = '';
+        if (item.name === 'Bruno The Trash Truck' && playerHasTruck > 0) {
+            sellBtnHtml = `<button class="btn sell-truck-btn" style="background: #ff4444; border-color: #cc2222; margin-top: 5px; width: 100%;">Sell for $5,000</button>`;
+        }
+
         div.innerHTML = `
             ${imgHtml}
             <h3>${item.name}</h3>
             <p>${descOverride}</p>
             <div class="price">$${item.price.toLocaleString()}</div>
             <button class="btn buy-btn" data-name="${item.name}" ${btnDisabled}>${btnText}</button>
+            ${sellBtnHtml}
         `;
         container.appendChild(div);
     });
@@ -590,6 +596,18 @@ function renderStore() {
             }
             try {
                 await apiCall('/api/game/buy', 'POST', { item_name: itemName });
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
+
+    document.querySelectorAll('.sell-truck-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            if (!confirm("Are you sure you want to sell 1 of your trash trucks for $5,000?")) return;
+            try {
+                await apiCall('/api/game/sell-truck', 'POST');
                 await refreshGameState();
             } catch (err) {
                 alert(err.message);

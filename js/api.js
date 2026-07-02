@@ -104,26 +104,178 @@ function initUI() {
     if (btnAdminLogout) btnAdminLogout.addEventListener('click', logout);
     if (btnStoreLogout) btnStoreLogout.addEventListener('click', logout);
 
+    let currentSlideIndex = 0;
+    let activeSlides = [];
+
+    const renderInstructionSlide = () => {
+        const slide = activeSlides[currentSlideIndex];
+        const container = document.getElementById('instruction-slides-container');
+        if (!container || !slide) return;
+
+        let controlsHtml = "";
+        if (slide.controls && slide.controls.length > 0) {
+            controlsHtml = `
+                <ul style="text-align: left; font-size: 8px; color: #00ffcc; line-height: 1.8; margin-top: 15px; padding-left: 15px; list-style-type: square; width: 100%; box-sizing: border-box;">
+                    ${slide.controls.map(ctrl => `<li style="margin-bottom: 8px;">${ctrl}</li>`).join('')}
+                </ul>
+            `;
+        }
+
+        container.innerHTML = `
+            <h2 style="color: #ffaa00; font-size: 10px; margin-bottom: 15px; text-shadow: 2px 2px #000; letter-spacing: 1px;">${slide.title}</h2>
+            <p style="color: #ddd; font-size: 8px; line-height: 1.6; margin-bottom: 15px; text-align: justify; word-break: break-word;">${slide.desc}</p>
+            ${controlsHtml}
+        `;
+
+        const prevBtn = document.getElementById('btn-instruction-prev');
+        const nextBtn = document.getElementById('btn-instruction-next');
+        const indicator = document.getElementById('instruction-page-indicator');
+
+        if (prevBtn) {
+            prevBtn.style.visibility = currentSlideIndex === 0 ? 'hidden' : 'visible';
+        }
+        if (nextBtn) {
+            nextBtn.innerText = currentSlideIndex === activeSlides.length - 1 ? 'START' : 'NEXT';
+            nextBtn.style.background = currentSlideIndex === activeSlides.length - 1 ? '#00ffcc' : '#ffaa00';
+            nextBtn.style.borderColor = currentSlideIndex === activeSlides.length - 1 ? '#00aa88' : '#cc7700';
+        }
+        if (indicator) {
+            indicator.innerText = `${currentSlideIndex + 1} / ${activeSlides.length}`;
+        }
+    };
+
+    const showInstructionsDialog = () => {
+        const frenzyToggle = document.getElementById('frenzy-toggle');
+        window.frenzyMode = frenzyToggle ? frenzyToggle.checked : false;
+        
+        const crimeToggle = document.getElementById('crime-toggle');
+        window.crimeMode = crimeToggle ? crimeToggle.checked : false;
+        
+        const fastfoodToggle = document.getElementById('fastfood-toggle');
+        window.fastFoodMode = fastfoodToggle ? fastfoodToggle.checked : false;
+
+        const politicsToggle = document.getElementById('politics-toggle');
+        window.politicsMode = politicsToggle ? politicsToggle.checked : false;
+        
+        const flowersToggle = document.getElementById('flowers-toggle');
+        window.flowersMode = flowersToggle ? flowersToggle.checked : false;
+
+        activeSlides = [];
+
+        // Welcome / Introduction
+        activeSlides.push({
+            title: "WELCOME TO FILTHADELPHIA!",
+            desc: "Filthadelphia is covered in trash. As the Trash Master, your mission is to clean up the streets, gather a posse of followers, and rise from citizen to President of the United States!",
+            controls: [
+                "Move: WASD / Arrow Keys",
+                "Pick Up Trash: Walk over it",
+                "Deposit Trash: Walk onto the Green DUMP zone to deposit truck trash and earn cash."
+            ]
+        });
+
+        // Mode explanations
+        if (window.frenzyMode) {
+            activeSlides.push({
+                title: "FRENZY MODE",
+                desc: "The city has gone into a cleaning frenzy! Trash generates at a double rate, and Informants are scattered around the streets.",
+                controls: [
+                    "Informants: Speak with them to receive random bonus rewards!"
+                ]
+            });
+        }
+
+        if (window.crimeMode) {
+            activeSlides.push({
+                title: "CRIME MODE",
+                desc: "You agreed to work with the mafia. Run mafia tasks from the store for massive payouts, but watch out for the law!",
+                controls: [
+                    "Police Patrols: 4 fast-moving police officers spawn at all corners of the map and actively hunt you down!",
+                    "Arrests: Slashes posse size by 75%, slashes 1 truck, and levies a scaling fine of $50,000 + $50,000 per subsequent arrest."
+                ]
+            });
+        }
+
+        if (window.fastFoodMode) {
+            activeSlides.push({
+                title: "FAST FOOD MODE",
+                desc: "Your posse members get hungry! You must periodically feed them, and health insurance premiums apply.",
+                controls: [
+                    "Feed Posse: Walk to Fast Food joints and purchase food, otherwise your posse size is cut in half!",
+                    "Health Insurance: Costs $10 per posse member per truck every 10 seconds."
+                ]
+            });
+        }
+
+        if (window.politicsMode) {
+            activeSlides.push({
+                title: "POLITICS MODE",
+                desc: "Campaign to win political office! Nominate yourself in the store, then shake hands with NPCs around the city.",
+                controls: [
+                    "Votes: Shake hands with NPCs around the city to win their votes.",
+                    "Rival Candidate: A rival candidate is going around shaking hands; shake more than them to win the round!",
+                    "Mafia Votes Bribe: Accepting delivers votes, but police are instantly dispatched after you!"
+                ]
+            });
+        }
+
+        if (window.flowersMode) {
+            activeSlides.push({
+                title: "FLOWERS MODE",
+                desc: "Beautify Filthadelphia's local parks by planting flowers!",
+                controls: [
+                    "Key F: Plant flowers while standing in park zones.",
+                    "Fertilizer: Purchase from the store to plant flowers. Fully planted parks reward big money payouts!"
+                ]
+            });
+        }
+
+        // Keys & Items Summary
+        activeSlides.push({
+            title: "KEYS & KEYBINDINGS",
+            desc: "Use the following hotkeys to interact and use purchased store items during the round:",
+            controls: [
+                "F: Plant Flower (Flowers Mode)",
+                "T: Use Borrowed Time (+20s to timer)",
+                "M: Use Mushrooms (Slow timer for 20s)",
+                "W: Use Wings (1.5x speed boost for 15s)",
+                "P: Use Protection (+5% posse win chance for 30s)",
+                "R: Use Parade Route (3x trash near route)"
+            ]
+        });
+
+        currentSlideIndex = 0;
+        renderInstructionSlide();
+        document.getElementById('instructions-dialog').classList.remove('hidden');
+    };
+
     if (btnStartGame) {
         btnStartGame.addEventListener('click', () => {
-            const frenzyToggle = document.getElementById('frenzy-toggle');
-            window.frenzyMode = frenzyToggle ? frenzyToggle.checked : false;
-            
-            const crimeToggle = document.getElementById('crime-toggle');
-            window.crimeMode = crimeToggle ? crimeToggle.checked : false;
-            
-            const fastfoodToggle = document.getElementById('fastfood-toggle');
-            window.fastFoodMode = fastfoodToggle ? fastfoodToggle.checked : false;
+            showInstructionsDialog();
+        });
+    }
 
-            const politicsToggle = document.getElementById('politics-toggle');
-            window.politicsMode = politicsToggle ? politicsToggle.checked : false;
-            
-            const flowersToggle = document.getElementById('flowers-toggle');
-            window.flowersMode = flowersToggle ? flowersToggle.checked : false;
+    const btnInstructionPrev = document.getElementById('btn-instruction-prev');
+    if (btnInstructionPrev) {
+        btnInstructionPrev.addEventListener('click', () => {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                renderInstructionSlide();
+            }
+        });
+    }
 
-            showScreen('game-layer');
-            if (window.startGameFromStore) {
-                window.startGameFromStore();
+    const btnInstructionNext = document.getElementById('btn-instruction-next');
+    if (btnInstructionNext) {
+        btnInstructionNext.addEventListener('click', () => {
+            if (currentSlideIndex < activeSlides.length - 1) {
+                currentSlideIndex++;
+                renderInstructionSlide();
+            } else {
+                document.getElementById('instructions-dialog').classList.add('hidden');
+                showScreen('game-layer');
+                if (window.startGameFromStore) {
+                    window.startGameFromStore();
+                }
             }
         });
     }

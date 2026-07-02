@@ -44,12 +44,8 @@ class HUD {
         this.score = newScore;
     }
 
-    showFollowerNotification(name, isPositive = true) {
-        if (isPositive) {
-            this.followerNotification = `${name} joined your posse!`;
-        } else {
-            this.followerNotification = name;
-        }
+    showFollowerNotification(text, isPositive = true) {
+        this.followerNotification = text;
         this.followerNotificationTimer = 180; // ~3 seconds
         this.followerNotificationPositive = isPositive;
     }

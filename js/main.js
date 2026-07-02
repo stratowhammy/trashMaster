@@ -216,8 +216,9 @@ class Game {
                                 const dist = Math.sqrt(dx * dx + dy * dy);
                                 if (dist < TILE_SIZE * 1.2) {
                                     car.active = false;
-                                    this.followerManager.addFollower(this.player.x, this.player.y);
-                                    this.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
+                                    const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
+                                    const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+                                    this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);
                                     return; // Stop processing 'E' if recruited from a car
                                 }
                             }
@@ -1039,8 +1040,21 @@ class Game {
         if (window.fastFoodMode) {
             // Hunger timer
             this.hungerTimer -= dt;
+            
+            const hungerPct = (this.hungerTimer / 45.0) * 100;
+            if (hungerPct <= 25 && !this.hungerWarned25) {
+                this.hungerWarned25 = true;
+                this.hud.showFollowerNotification("Warning: hunger at 25%!", false);
+            }
+            if (hungerPct <= 10 && !this.hungerWarned10) {
+                this.hungerWarned10 = true;
+                this.hud.showFollowerNotification("Danger: hunger at 10%! Your posse is starving!", false);
+            }
+
             if (this.hungerTimer <= 0) {
                 this.hungerTimer = 45.0;
+                this.hungerWarned25 = false;
+                this.hungerWarned10 = false;
                 const count = this.getRoundTotalFollowers();
                 const toLose = Math.floor(count / 2);
                 for (let i = 0; i < toLose; i++) {
@@ -1488,6 +1502,8 @@ class Game {
 
         // Fast Food Mode State
         this.hungerTimer = 45.0;
+        this.hungerWarned25 = false;
+        this.hungerWarned10 = false;
         this.fastFoodSuspensionTimer = 0.0;
         this.hasHealthInsurance = false;
         this.insurancePaymentTimer = 10.0;
@@ -2378,12 +2394,12 @@ class Game {
         if (this.nextFollowerGroupIndex === 0) {
             newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
             const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
-            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined you!` : 'New posse member!', true);
+            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);
         } else {
             const org = this.organizers[this.nextFollowerGroupIndex - 1];
             newFollower = org.followerManager.addFollower(org.x, org.y);
             const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
-            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined Organizer ${this.nextFollowerGroupIndex}!` : `New member joined Organizer ${this.nextFollowerGroupIndex}!`, true);
+            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined Organizer ${this.nextFollowerGroupIndex}'s posse!` : `New member joined Organizer ${this.nextFollowerGroupIndex}'s posse!`, true);
         }
         this.nextFollowerGroupIndex = (this.nextFollowerGroupIndex + 1) % totalGroups;
     }
@@ -2672,7 +2688,9 @@ window.addEventListener('DOMContentLoaded', () => {
             window.game.hud.updateScore(window.game.trashManager.totalPoints);
             
             window.game.hungerTimer = 45.0;
-            window.game.fastFoodSuspensionTimer = 10.0;
+            window.game.hungerWarned25 = false;
+            window.game.hungerWarned10 = false;
+            window.game.fastFoodSuspensionTimer = 15.0;
             
             if (Math.random() < 0.20) {
                 if (window.game.hasHealthInsurance) {
@@ -2687,7 +2705,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     window.game.hud.showFollowerNotification('Food poisoning! Entire posse died without insurance!', false);
                 }
             } else {
-                window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 10s.`, true);
+                window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 15s.`, true);
             }
         }
         canvas.focus();

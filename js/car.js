@@ -169,8 +169,9 @@ class CarManager {
                     if (player.interactionTriggered) {
                         player.interactionTriggered = false; // consume
                         car.active = false;
-                        game.followerManager.addFollower(player.x, player.y);
-                        game.hud.showFollowerNotification('Recruited a new posse member from the green car!', true);
+                        const newFollower = game.followerManager.addFollower(player.x, player.y);
+                        const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+                        game.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);
                     }
                 }
             }

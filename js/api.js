@@ -11,6 +11,8 @@ var playerUnlockedFastFood = 0;
 var playerUnlockedCrime = 0;
 var tempHiresCount = 0;
 var playerStats = {};
+var playerCredits = 3;
+var internationalFollowers = 0;
 
 async function apiCall(endpoint, method = 'GET', body = null) {
     const headers = { 'Content-Type': 'application/json' };
@@ -421,6 +423,10 @@ async function refreshGameState() {
         window.politicalOffice = data.political_office || 'citizen';
         playerStats = data.stats || {};
         window.playerStats = playerStats;
+        playerCredits = data.credits !== undefined ? data.credits : 3;
+        window.playerCredits = playerCredits;
+        internationalFollowers = data.international_followers || 0;
+        window.internationalFollowers = internationalFollowers;
         
         // Notify player when reaching requirements
         if (oldFollowers > 0) {
@@ -486,7 +492,9 @@ const STORE_ITEMS = [
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
     { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' },
     { name: 'Organizer', price: 250, desc: 'Splits followers to collect trash simultaneously across the map. Costs $250/round.', sprite: 'employee.png' },
-    { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' }
+    { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' },
+    { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'mushrooms.png' },
+    { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'employee.png' }
 ];
 
 function updateStoreUI() {
@@ -510,6 +518,59 @@ function renderStore() {
     const container = document.querySelector('.store-items');
     if (!container) return;
     container.innerHTML = '';
+
+    // ── Credits Unlock Panel ──
+    const creditsPanel = document.createElement('div');
+    creditsPanel.id = 'credits-unlock-panel';
+    creditsPanel.style.cssText = `
+        width: 100%; background: linear-gradient(135deg,rgba(20,40,80,0.95),rgba(10,20,50,0.95));
+        border: 2px solid #ffaa00; border-radius: 12px; padding: 16px 20px;
+        margin-bottom: 18px; box-sizing: border-box;
+    `;
+
+    const creditsLeft = (window.playerCredits !== undefined ? window.playerCredits : playerCredits);
+    const creditItems = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade'];
+
+    creditsPanel.innerHTML = `
+        <div style="font-family:'Press Start 2P',monospace; font-size:9px; color:#ffaa00; margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;">
+            🌟 Starting Credits: <span id="credits-remaining-display" style="color:#00ffcc;">${creditsLeft}</span> / 3 remaining
+        </div>
+        <div style="font-family:'Press Start 2P',monospace; font-size:7px; color:#aaa; margin-bottom:12px;">
+            Spend credits to unlock any item for free. Each player starts with 3 credits.
+        </div>
+        <div id="credit-item-buttons" style="display:flex; flex-wrap:wrap; gap:8px;">
+            ${creditItems.map(itemName => {
+                const owned = playerInventory[itemName] || 0;
+                const disabled = creditsLeft <= 0 ? 'disabled' : '';
+                const style = creditsLeft <= 0
+                    ? 'background:#222;color:#555;border:2px solid #333;cursor:not-allowed;'
+                    : 'background:linear-gradient(135deg,#1a3a6a,#0a2040);color:#00ffcc;border:2px solid #00aaff;cursor:pointer;';
+                return `<button class="btn credit-spend-btn" data-item="${itemName}" ${disabled}
+                    style="font-family:\'Press Start 2P\',monospace;font-size:7px;padding:6px 10px;border-radius:6px;${style}">
+                    ${itemName} ${owned > 0 ? `(x${owned})` : ''}
+                </button>`;
+            }).join('')}
+        </div>
+    `;
+    container.appendChild(creditsPanel);
+
+    // Wire credit spend buttons
+    creditsPanel.querySelectorAll('.credit-spend-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const itemName = e.target.getAttribute('data-item');
+            if (!itemName) return;
+            if (!confirm(`Spend 1 credit to unlock: ${itemName}?`)) return;
+            try {
+                const result = await apiCall('/api/game/spend-credit', 'POST', { item_name: itemName });
+                playerCredits = result.credits_remaining;
+                window.playerCredits = playerCredits;
+                await refreshGameState();
+                renderStore();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
 
     STORE_ITEMS.forEach(item => {
         const div = document.createElement('div');

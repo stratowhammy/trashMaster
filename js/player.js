@@ -21,6 +21,13 @@ class Player {
         this.positionHistory = [];
         this.historyMaxLength = 2000;
         this.keys = { up: false, down: false, left: false, right: false, k: false };
+
+        // Character class & Phase 1 state
+        this.characterClass = spriteId; // e.g. 'char1' through 'char6'
+        this.sick = false;              // Quinine auto-consumes when true
+        this.fertilizers = 0;           // Scientist gets 10; does not count vs inventory slots
+        this.capturedAnimals = [];      // Ranger: captured animal objects
+        this.speedMultiplier = 1.0;     // Can be overridden by character class or items
     }
 
     handleKeyDown(e) {
@@ -57,7 +64,17 @@ class Player {
             if (Math.abs(dx) > Math.abs(dy)) this.direction = dx > 0 ? 'right' : 'left';
             else this.direction = dy > 0 ? 'down' : 'up';
 
-            const currentSpeed = this.speed * (this.speedMultiplier || 1.0);
+            // Athlete (+10% speed) applies only when NOT driving a truck.
+            // All other multipliers (Wings, etc.) apply regardless of mode.
+            let effectiveMultiplier = this.speedMultiplier || 1.0;
+            if (this.characterClass === 'char4' && window.playerHasTruck) {
+                // Strip out only the Athlete base +10% bonus (factor 1.1); keep item bonuses.
+                // We do this by dividing out 1.1 from effectiveMultiplier if it was set to 1.1
+                // by the class init (no item bonuses active).
+                // Safe approach: Athlete base speed is stored separately.
+                effectiveMultiplier = effectiveMultiplier / (this.athleteBaseMultiplier || 1.0);
+            }
+            const currentSpeed = this.speed * effectiveMultiplier;
             const newX = this.x + dx * currentSpeed * 60 * dt;
             const newY = this.y + dy * currentSpeed * 60 * dt;
 

@@ -262,11 +262,51 @@ class HUD {
 
         let nextBarY = canvasHeight - 24;
 
+        // ── Animal Capacity Bar (Ranger only, Bottom Center) ──
+        if (window.game && window.game.player &&
+            window.game.player.characterClass === 'char1') {
+            const animalCount = (window.game.player.capturedAnimals || []).length;
+            // Each captured animal reduces the trash bar max by 10.
+            // Max animals: 1 without truck, many with truck. We cap display at 10.
+            const hasTruck = !!(window.playerHasTruck);
+            const maxAnimals = hasTruck ? 10 : 1;
+            const fillPct = Math.max(0, Math.min(1, animalCount / Math.max(1, maxAnimals)));
+
+            const barW = Math.min(400, canvasWidth * 0.5);
+            const barH = 14;
+            const barX = canvasWidth / 2 - barW / 2;
+            const barY = nextBarY;
+            nextBarY -= 18;
+
+            // Background
+            ctx.fillStyle = 'rgba(10, 40, 20, 0.7)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            // Fill — green → amber as animals accumulate (increasing load)
+            const fillColor = fillPct > 0.7 ? '#ffaa00' : '#44dd88';
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+            // Border
+            ctx.strokeStyle = '#44dd88';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            // Text
+            ctx.fillStyle = '#fff';
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const capacityReduction = animalCount * 10;
+            ctx.fillText(`ANIMALS: ${animalCount}  |  CARGO -${capacityReduction}`, barX + barW / 2, barY + barH / 2 + 1);
+        }
+
         // ── Trash Truck Capacity Bar (Bottom Center) ──
         if (window.playerHasTruck > 0 && window.game) {
             const currentTrash = window.game.trashCollectedInTruck || 0;
-            const maxTrash = window.playerHasTruck * 50;
-            const fillPct = Math.max(0, Math.min(1, currentTrash / maxTrash));
+            const animalPenalty = window.game.player ? (window.game.player.capturedAnimals || []).length * 10 : 0;
+            const maxTrash = Math.max(0, (window.playerHasTruck * 50) - animalPenalty);
+            const fillPct = maxTrash > 0 ? Math.max(0, Math.min(1, currentTrash / maxTrash)) : 1;
 
             const barW = Math.min(400, canvasWidth * 0.5);
             const barH = 16;

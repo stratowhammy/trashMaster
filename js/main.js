@@ -10,6 +10,11 @@ const GameState = {
     UI_OVERLAY: 'ui_overlay', // when looking at store
 };
 
+// Phase 1 Global State
+if (typeof window.internationalFollowers === 'undefined') {
+    window.internationalFollowers = 0;
+}
+
 class GarbageTruckFollower {
     constructor(x, y, index) {
         this.x = x;
@@ -512,6 +517,11 @@ class Game {
                 if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
                 if (e.key === 'p' || e.key === 'P') this.useConsumable('Protection');
 
+                // C key: Ranger animal capture (if near an animal node)
+                if ((e.key === 'c' || e.key === 'C') && this.player && this.player.characterClass === 'char1') {
+                    this._rangerTryCaptureAnimal();
+                }
+
                 // Prevent scrolling with arrow keys
                 if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
                     e.preventDefault();
@@ -602,7 +612,9 @@ class Game {
 
         let maxToPick = Infinity;
         if (window.playerHasTruck > 0) {
-            const maxCap = window.playerHasTruck * 50;
+            // Reduce max truck capacity by 10 per captured animal (Ranger)
+            const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
+            const maxCap = Math.max(0, window.playerHasTruck * 50 - animalPenalty);
             maxToPick = Math.max(0, maxCap - this.trashCollectedInTruck);
             if (maxToPick <= 0) {
                 if (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000) {
@@ -613,7 +625,9 @@ class Game {
             }
         }
 
-        const pickupRadius = TILE_SIZE * 0.8;
+        // Trashpickers: double the effective pickup radius for the player
+        const baseRadius = TILE_SIZE * 0.8;
+        const pickupRadius = this.doubleTrashPickup ? baseRadius * 2 : baseRadius;
         const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.getRoundTotalFollowers(), maxToPick);
 
         if (picked.length > 0) {
@@ -672,6 +686,11 @@ class Game {
             this.wingsTimer -= dt;
             if (this.wingsTimer <= 0) {
                 if (this.player) this.player.speedMultiplier = 1.0;
+                // Restore Athlete base bonus if applicable
+                if (this.player && this.player.characterClass === 'char4' && !window.playerHasTruck) {
+                    this.player.speedMultiplier = 1.1;
+                    this.player.athleteBaseMultiplier = 1.1;
+                }
                 this.wingsTimer = 0;
             }
         }
@@ -682,6 +701,17 @@ class Game {
                 this.protectionBonus = 0;
                 this.hud.showFollowerNotification('Protection Expired!', false);
             }
+        }
+
+        // ── Quinine auto-consume: if player is sick and has Quinine, auto-cure ──
+        if (this.player && this.player.sick &&
+            window.playerInventory && (window.playerInventory['Quinine'] || 0) > 0) {
+            this.player.sick = false;
+            window.playerInventory['Quinine'] -= 1;
+            window.apiCall('/api/game/consume', 'POST', { item_name: 'Quinine' })
+                .then(() => { console.log('Quinine auto-consumed: sick status cured.'); })
+                .catch(e => console.error('Quinine consume error:', e));
+            this.hud.showFollowerNotification('🧪 Quinine auto-consumed! Sickness cured!', true);
         }
 
         // Employee upkeep timer ($200 every 15s per hired employee, excluding Bruno)
@@ -1500,6 +1530,18 @@ class Game {
         this.wingsTimer = 0;
         if (this.player) this.player.speedMultiplier = 1.0;
 
+        // ── Trashpickers: check inventory, set flag for this round ──
+        this.doubleTrashPickup = false;
+        if (window.playerInventory && (window.playerInventory['Trashpickers'] || 0) > 0) {
+            this.doubleTrashPickup = true;
+            // Consume Trashpickers for this round
+            window.apiCall('/api/game/consume', 'POST', { item_name: 'Trashpickers' }).then(() => {
+                window.playerInventory['Trashpickers'] -= 1;
+                console.log('Trashpickers consumed: doubleTrashPickup active for this round.');
+            }).catch(e => console.error(e));
+            this.hud.showFollowerNotification('🧹 Trashpickers active! Double pickup this round!', true);
+        }
+
         // Fast Food Mode State
         this.hungerTimer = 45.0;
         this.hungerWarned25 = false;
@@ -1507,6 +1549,10 @@ class Game {
         this.fastFoodSuspensionTimer = 0.0;
         this.hasHealthInsurance = false;
         this.insurancePaymentTimer = 10.0;
+
+        // ── Character Class Initialization Rules ──
+        const charClass = this.player ? this.player.characterClass : spriteId;
+        this._applyCharacterClassInit(charClass);
 
         // Snap camera to player
         if (window.gameLog) window.gameLog(`_startGame: snapping camera to player x=${this.player.x}, y=${this.player.y}`);
@@ -1524,6 +1570,122 @@ class Game {
             if (window.gameLog) window.gameLog(`_startGame: state set to ${this.state}. Canvas size: w=${this.canvas.width}, h=${this.canvas.height}`);
         }
         console.log('Game state set. Player:', this.player);
+    }
+
+    // ── CHARACTER CLASS INITIALIZATION ──
+    _applyCharacterClassInit(charClass) {
+        if (!this.player) return;
+
+        switch (charClass) {
+            case 'char1': // Ranger
+                // Default inventory: 1 animal slot (empty). Spawn random animal nodes on map.
+                this.player.capturedAnimals = [];
+                this._spawnAnimalNodes(8);
+                this.hud.showFollowerNotification('🦊 Ranger: Press [C] near an animal to capture it!', true);
+                break;
+
+            case 'char2': // Student
+                // Starts with 2 extra followers
+                this.followerManager.addFollower(this.player.x, this.player.y);
+                this.followerManager.addFollower(this.player.x, this.player.y);
+                this.hud.followerCount = this.getRoundTotalFollowers();
+                this.hud.showFollowerNotification('📚 Student: +2 starting followers!', true);
+                break;
+
+            case 'char3': // Scientist
+                // 10 fertilizers, does not count toward inventory grid
+                this.player.fertilizers = 10;
+                // Expose to window.playerInventory ONLY for display; does not consume grid slots
+                if (!window.playerInventory) window.playerInventory = {};
+                window.playerInventory['Fertilizer'] = (window.playerInventory['Fertilizer'] || 0) + 10;
+                this.hud.showFollowerNotification('🔬 Scientist: +10 Fertilizers loaded!', true);
+                break;
+
+            case 'char4': // Athlete
+                // +10% speed. Suppressed in truck mode (handled in player.js update()).
+                this.player.athleteBaseMultiplier = 1.1;
+                if (!window.playerHasTruck) {
+                    this.player.speedMultiplier = 1.1;
+                } else {
+                    // Truck mode: keep speedMultiplier at 1.0; bonus is zeroed in player.update()
+                    this.player.speedMultiplier = 1.0;
+                }
+                this.hud.showFollowerNotification('🏃 Athlete: +10% movement speed active!', true);
+                break;
+
+            case 'char5': // Robot
+                // +30 seconds to round timer
+                this.hud.timeRemaining += 30;
+                this.hud.showFollowerNotification('🤖 Robot: +30 seconds added to timer!', true);
+                break;
+
+            case 'char6': // Superhero
+                // Grant 2 Wings instances directly to active utility slots (bypass inventory)
+                // Activates Wings speed boost for 2 × 15s = 30s stacked.
+                this.player.speedMultiplier = 1.5;
+                this.wingsTimer = 30; // 2 × 15s stacked
+                // Track the 2 Wings separately so they show in HUD
+                this.superheroWingsCharges = 2;
+                this.hud.showFollowerNotification('🦸 Superhero: 2x Wings activated (30s boost)!', true);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    // ── RANGER: Spawn animal nodes across the map ──
+    _spawnAnimalNodes(count) {
+        this.animalNodes = [];
+        const animalTypes = ['fox', 'raccoon', 'squirrel', 'pigeon', 'cat'];
+        let attempts = 0;
+        while (this.animalNodes.length < count && attempts < count * 20) {
+            attempts++;
+            const tx = Math.floor(Math.random() * MAP_WIDTH);
+            const ty = Math.floor(Math.random() * MAP_HEIGHT);
+            const tile = this.gameMap.getTile(tx, ty);
+            if (tile === TileType.ROAD || tile === TileType.SIDEWALK) {
+                this.animalNodes.push({
+                    x: tx * TILE_SIZE + TILE_SIZE / 2,
+                    y: ty * TILE_SIZE + TILE_SIZE / 2,
+                    type: animalTypes[Math.floor(Math.random() * animalTypes.length)],
+                    captured: false
+                });
+            }
+        }
+    }
+
+    // ── RANGER: Try to capture a nearby animal ──
+    _rangerTryCaptureAnimal() {
+        if (!this.player || !this.animalNodes) return;
+        const px = this.player.x;
+        const py = this.player.y;
+        const maxAnimals = window.playerHasTruck ? 99 : 1;
+
+        for (const node of this.animalNodes) {
+            if (node.captured) continue;
+            const dx = px - node.x;
+            const dy = py - node.y;
+            if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 1.2) {
+                if (this.player.capturedAnimals.length >= maxAnimals) {
+                    this.hud.showFollowerNotification(
+                        window.playerHasTruck
+                            ? 'Animal cargo full!'
+                            : '🦊 Can only hold 1 animal without a Garbage Truck!',
+                        false
+                    );
+                    return;
+                }
+                node.captured = true;
+                this.player.capturedAnimals.push({ type: node.type });
+                const cargoReduction = this.player.capturedAnimals.length * 10;
+                this.hud.showFollowerNotification(
+                    `🦊 Captured a ${node.type}! Cargo capacity -10 (total -${cargoReduction}).`, true
+                );
+                return;
+            }
+        }
+        this.hud.showFollowerNotification('No animal nearby to capture.', false);
     }
 
     async _endRoundAndReturnToStore() {
@@ -1555,6 +1717,8 @@ class Game {
                 rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0
             });
             window.employeesHired = 0;
+            // Reset Trashpickers at round end
+            this.doubleTrashPickup = false;
             await window.refreshGameState();
             window.renderStore();
 
@@ -1767,6 +1931,46 @@ class Game {
 
         // Render trash
         this.trashManager.render(ctx, this.camera, this.spriteManager);
+
+        // Render Ranger animal nodes (only for Ranger class)
+        if (this.animalNodes && this.player && this.player.characterClass === 'char1') {
+            const time = performance.now() / 1000;
+            for (const node of this.animalNodes) {
+                if (node.captured) continue;
+                const wrapped = nearestWrap(node.x, node.y, this.camera.getCenterX(), this.camera.getCenterY());
+                if (!this.camera.isVisible(wrapped.x - 32, wrapped.y - 32, 64, 64)) continue;
+                const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+
+                // Pulsing circle background
+                const pulse = 1 + Math.sin(time * 3 + node.x * 0.01) * 0.08;
+                ctx.save();
+                ctx.globalAlpha = 0.85;
+                ctx.fillStyle = '#2d6b2d';
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, 14 * pulse, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#88ff88';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, 14 * pulse, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Paw icon text
+                ctx.font = '14px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.globalAlpha = 1.0;
+                ctx.fillText('🐾', screen.x, screen.y);
+
+                // Animal type label
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '6px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(node.type.toUpperCase(), screen.x, screen.y + 16);
+                ctx.restore();
+            }
+        }
 
         // Render followers (behind player)
         this.followerManager.render(ctx, this.camera, this.spriteManager);
@@ -2402,6 +2606,20 @@ class Game {
             this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined Organizer ${this.nextFollowerGroupIndex}'s posse!` : `New member joined Organizer ${this.nextFollowerGroupIndex}'s posse!`, true);
         }
         this.nextFollowerGroupIndex = (this.nextFollowerGroupIndex + 1) % totalGroups;
+
+        // Phase 1: Track international followers globally
+        window.internationalFollowers = (window.internationalFollowers || 0) + 1;
+
+        // Trashpickers: deduct $20 from bank balance to equip the new recruit
+        if (this.doubleTrashPickup) {
+            this.trashManager.totalPoints = Math.max(0, this.trashManager.totalPoints - 20);
+            this.hud.updateScore(this.trashManager.totalPoints);
+            // Show brief deduction notice at low frequency to avoid spam
+            if (!this._lastTrashpickersNotify || Date.now() - this._lastTrashpickersNotify > 3000) {
+                this.hud.showFollowerNotification('-$20 to equip new recruit (Trashpickers)', false);
+                this._lastTrashpickersNotify = Date.now();
+            }
+        }
     }
 
     _removeSequentialFollower() {

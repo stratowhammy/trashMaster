@@ -94,6 +94,14 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN times_caught INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN credits INTEGER DEFAULT 3")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN international_followers INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         db.commit()
         
         # Create default admin if not exists
@@ -199,7 +207,8 @@ def sync_game():
     cursor.execute("""
         SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime,
                made_man_status, political_office,
-               stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
+               stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers,
+               credits, international_followers
         FROM users WHERE id=?
     """, (user_data['user_id'],))
     user = cursor.fetchone()
@@ -216,6 +225,8 @@ def sync_game():
         'unlocked_crime': int(user['unlocked_crime'] or 0),
         'made_man_status': user['made_man_status'] or 'none',
         'political_office': user['political_office'] or 'citizen',
+        'credits': int(user['credits'] or 3),
+        'international_followers': int(user['international_followers'] or 0),
         'inventory': inv,
         'stats': {
             'max_single_trash': user['stat_max_single_trash'] or 0,
@@ -243,7 +254,9 @@ def buy_item():
         'Bruno The Trash Truck': 10000,
         'Fertilizer': 100,
         'Parade': 3000,
-        'Organizer': 250
+        'Organizer': 250,
+        'Quinine': 750,
+        'Trashpickers': 1000
     }
     
     if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
@@ -325,6 +338,39 @@ def sell_truck():
     db.commit()
     
     return jsonify({'success': True, 'message': 'Trash truck sold for $5,000!'})
+
+@app.route('/api/game/spend-credit', methods=['POST'])
+def spend_credit():
+    """Spend 1 starting credit to unlock an item into inventory."""
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+
+    item_name = request.json.get('item_name')
+    allowed_items = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade']
+    if item_name not in allowed_items:
+        return jsonify({'error': 'Item cannot be unlocked with credits'}), 400
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT credits FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    if not user or (user['credits'] or 0) <= 0:
+        return jsonify({'error': 'No credits remaining'}), 400
+
+    # Deduct credit and add item to inventory
+    db.execute("UPDATE users SET credits = credits - 1 WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+    row = cursor.fetchone()
+    if row:
+        db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+    else:
+        db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], item_name))
+    db.commit()
+
+    cursor.execute("SELECT credits FROM users WHERE id=?", (user_data['user_id'],))
+    updated = cursor.fetchone()
+    return jsonify({'success': True, 'credits_remaining': int(updated['credits'] or 0)})
+
 
 @app.route('/api/game/consume', methods=['POST'])
 def consume_item():

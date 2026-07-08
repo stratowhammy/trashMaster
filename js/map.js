@@ -78,61 +78,87 @@ const BUILDING_COLORS = [
     { base: '#735b6b', dark: '#624d5a', roof: '#856d7d' },
 ];
 
-class GameMap {
+class BaseMap {
     constructor() {
         this.tiles = [];
         this.buildingMeta = [];
         this.buildings = []; // { id, address, tiles: [{x,y}], doorTiles: [{x,y}] }
         this.openDoors = new Set(); // Set of building IDs whose doors are open (walkable)
+        this.theme = 'default';
+        this.roadDirections = [];
+    }
+
+    regenerate() {
         this.generate();
         this._catalogBuildings();
     }
 
-    generate() {
-        this.tiles = Array.from({ length: MAP_HEIGHT }, () =>
-            Array.from({ length: MAP_WIDTH }, () => TileType.GRASS)
-        );
-        this.buildingMeta = Array.from({ length: MAP_HEIGHT }, () =>
-            Array.from({ length: MAP_WIDTH }, () => -1)
-        );
-
-        const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
-        const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
-
-        for (const ry of hRoads) {
-            const type = (ry % 2 === 0) ? TileType.ROAD_LEFT : TileType.ROAD_RIGHT;
-            for (let x = 0; x < MAP_WIDTH; x++) this.tiles[ry][x] = type;
+    _placeProceduralBuildings() {
+        let buildingIndex = 0;
+        const sizes = [[4, 4], [3, 3], [2, 2], [2, 3], [3, 2]];
+        
+        for (let attempt = 0; attempt < 800; attempt++) {
+            const size = sizes[Math.floor(Math.random() * sizes.length)];
+            const bw = size[0];
+            const bh = size[1];
+            const bx = Math.floor(Math.random() * MAP_WIDTH);
+            const by = Math.floor(Math.random() * MAP_HEIGHT);
+            
+            if (this._canPlaceBuildingAt(bx, by, bw, bh)) {
+                for (let y = 0; y < bh; y++) {
+                    for (let x = 0; x < bw; x++) {
+                        const wx = wrapTileX(bx + x);
+                        const wy = wrapTileY(by + y);
+                        this.tiles[wy][wx] = TileType.BUILDING;
+                        this.buildingMeta[wy][wx] = buildingIndex;
+                    }
+                }
+                buildingIndex++;
+            }
         }
-        for (const rx of vRoads) {
-            const type = (rx % 2 === 0) ? TileType.ROAD_DOWN : TileType.ROAD_UP;
-            for (let y = 0; y < MAP_HEIGHT; y++) this.tiles[y][rx] = type;
-        }
-        for (const ry of hRoads) for (const rx of vRoads) this.tiles[ry][rx] = TileType.CROSSWALK;
+    }
 
+    _canPlaceBuildingAt(bx, by, bw, bh) {
+        for (let dy = -1; dy <= bh; dy++) {
+            for (let dx = -1; dx <= bw; dx++) {
+                const wx = wrapTileX(bx + dx);
+                const wy = wrapTileY(by + dy);
+                if (this.tiles[wy][wx] !== TileType.GRASS) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    _generateSidewalks() {
+        const temp = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
-                if (this.tiles[y][x] !== TileType.ROAD && this.tiles[y][x] !== TileType.ROAD_UP && this.tiles[y][x] !== TileType.ROAD_DOWN && this.tiles[y][x] !== TileType.ROAD_LEFT && this.tiles[y][x] !== TileType.ROAD_RIGHT && this.tiles[y][x] !== TileType.CROSSWALK) {
-                    const neighbors = [[y-1,x],[y+1,x],[y,x-1],[y,x+1]];
+                if (this.tiles[y][x] === TileType.GRASS) {
+                    const neighbors = [
+                        [y-1, x], [y+1, x], [y, x-1], [y, x+1],
+                        [y-1, x-1], [y-1, x+1], [y+1, x-1], [y+1, x+1]
+                    ];
                     for (const [ny, nx] of neighbors) {
-                        if (ny >= 0 && ny < MAP_HEIGHT && nx >= 0 && nx < MAP_WIDTH) {
-                            const nt = this.tiles[ny][nx];
-                            if (nt === TileType.ROAD || nt === TileType.ROAD_UP || nt === TileType.ROAD_DOWN || nt === TileType.ROAD_LEFT || nt === TileType.ROAD_RIGHT || nt === TileType.CROSSWALK) {
-                                this.tiles[y][x] = TileType.SIDEWALK;
-                                break;
-                            }
+                        const wnx = wrapTileX(nx);
+                        const wny = wrapTileY(ny);
+                        const nt = this.tiles[wny][wnx];
+                        if (nt !== TileType.GRASS && nt !== TileType.SIDEWALK && nt !== TileType.PARK_PATH) {
+                            temp[y][x] = true;
+                            break;
                         }
                     }
                 }
             }
         }
-
-        let buildingIndex = 0;
-        const blockRanges = this._getBlockRanges(hRoads, vRoads);
-        for (const block of blockRanges) {
-            this._fillBlock(block, buildingIndex % BUILDING_COLORS.length);
-            buildingIndex++;
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (temp[y][x]) {
+                    this.tiles[y][x] = TileType.SIDEWALK;
+                }
+            }
         }
-        this._createParks();
     }
 
     _getBlockRanges(hRoads, vRoads) {
@@ -189,13 +215,11 @@ class GameMap {
         }
     }
 
-    // ── Wrapping tile access ──
     isWalkable(tileX, tileY, curTX, curTY, lenient = false) {
         const wx = wrapTileX(tileX);
         const wy = wrapTileY(tileY);
         const t = this.tiles[wy][wx];
         
-        // If current position isn't specified (e.g. spawn checks, pathfinding initial steps), use default walkability
         if (curTX === undefined || curTY === undefined) {
             if (t === TileType.BUILDING) return false;
             if (t === TileType.BUILDING_DOOR) {
@@ -215,12 +239,10 @@ class GameMap {
         const bldgA = this.getBuildingAtTile(curWX, curWY);
         const bldgB = this.getBuildingAtTile(wx, wy);
 
-        // Scenario 1: Both outside
         if (!bldgA && !bldgB) {
             return t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR;
         }
 
-        // Scenario 2: Outside trying to enter building B
         if (!bldgA && bldgB) {
             const isOpen = this.openDoors.has(bldgB.id);
             if (lenient) return isOpen;
@@ -229,7 +251,6 @@ class GameMap {
             return isOpen && isDoor;
         }
 
-        // Scenario 3: Inside building A trying to exit
         if (bldgA && !bldgB) {
             const isOpen = this.openDoors.has(bldgA.id);
             if (lenient) return isOpen;
@@ -238,7 +259,6 @@ class GameMap {
             return isOpen && isDoor;
         }
 
-        // Scenario 4: Inside building A moving to tile B
         if (bldgA && bldgB) {
             return bldgA.id === bldgB.id;
         }
@@ -260,7 +280,6 @@ class GameMap {
         return null;
     }
 
-    // ── Wrapping renderer ──
     render(ctx, camera, player) {
         const startTX = Math.floor(camera.x / TILE_SIZE);
         const startTY = Math.floor(camera.y / TILE_SIZE);
@@ -285,270 +304,16 @@ class GameMap {
                 const sx = worldTX * TILE_SIZE - camera.x;
                 const sy = worldTY * TILE_SIZE - camera.y;
                 this._drawTile(ctx, this.tiles[ty][tx], sx, sy, tx, ty);
-            }
-        }
-    }
 
-    _drawTile(ctx, tile, sx, sy, tx, ty) {
-        const s = TILE_SIZE;
-        switch (tile) {
-            case TileType.ROAD:
-            case TileType.ROAD_UP:
-            case TileType.ROAD_DOWN:
-            case TileType.ROAD_LEFT:
-            case TileType.ROAD_RIGHT:
-                ctx.fillStyle = TILE_COLORS[tile]; ctx.fillRect(sx,sy,s,s);
-                if ((tx+ty)%4<2) { ctx.fillStyle='#666';
-                    if(ty%2===0) ctx.fillRect(sx+s/2-1,sy+2,2,s-4);
-                    else ctx.fillRect(sx+2,sy+s/2-1,s-4,2);
-                } break;
-            case TileType.SIDEWALK:
-                ctx.fillStyle = TILE_COLORS[TileType.SIDEWALK]; ctx.fillRect(sx,sy,s,s);
-                ctx.strokeStyle=TILE_DETAIL_COLORS[TileType.SIDEWALK]; ctx.lineWidth=0.5;
-                ctx.strokeRect(sx+1,sy+1,s-2,s-2);
-                if((tx+ty)%3===0) ctx.strokeRect(sx+s/4,sy+s/4,s/2,s/2);
-                break;
-            case TileType.GRASS:
-                ctx.fillStyle = TILE_COLORS[TileType.GRASS]; ctx.fillRect(sx,sy,s,s);
-                ctx.fillStyle=TILE_DETAIL_COLORS[TileType.GRASS];
-                const seed=(tx*7+ty*13)%5;
-                for(let i=0;i<3;i++){ctx.fillRect(sx+((seed+i*11)%s),sy+((seed+i*7)%s),1,3);}
-                if((tx*3+ty*7)%17===0){ctx.fillStyle='#e8d44d';ctx.fillRect(sx+10,sy+12,3,3);}
-                else if((tx*5+ty*11)%19===0){ctx.fillStyle='#d46a6a';ctx.fillRect(sx+20,sy+8,3,3);}
-                break;
-            case TileType.BUILDING: {
-                const bldg = this.getBuildingAtTile(tx, ty);
-                if (bldg && this._playerInsideBuildingId === bldg.id) {
-                    // Draw interior floor
-                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
-                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
-                    break;
-                }
-                
-                if (window.crimeMode && bldg) {
-                    if (bldg.id === 0) {
-                        // Bank: Yellowish gold brick wall style
-                        ctx.fillStyle = '#d4af37';
-                        ctx.fillRect(sx, sy, s, s);
-                        ctx.strokeStyle = '#aa8800';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
-                        
-                        // Small highlights
-                        ctx.fillStyle = '#ffd700';
-                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
-                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
-                        break;
-                    } else if (bldg.id === 1) {
-                        // Police Station: Blue brick wall style
-                        ctx.fillStyle = '#0f2b5c';
-                        ctx.fillRect(sx, sy, s, s);
-                        ctx.strokeStyle = '#05132d';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
-                        
-                        // Small highlights
-                        ctx.fillStyle = '#1c4280';
-                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
-                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
-                        break;
+                // Draw illegal dump park highlight overlay on main map
+                if (window.game && window.game.crimeManager && window.game.crimeManager.activeTask && window.game.crimeManager.activeTask.type === 'illegal_dump' && this.parkBlocks) {
+                    const targetParkId = window.game.crimeManager.activeTask.targetParkId;
+                    const park = this.parkBlocks.find(p => p.id === targetParkId);
+                    if (park && tx >= park.x1 && tx <= park.x2 && ty >= park.y1 && ty <= park.y2) {
+                        const pulse = Math.sin(performance.now() / 200) * 0.2 + 0.3;
+                        ctx.fillStyle = `rgba(255, 69, 0, ${pulse})`;
+                        ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
                     }
-                }
-
-                const ci = this.buildingMeta[ty][tx];
-                let c = BUILDING_COLORS[ci>=0?ci:0];
-                let isHospital = bldg && bldg.type === 'hospital';
-                
-                ctx.fillStyle = isHospital ? '#ffffff' : c.base;
-                ctx.fillRect(sx, sy, s, s);
-                ctx.fillStyle='#2a2a3a';
-                for(let wy=4;wy<s-4;wy+=8) for(let wx=4;wx<s-4;wx+=8){
-                    ctx.fillRect(sx+wx,sy+wy,4,4);
-                    if((tx+ty+wx+wy)%3!==0){ctx.fillStyle='#ffd86e44';ctx.fillRect(sx+wx,sy+wy,4,4);ctx.fillStyle='#2a2a3a';}
-                }
-                ctx.strokeStyle=c.dark;ctx.lineWidth=1;ctx.strokeRect(sx+.5,sy+.5,s-1,s-1);
-                break; }
-            case TileType.BUILDING_DOOR: {
-                const bldg2 = this.getBuildingAtTile(tx, ty);
-                if (bldg2 && this._playerInsideBuildingId === bldg2.id) {
-                    // Draw interior floor for door tile when inside
-                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
-                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
-                    break;
-                }
-                const isOpen = bldg2 && this.openDoors.has(bldg2.id);
-                if (isOpen) {
-                    // Open door - black doorway with golden glowing frame
-                    ctx.fillStyle = '#111111';
-                    ctx.fillRect(sx, sy, s, s);
-                    ctx.strokeStyle = '#ffaa00';
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
-                } else {
-                    // Closed door - fills the whole tile
-                    ctx.fillStyle = TILE_COLORS[TileType.BUILDING_DOOR];
-                    ctx.fillRect(sx, sy, s, s);
-                    ctx.strokeStyle = '#5a4530';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
-                    
-                    // Golden doorknob
-                    ctx.fillStyle = '#ffd700';
-                    ctx.beginPath();
-                    ctx.arc(sx + s - 16, sy + s / 2, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#b59300';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
-                break; }
-            case TileType.CROSSWALK:
-                ctx.fillStyle=TILE_COLORS[TileType.ROAD];ctx.fillRect(sx,sy,s,s);
-                ctx.fillStyle=TILE_COLORS[TileType.CROSSWALK];
-                for(let i=2;i<s-2;i+=6) ctx.fillRect(sx+i,sy+2,4,s-4);
-                break;
-            case TileType.PARK_PATH:
-                ctx.fillStyle=TILE_COLORS[TileType.PARK_PATH];ctx.fillRect(sx,sy,s,s);
-                ctx.strokeStyle=TILE_DETAIL_COLORS[TileType.PARK_PATH];ctx.lineWidth=0.5;
-                ctx.beginPath();ctx.moveTo(sx+s/3,sy);ctx.lineTo(sx+s/3,sy+s);
-                ctx.moveTo(sx+2*s/3,sy);ctx.lineTo(sx+2*s/3,sy+s);
-                ctx.moveTo(sx,sy+s/2);ctx.lineTo(sx+s,sy+s/2);ctx.stroke();
-                break;
-        }
-    }
-
-    _catalogBuildings() {
-        // Flood-fill to find connected building clusters and assign addresses
-        const visited = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
-        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        let letterIdx = 0;
-        let numCounter = 100;
-
-        for (let y = 0; y < MAP_HEIGHT; y++) {
-            for (let x = 0; x < MAP_WIDTH; x++) {
-                if (visited[y][x]) continue;
-                if (this.tiles[y][x] !== TileType.BUILDING && this.tiles[y][x] !== TileType.BUILDING_DOOR) continue;
-
-                // Flood fill this building cluster
-                const tiles = [];
-                const stack = [{ x, y }];
-                while (stack.length > 0) {
-                    const p = stack.pop();
-                    if (p.x < 0 || p.x >= MAP_WIDTH || p.y < 0 || p.y >= MAP_HEIGHT) continue;
-                    if (visited[p.y][p.x]) continue;
-                    const t = this.tiles[p.y][p.x];
-                    if (t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR) continue;
-                    visited[p.y][p.x] = true;
-                    tiles.push({ x: p.x, y: p.y });
-                    stack.push({ x: p.x + 1, y: p.y });
-                    stack.push({ x: p.x - 1, y: p.y });
-                    stack.push({ x: p.x, y: p.y + 1 });
-                    stack.push({ x: p.x, y: p.y - 1 });
-                }
-
-                if (tiles.length > 0) {
-                    const letter = letters[letterIdx % letters.length];
-                    const address = letter + numCounter;
-                    
-                    // Find a sidewalk-adjacent building tile to serve as the door
-                    let doorTile = null;
-                    for (const tile of tiles) {
-                        const neighbors = [
-                            { x: tile.x + 1, y: tile.y },
-                            { x: tile.x - 1, y: tile.y },
-                            { x: tile.x, y: tile.y + 1 },
-                            { x: tile.x, y: tile.y - 1 }
-                        ];
-                        let isAdjToSidewalk = false;
-                        for (const n of neighbors) {
-                            const nwx = wrapTileX(n.x);
-                            const nwy = wrapTileY(n.y);
-                            if (this.tiles[nwy][nwx] === TileType.SIDEWALK) {
-                                isAdjToSidewalk = true;
-                                break;
-                            }
-                        }
-                        if (isAdjToSidewalk) {
-                            doorTile = tile;
-                            break;
-                        }
-                    }
-
-                    // Fallback
-                    if (!doorTile) {
-                        doorTile = tiles[0];
-                    }
-
-                    // Convert this tile on the map to be the building door
-                    this.tiles[doorTile.y][doorTile.x] = TileType.BUILDING_DOOR;
-
-                    this.buildings.push({
-                        id: this.buildings.length,
-                        address,
-                        tiles,
-                        doorTiles: [doorTile],
-                        type: 'default'
-                    });
-                    numCounter += Math.floor(Math.random() * 20) + 10;
-                    if (numCounter > 999) { numCounter = 100; letterIdx++; }
-                    if (numCounter % 100 === 0) numCounter++;
-                }
-            }
-        }
-        
-        // Assign special building types randomly
-        const count = this.buildings.length;
-        if (count > 0) {
-            // ID 0: Bank, ID 1: Police Station
-            this.buildings[0].type = 'bank';
-            if (count > 1) this.buildings[1].type = 'police';
-            
-            // Randomly select indices for Hospital (1) and Fast Food (8)
-            let availableIds = [];
-            for (let i = 2; i < count; i++) availableIds.push(i);
-            
-            // Find building closest to the center (32, 32) to be City Hall
-            let centerBldg = null;
-            let minDist = Infinity;
-            for (const bldg of this.buildings) {
-                let cx = 0, cy = 0;
-                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
-                cx /= bldg.tiles.length;
-                cy /= bldg.tiles.length;
-                const dist = Math.sqrt((cx - 32)**2 + (cy - 32)**2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    centerBldg = bldg;
-                }
-            }
-            if (centerBldg) {
-                centerBldg.type = 'city_hall';
-                availableIds = availableIds.filter(id => id !== centerBldg.id);
-            }
-            
-            // Shuffle
-            for (let i = availableIds.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [availableIds[i], availableIds[j]] = [availableIds[j], availableIds[i]];
-            }
-            
-            // Assign the 5 other Philadelphia landmarks
-            const phillyLandmarks = ['art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station'];
-            for (const type of phillyLandmarks) {
-                if (availableIds.length > 0) {
-                    this.buildings[availableIds.pop()].type = type;
-                }
-            }
-            
-            if (availableIds.length > 0) {
-                this.buildings[availableIds.pop()].type = 'hospital';
-            }
-            if (availableIds.length > 0) {
-                this.buildings[availableIds.pop()].type = 'dump';
-            }
-            for (let i = 0; i < 8; i++) {
-                if (availableIds.length > 0) {
-                    this.buildings[availableIds.pop()].type = 'fast_food';
                 }
             }
         }
@@ -581,14 +346,12 @@ class GameMap {
     }
 
     renderAddresses(ctx, camera) {
-        // Render building addresses near their first door tile
         for (const bldg of this.buildings) {
             if (bldg.doorTiles.length === 0) continue;
             const door = bldg.doorTiles[0];
             const sx = door.x * TILE_SIZE - camera.x;
             const sy = door.y * TILE_SIZE - camera.y;
 
-            // Only render if on screen
             if (sx < -100 || sx > camera.width + 100 || sy < -100 || sy > camera.height + 100) continue;
 
             let text = bldg.address;
@@ -614,5 +377,373 @@ class GameMap {
             ctx.textAlign = 'left';
             ctx.fillText(text, sx, sy - 4);
         }
+    }
+
+    _catalogBuildings() {
+        this.buildings = [];
+        const visited = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let letterIdx = 0;
+        let numCounter = 100;
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (visited[y][x]) continue;
+                if (this.tiles[y][x] !== TileType.BUILDING && this.tiles[y][x] !== TileType.BUILDING_DOOR) continue;
+
+                const tiles = [];
+                const stack = [{ x, y }];
+                while (stack.length > 0) {
+                    const p = stack.pop();
+                    if (p.x < 0 || p.x >= MAP_WIDTH || p.y < 0 || p.y >= MAP_HEIGHT) continue;
+                    if (visited[p.y][p.x]) continue;
+                    const t = this.tiles[p.y][p.x];
+                    if (t !== TileType.BUILDING && t !== TileType.BUILDING_DOOR) continue;
+                    visited[p.y][p.x] = true;
+                    tiles.push({ x: p.x, y: p.y });
+                    stack.push({ x: p.x + 1, y: p.y });
+                    stack.push({ x: p.x - 1, y: p.y });
+                    stack.push({ x: p.x, y: p.y + 1 });
+                    stack.push({ x: p.x, y: p.y - 1 });
+                }
+
+                if (tiles.length > 0) {
+                    const letter = letters[letterIdx % letters.length];
+                    const address = letter + numCounter;
+                    
+                    let doorTile = null;
+                    for (const tile of tiles) {
+                        const neighbors = [
+                            { x: tile.x + 1, y: tile.y },
+                            { x: tile.x - 1, y: tile.y },
+                            { x: tile.x, y: tile.y + 1 },
+                            { x: tile.x, y: tile.y - 1 }
+                        ];
+                        let isAdjToSidewalk = false;
+                        for (const n of neighbors) {
+                            const nwx = wrapTileX(n.x);
+                            const nwy = wrapTileY(n.y);
+                            if (this.tiles[nwy][nwx] === TileType.SIDEWALK) {
+                                isAdjToSidewalk = true;
+                                break;
+                            }
+                        }
+                        if (isAdjToSidewalk) {
+                            doorTile = tile;
+                            break;
+                        }
+                    }
+
+                    if (!doorTile) {
+                        doorTile = tiles[0];
+                    }
+
+                    this.tiles[doorTile.y][doorTile.x] = TileType.BUILDING_DOOR;
+
+                    this.buildings.push({
+                        id: this.buildings.length,
+                        address,
+                        tiles,
+                        doorTiles: [doorTile],
+                        type: 'default'
+                    });
+                    numCounter += Math.floor(Math.random() * 20) + 10;
+                    if (numCounter > 999) { numCounter = 100; letterIdx++; }
+                    if (numCounter % 100 === 0) numCounter++;
+                }
+            }
+        }
+        
+        const count = this.buildings.length;
+        if (count > 0) {
+            this.buildings[0].type = 'bank';
+            if (count > 1) this.buildings[1].type = 'police';
+            
+            let availableIds = [];
+            for (let i = 2; i < count; i++) availableIds.push(i);
+            
+            let centerBldg = null;
+            let minDist = Infinity;
+            for (const bldg of this.buildings) {
+                let cx = 0, cy = 0;
+                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
+                cx /= bldg.tiles.length;
+                cy /= bldg.tiles.length;
+                const dist = Math.sqrt((cx - 32)**2 + (cy - 32)**2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    centerBldg = bldg;
+                }
+            }
+            let centerBuildingType = 'cityhall';
+            let landmarksToAssign = ['art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station'];
+            
+            if (this.theme === 'dahgbad') {
+                centerBuildingType = 'burj_khalifa';
+                landmarksToAssign = ['petra', 'dome_of_rock', 'pyramids', 'burj_al_arab', 'kingdom_centre'];
+            } else if (this.theme === 'cucaracha') {
+                centerBuildingType = 'christ_redeemer';
+                landmarksToAssign = ['machu_picchu', 'obelisco_ba', 'torre_entel', 'palacio_salvo', 'congresso_nacional'];
+            }
+
+            if (centerBldg) {
+                centerBldg.type = centerBuildingType;
+                availableIds = availableIds.filter(id => id !== centerBldg.id);
+            }
+            
+            const assignRandom = (type, amt) => {
+                for (let i = 0; i < amt; i++) {
+                    if (availableIds.length === 0) break;
+                    const r = Math.floor(Math.random() * availableIds.length);
+                    const bId = availableIds.splice(r, 1)[0];
+                    const b = this.buildings.find(x => x.id === bId);
+                    if (b) b.type = type;
+                }
+            };
+            
+            assignRandom('hospital', 1);
+            assignRandom('airport', 1);
+            assignRandom('fastfood', 8);
+            
+            for (let i = availableIds.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableIds[i], availableIds[j]] = [availableIds[j], availableIds[i]];
+            }
+            
+            for (const type of landmarksToAssign) {
+                if (availableIds.length > 0) {
+                    this.buildings[availableIds.pop()].type = type;
+                }
+            }
+            
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'hospital';
+            }
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'dump';
+            }
+            for (let i = 0; i < 8; i++) {
+                if (availableIds.length > 0) {
+                    this.buildings[availableIds.pop()].type = 'fast_food';
+                }
+            }
+        }
+    }
+}
+
+class GameMap extends BaseMap {
+    constructor() {
+        const theme = (window.travelDestination) ? window.travelDestination.toLowerCase() : 'default';
+        if (theme === 'dahgbad') {
+            return new DahgbadMap();
+        } else if (theme === 'cucaracha') {
+            return new CucarachaMap();
+        }
+        super();
+        this.theme = 'default';
+        this.regenerate();
+    }
+
+    generate() {
+        this.tiles = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => TileType.GRASS)
+        );
+        this.buildingMeta = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => -1)
+        );
+        this.roadDirections = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => null)
+        );
+
+        const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+        const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+
+        for (const ry of hRoads) {
+            const type = (ry % 2 === 0) ? TileType.ROAD_LEFT : TileType.ROAD_RIGHT;
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                this.tiles[ry][x] = type;
+                this.roadDirections[ry][x] = (ry % 2 === 0) ? [-1, 0] : [1, 0];
+            }
+        }
+        for (const rx of vRoads) {
+            const type = (rx % 2 === 0) ? TileType.ROAD_DOWN : TileType.ROAD_UP;
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                this.tiles[y][rx] = type;
+                this.roadDirections[y][rx] = (rx % 2 === 0) ? [0, 1] : [0, -1];
+            }
+        }
+        for (const ry of hRoads) {
+            for (const rx of vRoads) {
+                this.tiles[ry][rx] = TileType.CROSSWALK;
+                this.roadDirections[ry][rx] = (ry % 2 === 0) ? [-1, 0] : [1, 0];
+            }
+        }
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (this.tiles[y][x] !== TileType.ROAD && this.tiles[y][x] !== TileType.ROAD_UP && this.tiles[y][x] !== TileType.ROAD_DOWN && this.tiles[y][x] !== TileType.ROAD_LEFT && this.tiles[y][x] !== TileType.ROAD_RIGHT && this.tiles[y][x] !== TileType.CROSSWALK) {
+                    const neighbors = [[y-1,x],[y+1,x],[y,x-1],[y,x+1]];
+                    for (const [ny, nx] of neighbors) {
+                        if (ny >= 0 && ny < MAP_HEIGHT && nx >= 0 && nx < MAP_WIDTH) {
+                            const nt = this.tiles[ny][nx];
+                            if (nt === TileType.ROAD || nt === TileType.ROAD_UP || nt === TileType.ROAD_DOWN || nt === TileType.ROAD_LEFT || nt === TileType.ROAD_RIGHT || nt === TileType.CROSSWALK) {
+                                this.tiles[y][x] = TileType.SIDEWALK;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let buildingIndex = 0;
+        const blockRanges = this._getBlockRanges(hRoads, vRoads);
+        for (const block of blockRanges) {
+            this._fillBlock(block, buildingIndex % BUILDING_COLORS.length);
+            buildingIndex++;
+        }
+        this._createParks();
+    }
+
+    _drawTile(ctx, tile, sx, sy, tx, ty) {
+        const s = TILE_SIZE;
+        switch (tile) {
+            case TileType.ROAD:
+            case TileType.ROAD_UP:
+            case TileType.ROAD_DOWN:
+            case TileType.ROAD_LEFT:
+            case TileType.ROAD_RIGHT:
+                let roadColor = TILE_COLORS[tile];
+                ctx.fillStyle = roadColor; ctx.fillRect(sx,sy,s,s);
+                if ((tx+ty)%4<2) { ctx.fillStyle='#666';
+                    if(ty%2===0) ctx.fillRect(sx+s/2-1,sy+2,2,s-4);
+                    else ctx.fillRect(sx+2,sy+s/2-1,s-4,2);
+                } break;
+            case TileType.SIDEWALK:
+                let sidewalkColor = TILE_COLORS[TileType.SIDEWALK];
+                let sidewalkDetail = TILE_DETAIL_COLORS[TileType.SIDEWALK];
+                ctx.fillStyle = sidewalkColor; ctx.fillRect(sx,sy,s,s);
+                ctx.strokeStyle=sidewalkDetail; ctx.lineWidth=0.5;
+                ctx.strokeRect(sx+1,sy+1,s-2,s-2);
+                if((tx+ty)%3===0) ctx.strokeRect(sx+s/4,sy+s/4,s/2,s/2);
+                if ((tx * 11 + ty * 13) % 23 === 0) {
+                    this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                }
+                break;
+            case TileType.GRASS:
+                let grassColor = TILE_COLORS[TileType.GRASS];
+                let grassDetail = TILE_DETAIL_COLORS[TileType.GRASS];
+                ctx.fillStyle = grassColor; ctx.fillRect(sx,sy,s,s);
+                ctx.fillStyle=grassDetail;
+                const seed=(tx*7+ty*13)%5;
+                for(let i=0;i<3;i++){ctx.fillRect(sx+((seed+i*11)%s),sy+((seed+i*7)%s),1,3);}
+                if((tx*3+ty*7)%17===0){ctx.fillStyle='#e8d44d';ctx.fillRect(sx+10,sy+12,3,3);}
+                else if((tx*5+ty*11)%19===0){ctx.fillStyle='#d46a6a';ctx.fillRect(sx+20,sy+8,3,3);}
+                if ((tx * 17 + ty * 5) % 11 === 0 || (tx * 7 + ty * 3) % 13 === 0) {
+                    this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                }
+                break;
+            case TileType.BUILDING: {
+                const bldg = this.getBuildingAtTile(tx, ty);
+                if (bldg && this._playerInsideBuildingId === bldg.id) {
+                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
+                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
+                    break;
+                }
+                
+                if (window.crimeMode && bldg) {
+                    if (bldg.id === 0) {
+                        ctx.fillStyle = '#d4af37';
+                        ctx.fillRect(sx, sy, s, s);
+                        ctx.strokeStyle = '#aa8800';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+                        ctx.fillStyle = '#ffd700';
+                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
+                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
+                        break;
+                    } else if (bldg.id === 1) {
+                        ctx.fillStyle = '#0f2b5c';
+                        ctx.fillRect(sx, sy, s, s);
+                        ctx.strokeStyle = '#05132d';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+                        ctx.fillStyle = '#1c4280';
+                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
+                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
+                        break;
+                    }
+                }
+
+                const ci = this.buildingMeta[ty][tx];
+                let c = BUILDING_COLORS[ci>=0?ci:0];
+                let isHospital = bldg && bldg.type === 'hospital';
+                let isAirport = bldg && bldg.type === 'airport';
+                
+                if (isHospital) {
+                    ctx.fillStyle = '#e8e8e8';
+                } else if (isAirport) {
+                    ctx.fillStyle = '#b0b8c0';
+                } else {
+                    ctx.fillStyle = c.base;
+                }
+                ctx.fillRect(sx, sy, s, s);
+                ctx.fillStyle='#2a2a3a';
+                for(let wy=4;wy<s-4;wy+=8) for(let wx=4;wx<s-4;wx+=8){
+                    ctx.fillRect(sx+wx,sy+wy,4,4);
+                    if((tx+ty+wx+wy)%3!==0){ctx.fillStyle='#ffd86e44';ctx.fillRect(sx+wx,sy+wy,4,4);ctx.fillStyle='#2a2a3a';}
+                }
+                ctx.strokeStyle=c.dark;ctx.lineWidth=1;ctx.strokeRect(sx+.5,sy+.5,s-1,s-1);
+                break; }
+            case TileType.BUILDING_DOOR: {
+                const bldg2 = this.getBuildingAtTile(tx, ty);
+                if (bldg2 && this._playerInsideBuildingId === bldg2.id) {
+                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
+                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
+                    break;
+                }
+                const isOpen = bldg2 && this.openDoors.has(bldg2.id);
+                if (isOpen) {
+                    ctx.fillStyle = '#111111';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#ffaa00';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
+                } else {
+                    ctx.fillStyle = TILE_COLORS[TileType.BUILDING_DOOR];
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#5a4530';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(sx + s - 16, sy + s / 2, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#b59300';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                break; }
+            case TileType.CROSSWALK:
+                ctx.fillStyle = TILE_COLORS[TileType.CROSSWALK]; ctx.fillRect(sx,sy,s,s);
+                ctx.fillStyle = TILE_DETAIL_COLORS[TileType.CROSSWALK];
+                ctx.fillRect(sx+4,sy+s/2-2,s-8,4);
+                break;
+            case TileType.PARK_PATH:
+                ctx.fillStyle = TILE_COLORS[TileType.PARK_PATH]; ctx.fillRect(sx,sy,s,s);
+                ctx.fillStyle = TILE_DETAIL_COLORS[TileType.PARK_PATH];
+                ctx.fillRect(sx+2,sy+2,s-4,1);
+                ctx.fillRect(sx+2,sy+s-3,s-4,1);
+                break;
+        }
+    }
+
+    _drawTree(ctx, x, y, theme) {
+        ctx.fillStyle = '#5c4033';
+        ctx.fillRect(x - 2, y, 4, 12); // Trunk
+        ctx.fillStyle = '#2e8b57';
+        ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3cb371';
+        ctx.beginPath(); ctx.arc(x - 4, y - 8, 8, 0, Math.PI * 2); ctx.fill();
     }
 }

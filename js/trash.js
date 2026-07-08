@@ -149,7 +149,9 @@ class TrashManager {
 
     checkPickup(entityX, entityY, pickupRadius, followerCount = 0, maxToPick = Infinity) {
         const picked = [];
-        const pointValue = Math.max(1, Math.round(Math.sqrt(16 * followerCount)));
+        const isPriceFixing = window.game && window.game.priceFixingActive;
+        const basePointValue = Math.max(1, Math.round(Math.sqrt(16 * followerCount)));
+        const pointValue = isPriceFixing ? Math.round(basePointValue * 1.25) : basePointValue;
         for (const item of this.items) {
             if (item.collected) continue;
             if (picked.length >= maxToPick) break;
@@ -162,17 +164,28 @@ class TrashManager {
             if (dist < pickupRadius) {
                 item.collected = true;
                 this.totalCollected++;
-                this.totalPoints += pointValue;
+                
+                let actualPoints = pointValue;
+                let text = `+${pointValue}`;
+                let color = '#00ff88';
+
+                if (item.isIllegalDumpTrash) {
+                    actualPoints += 150;
+                    text = `+$${actualPoints} Clean-up!`;
+                    color = '#ffd700';
+                }
+
+                this.totalPoints += actualPoints;
                 picked.push(item);
 
                 // Create pickup effect
                 this.pickupEffects.push({
                     x: wrapped.x,
                     y: wrapped.y,
-                    text: `+${pointValue}`,
+                    text: text,
                     timer: 0,
                     alpha: 1,
-                    color: '#00ff88',
+                    color: color,
                 });
             }
         }

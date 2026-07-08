@@ -305,7 +305,7 @@ class HUD {
         if (window.playerHasTruck > 0 && window.game) {
             const currentTrash = window.game.trashCollectedInTruck || 0;
             const animalPenalty = window.game.player ? (window.game.player.capturedAnimals || []).length * 10 : 0;
-            const maxTrash = Math.max(0, (window.playerHasTruck * 50) - animalPenalty);
+            const maxTrash = Math.max(0, (window.playerHasTruck * 100) - animalPenalty);
             const fillPct = maxTrash > 0 ? Math.max(0, Math.min(1, currentTrash / maxTrash)) : 1;
 
             const barW = Math.min(400, canvasWidth * 0.5);

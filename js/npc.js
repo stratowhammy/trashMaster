@@ -35,6 +35,7 @@ class NPC {
         this.direction = 'down';
         this.animTimer = 0;
         this.shaken = false;
+        this.isRedRivalOnly = false;
     }
 
     isPlayerNear(playerX, playerY) {
@@ -63,10 +64,29 @@ class NPC {
 
         const img = spriteManager.getCharacterImage(this.spriteId);
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
-            ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2, drawSize, drawSize);
+            if (this.isRedRivalOnly) {
+                let offscreen = NPC._tintCanvas;
+                if (!offscreen) {
+                    offscreen = document.createElement('canvas');
+                    NPC._tintCanvas = offscreen;
+                }
+                offscreen.width = drawSize;
+                offscreen.height = drawSize;
+                const octx = offscreen.getContext('2d');
+                octx.clearRect(0, 0, drawSize, drawSize);
+                octx.drawImage(img, 0, 0, drawSize, drawSize);
+                octx.save();
+                octx.globalCompositeOperation = 'source-atop';
+                octx.fillStyle = 'rgba(255, 0, 0, 0.6)';
+                octx.fillRect(0, 0, drawSize, drawSize);
+                octx.restore();
+                ctx.drawImage(offscreen, screen.x - drawSize / 2, screen.y - drawSize / 2);
+            } else {
+                ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2, drawSize, drawSize);
+            }
         } else {
             // Fallback
-            ctx.fillStyle = '#4488cc';
+            ctx.fillStyle = this.isRedRivalOnly ? '#ff3333' : '#4488cc';
             ctx.beginPath();
             ctx.arc(screen.x, screen.y, this.size / 2, 0, Math.PI * 2);
             ctx.fill();
@@ -100,7 +120,7 @@ class NPC {
         ctx.fillStyle = '#fff';
         ctx.font = '6px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(this.name, screen.x, screen.y - drawSize / 2 - 6);
+        ctx.fillText(this.name + (this.isRedRivalOnly ? " (R)" : ""), screen.x, screen.y - drawSize / 2 - 6);
 
         if (window.politicsMode && !this.shaken) {
             ctx.save();
@@ -108,7 +128,11 @@ class NPC {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const bobY = Math.sin(Date.now() / 200) * 3;
-            ctx.fillText('🤝', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+            if (this.isRedRivalOnly) {
+                ctx.fillText('🤝🔴', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+            } else {
+                ctx.fillText('🤝', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+            }
             ctx.restore();
         }
 
@@ -148,7 +172,7 @@ class NPCManager {
             [sidewalks[i], sidewalks[j]] = [sidewalks[j], sidewalks[i]];
         }
 
-        const maxPositions = window.politicsMode ? 50 : 20;
+        const maxPositions = window.politicsMode ? 150 : 20;
         const positions = [];
         for (const pos of sidewalks) {
             let tooClose = false;
@@ -168,7 +192,7 @@ class NPCManager {
         const informantIndices = new Set();
         const flowerIndices = new Set();
 
-        const numNPCsToSpawn = window.politicsMode ? Math.min(25, positions.length) : Math.min(10, positions.length);
+        const numNPCsToSpawn = window.politicsMode ? Math.min(100, positions.length) : Math.min(10, positions.length);
 
         if (frenzyMode && buildings && buildings.length >= 5) {
             // Pick 5 random NPCs to be informants
@@ -233,7 +257,11 @@ class NPCManager {
                 continue;
             } else {
                 dialogue = NPC_DIALOGUES[i % NPC_DIALOGUES.length];
-                this.npcs.push(new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false));
+                const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false);
+                if (window.politicsMode && Math.random() < 0.6) {
+                    npc.isRedRivalOnly = true;
+                }
+                this.npcs.push(npc);
             }
         }
     }
@@ -247,10 +275,13 @@ class NPCManager {
         let nearest = null;
         let nearestDist = Infinity;
 
+        const px = ((playerX % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+        const py = ((playerY % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
+
         for (const npc of this.npcs) {
             if (npc.isPlayerNear(playerX, playerY)) {
-                const dx = npc.x - playerX;
-                const dy = npc.y - playerY;
+                const dx = npc.x - px;
+                const dy = npc.y - py;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < nearestDist) {
                     nearestDist = dist;
@@ -376,7 +407,10 @@ class NPCManager {
             'Donnie', 'Lefty', 'Henry', 'Tommy', 'Jimmy', 'Nicky', 'Bobby', 'Phil'
         ];
         const npcName = nameList[Math.floor(Math.random() * nameList.length)];
-        const npc = new NPC(tx, ty, 'char1', ["Go Trash Party!", "Vote for the Council!"], npcName);
+        const npc = new NPC(tx, ty, 'char_npc', ["Go Trash Party!", "Vote for the Council!"], npcName);
+        if (window.politicsMode && Math.random() < 0.6) {
+            npc.isRedRivalOnly = true;
+        }
         npc.shaken = false;
         this.npcs.push(npc);
         return npc;

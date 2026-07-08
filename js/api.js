@@ -4,15 +4,19 @@ const API_URL = '';
 var authToken = localStorage.getItem('trashMasterToken') || null;
 var userRole = localStorage.getItem('trashMasterRole') || null;
 var playerBalance = 0;
-var playerHasTruck = false;
+var playerCredits = 3;
+var playerHasTruck = 0;
 var playerInventory = {};
 var playerMovementSize = 0;
 var playerUnlockedFastFood = 0;
 var playerUnlockedCrime = 0;
-var tempHiresCount = 0;
+var playerStats = {};
+var completedMafiaJobs = 0;
 var playerStats = {};
 var playerCredits = 3;
 var internationalFollowers = 0;
+var statsHistory = [];
+var activeStatsCategory = 'trash';
 
 async function apiCall(endpoint, method = 'GET', body = null) {
     const headers = { 'Content-Type': 'application/json' };
@@ -30,6 +34,7 @@ async function apiCall(endpoint, method = 'GET', body = null) {
         throw e;
     }
 }
+
 
 // ── UI Management ──
 function showScreen(screenId) {
@@ -284,38 +289,6 @@ function initUI() {
         });
     }
 
-    // ── Hire Dialog Buttons (Wired to window for HTML onclick compatibility) ──
-    window.handleHireMinus = function() {
-        if (tempHiresCount > 0) {
-            tempHiresCount--;
-            updateHireDialogUI();
-        }
-    };
-
-    window.handleHirePlus = function() {
-        const followers = playerMovementSize || 0;
-        let maxAllowed = 5;
-        if (followers >= 40) {
-            maxAllowed = 2 * (playerHasTruck || 0);
-        }
-        if (tempHiresCount < maxAllowed) {
-            tempHiresCount++;
-            updateHireDialogUI();
-        } else {
-            alert(`Maximum ${maxAllowed} posse members allowed!`);
-        }
-    };
-
-    window.handleHireConfirm = function() {
-        window.employeesHired = tempHiresCount;
-        document.getElementById('hire-dialog').classList.add('hidden');
-        alert(`Confirmed posse size: ${window.employeesHired}`);
-    };
-
-    window.handleHireCancel = function() {
-        document.getElementById('hire-dialog').classList.add('hidden');
-    };
-
     // ── Trophy Dialog Buttons ──
     const btnViewTrophies = document.getElementById('btn-view-trophies');
     const btnTrophyClose = document.getElementById('btn-trophy-close');
@@ -331,6 +304,48 @@ function initUI() {
             document.getElementById('trophy-dialog').classList.add('hidden');
         });
     }
+
+    // ── Performance Stats Dialog Buttons ──
+    const btnViewStats = document.getElementById('btn-view-stats');
+    const btnStatsClose = document.getElementById('btn-stats-close');
+    
+    if (btnViewStats) {
+        btnViewStats.addEventListener('click', async () => {
+            try {
+                const data = await apiCall('/api/game/stats-history');
+                statsHistory = data.history || [];
+                
+                // Set default tab active
+                activeStatsCategory = 'trash';
+                updateStatsTabStyles();
+                
+                document.getElementById('stats-dialog').classList.remove('hidden');
+                
+                // Draw graph and summary
+                drawStatsGraph(activeStatsCategory);
+                updateStatsSummary(activeStatsCategory);
+            } catch (err) {
+                alert("Failed to load statistics: " + err.message);
+            }
+        });
+    }
+
+    if (btnStatsClose) {
+        btnStatsClose.addEventListener('click', () => {
+            document.getElementById('stats-dialog').classList.add('hidden');
+        });
+    }
+
+    // Tab buttons event listeners
+    document.querySelectorAll('.stats-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const category = e.target.getAttribute('data-category');
+            activeStatsCategory = category;
+            updateStatsTabStyles();
+            drawStatsGraph(category);
+            updateStatsSummary(category);
+        });
+    });
 
     // ── Made Man Dialog Buttons ──
     const btnMadeManYes = document.getElementById('btn-made-man-yes');
@@ -402,6 +417,214 @@ function initUI() {
             }
         });
     }
+
+    // ── Election Loss Mafia-Style Dialog ──
+    const btnElectionLossYes = document.getElementById('btn-election-loss-yes');
+    const btnElectionLossNo = document.getElementById('btn-election-loss-no');
+    
+    if (btnElectionLossYes) {
+        btnElectionLossYes.addEventListener('click', async () => {
+            try {
+                // Accepts the same way we do initial political choice
+                await apiCall('/api/game/political-choice', 'POST', { choice: 'accepted' });
+                document.getElementById('election-loss-dialog').classList.add('hidden');
+                alert("The campaign trail calls again!");
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+    if (btnElectionLossNo) {
+        btnElectionLossNo.addEventListener('click', async () => {
+            try {
+                // We decline so it stops bugging us (for now)
+                await apiCall('/api/game/political-choice', 'POST', { choice: 'declined' });
+                document.getElementById('election-loss-dialog').classList.add('hidden');
+                alert("Maybe next time.");
+                await refreshGameState();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+    
+    // ── International Travel Dialog ──
+    const btnTravelDahgbad = document.getElementById('btn-travel-dahgbad');
+    const btnTravelCucaracha = document.getElementById('btn-travel-cucaracha');
+    const btnTravelCancel = document.getElementById('btn-travel-cancel');
+    
+    const handleTravel = (destination, costPerMember) => {
+        let followers = 0;
+        if (window.game) {
+            followers = window.game.getRoundTotalFollowers ? window.game.getRoundTotalFollowers() : 0;
+            if (followers === 0 && window.game.followerManager && window.game.followerManager.followers) {
+                followers = window.game.followerManager.followers.length;
+            }
+        }
+        const totalCost = costPerMember * followers;
+        if (window.playerBalance < totalCost) {
+            alert(`You need $${totalCost} to fly ${followers} posse members to ${destination}!`);
+            return;
+        }
+        if (confirm(`Fly to ${destination} with ${followers} posse members for $${totalCost}?`)) {
+            apiCall('/api/game/travel', 'POST', { destination: destination, cost: totalCost })
+                .then(data => {
+                    window.playerBalance = data.balance;
+                    const isFilth = destination.toLowerCase() === 'filthadelphia';
+                    window.travelDestination = isFilth ? null : destination;
+                    document.getElementById('airport-dialog').classList.add('hidden');
+                    
+                    // Create a completely new map instance for the destination
+                    // The GameMap constructor checks window.travelDestination and
+                    // returns a DahgbadMap, CucarachaMap, or default Philly map.
+                    if (window.game) {
+                        window.game.gameMap = new GameMap();
+                        if (window.game.miniMap) {
+                            window.game.miniMap.buildStatic(window.game.gameMap);
+                        }
+                        if (window.game.carManager) {
+                            window.game.carManager.spawnCars(window.game.gameMap);
+                        }
+                        // Re-spawn trash on the new map
+                        if (window.game.trashManager) {
+                            window.game.trashManager.items = [];
+                            window.game.trashManager.spawnInitial(window.game.gameMap, 80);
+                        }
+                        // Re-spawn NPCs on the new map
+                        if (window.game.npcManager) {
+                            window.game.npcManager.npcs = [];
+                            window.game.npcManager.spawnNPCs(window.game.gameMap, window.game.gameMap.buildings, window.frenzyMode);
+                        }
+                        // Re-position player to a walkable tile on the new map
+                        if (window.game.player) {
+                            for (let r = 0; r < 20; r++) {
+                                let found = false;
+                                for (let dy = -r; dy <= r && !found; dy++) {
+                                    for (let dx = -r; dx <= r && !found; dx++) {
+                                        const tx = 32 + dx;
+                                        const ty = 32 + dy;
+                                        if (tx >= 0 && tx < MAP_WIDTH && ty >= 0 && ty < MAP_HEIGHT) {
+                                            const tile = window.game.gameMap.getTile(tx, ty);
+                                            if (tile === TileType.ROAD || tile === TileType.SIDEWALK || tile === TileType.CROSSWALK) {
+                                                window.game.player.x = tx * TILE_SIZE + TILE_SIZE / 2;
+                                                window.game.player.y = ty * TILE_SIZE + TILE_SIZE / 2;
+                                                window.game.player.keys = { up: false, down: false, left: false, right: false, k: false };
+                                                found = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (found) break;
+                            }
+                        }
+                        if (isFilth) {
+                            window.playerHasTruck = playerHasTruck;
+                            alert(`Welcome back to ${destination}! Garbage Truck is re-enabled if owned.`);
+                        } else {
+                            window.playerHasTruck = false; // Disable truck
+                            alert(`Welcome to ${destination}! Garbage Truck is disabled.`);
+                        }
+                    }
+                    updateStoreUI();
+                })
+                .catch(e => {
+                    alert(e.message);
+                });
+        }
+    };
+    
+    const btnTravelFilthadelphia = document.getElementById('btn-travel-filthadelphia');
+    if (btnTravelFilthadelphia) {
+        btnTravelFilthadelphia.addEventListener('click', () => handleTravel('Filthadelphia', 800));
+    }
+    if (btnTravelDahgbad) {
+        btnTravelDahgbad.addEventListener('click', () => handleTravel('Dahgbad', 1000));
+    }
+    if (btnTravelCucaracha) {
+        btnTravelCucaracha.addEventListener('click', () => handleTravel('Cucaracha', 500));
+    }
+    if (btnTravelCancel) {
+        btnTravelCancel.addEventListener('click', () => {
+            document.getElementById('airport-dialog').classList.add('hidden');
+        });
+    }
+    
+    // ── Stranded Defeat Screen ──
+    const btnStrandedReturn = document.getElementById('btn-stranded-return');
+    if (btnStrandedReturn) {
+        btnStrandedReturn.addEventListener('click', () => {
+            apiCall('/api/game/travel', 'POST', { destination: 'filthadelphia', cost: 0 })
+                .then(data => {
+                    document.getElementById('stranded-screen').classList.add('hidden');
+                    window.travelDestination = null;
+                    if (window.game) {
+                        window.game.gameMap = new GameMap();
+                        if (window.game.miniMap) {
+                            window.game.miniMap.buildStatic(window.game.gameMap);
+                        }
+                    }
+                    window.returnToStore();
+                })
+                .catch(e => {
+                    alert(e.message);
+                });
+        });
+    }
+    
+    // ── Primary Win Screen ──
+    const btnPrimaryWinContinue = document.getElementById('btn-primary-win-continue');
+    if (btnPrimaryWinContinue) {
+        btnPrimaryWinContinue.addEventListener('click', () => {
+            document.getElementById('primary-win-screen').classList.add('hidden');
+            window.returnToStore();
+        });
+    }
+    
+    // ── Hire Dialog Event Listeners ──
+    const btnHireMinus = document.getElementById('hire-minus-btn');
+    const btnHirePlus = document.getElementById('hire-plus-btn');
+    const btnHireConfirm = document.getElementById('btn-hire-confirm');
+    const btnHireCancel = document.getElementById('btn-hire-cancel');
+
+    if (btnHireMinus) {
+        btnHireMinus.addEventListener('click', () => {
+            if (tempHiresCount > 0) {
+                tempHiresCount--;
+                updateHireDialogUI();
+            }
+        });
+    }
+
+    if (btnHirePlus) {
+        btnHirePlus.addEventListener('click', () => {
+            const followers = playerMovementSize || 0;
+            let maxAllowed = 5;
+            if (followers >= 40) {
+                maxAllowed = 2 * parseInt(playerHasTruck || 0);
+            }
+            if (tempHiresCount < maxAllowed) {
+                tempHiresCount++;
+                updateHireDialogUI();
+            } else {
+                alert(`Maximum ${maxAllowed} posse members allowed!`);
+            }
+        });
+    }
+
+    if (btnHireConfirm) {
+        btnHireConfirm.addEventListener('click', () => {
+            window.employeesHired = tempHiresCount;
+            document.getElementById('hire-dialog').classList.add('hidden');
+            alert(`Confirmed posse size: ${window.employeesHired}`);
+        });
+    }
+
+    if (btnHireCancel) {
+        btnHireCancel.addEventListener('click', () => {
+            document.getElementById('hire-dialog').classList.add('hidden');
+        });
+    }
 }
 
 async function refreshGameState() {
@@ -421,12 +644,18 @@ async function refreshGameState() {
         window.playerUnlockedCrime = playerUnlockedCrime;
         window.madeManStatus = data.made_man_status || 'none';
         window.politicalOffice = data.political_office || 'citizen';
+        window.politicsBanned = !!data.politics_banned;
+        completedMafiaJobs = data.completed_mafia_jobs || 0;
+        window.completedMafiaJobs = completedMafiaJobs;
         playerStats = data.stats || {};
         window.playerStats = playerStats;
         playerCredits = data.credits !== undefined ? data.credits : 3;
         window.playerCredits = playerCredits;
-        internationalFollowers = data.international_followers || 0;
         window.internationalFollowers = internationalFollowers;
+        window.playerUnlockedInternational = data.unlocked_international || 0;
+        window.electionState = data.election_state || 'idle';
+        window.roundsInState = data.rounds_in_state || 0;
+        window.travelDestination = data.travel_destination && data.travel_destination.toLowerCase() !== 'filthadelphia' ? data.travel_destination : null;
         
         // Notify player when reaching requirements
         if (oldFollowers > 0) {
@@ -444,7 +673,7 @@ async function refreshGameState() {
         const followers = playerStats.total_followers || 0;
         if (followers >= 10 && window.madeManStatus === 'none') {
             document.getElementById('made-man-dialog').classList.remove('hidden');
-        } else if (window.madeManStatus !== 'accepted') {
+        } else if (window.madeManStatus !== 'accepted' && !window.politicsBanned) {
             let nextOffice = null;
             let promptText = "";
             let promptTitle = "";
@@ -476,6 +705,10 @@ async function refreshGameState() {
                 document.getElementById('political-candidate-dialog').classList.remove('hidden');
             }
         }
+
+        if (window.electionState.startsWith('cooldown_') && window.roundsInState >= 8) {
+            document.getElementById('election-loss-dialog').classList.remove('hidden');
+        }
     } catch (e) {
         console.error("Failed to sync state", e);
     }
@@ -490,11 +723,11 @@ const STORE_ITEMS = [
     { name: 'Magic 8-Ball', price: 1500, desc: 'Score multiplied randomly at end of round', sprite: 'magic_8_ball.png' },
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
-    { name: 'Hire Posse Member', price: 0, desc: 'Hire posse member ($200/15s upkeep). Needs truck.', isEmployee: true, sprite: 'employee.png' },
     { name: 'Organizer', price: 250, desc: 'Splits followers to collect trash simultaneously across the map. Costs $250/round.', sprite: 'employee.png' },
     { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' },
     { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'mushrooms.png' },
-    { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'employee.png' }
+    { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'employee.png' },
+    { name: 'Price Fixing', price: 2000, desc: 'Trash worth 1.25x value, but 4 police chase you! Press B to bribe.', sprite: 'protection.png' }
 ];
 
 function updateStoreUI() {
@@ -519,60 +752,107 @@ function renderStore() {
     if (!container) return;
     container.innerHTML = '';
 
-    // ── Credits Unlock Panel ──
-    const creditsPanel = document.createElement('div');
-    creditsPanel.id = 'credits-unlock-panel';
-    creditsPanel.style.cssText = `
-        width: 100%; background: linear-gradient(135deg,rgba(20,40,80,0.95),rgba(10,20,50,0.95));
-        border: 2px solid #ffaa00; border-radius: 12px; padding: 16px 20px;
-        margin-bottom: 18px; box-sizing: border-box;
-    `;
-
-    const creditsLeft = (window.playerCredits !== undefined ? window.playerCredits : playerCredits);
-    const creditItems = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade'];
-
-    creditsPanel.innerHTML = `
-        <div style="font-family:'Press Start 2P',monospace; font-size:9px; color:#ffaa00; margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;">
-            🌟 Starting Credits: <span id="credits-remaining-display" style="color:#00ffcc;">${creditsLeft}</span> / 3 remaining
-        </div>
-        <div style="font-family:'Press Start 2P',monospace; font-size:7px; color:#aaa; margin-bottom:12px;">
-            Spend credits to unlock any item for free. Each player starts with 3 credits.
-        </div>
-        <div id="credit-item-buttons" style="display:flex; flex-wrap:wrap; gap:8px;">
-            ${creditItems.map(itemName => {
-                const owned = playerInventory[itemName] || 0;
-                const disabled = creditsLeft <= 0 ? 'disabled' : '';
-                const style = creditsLeft <= 0
-                    ? 'background:#222;color:#555;border:2px solid #333;cursor:not-allowed;'
-                    : 'background:linear-gradient(135deg,#1a3a6a,#0a2040);color:#00ffcc;border:2px solid #00aaff;cursor:pointer;';
-                return `<button class="btn credit-spend-btn" data-item="${itemName}" ${disabled}
-                    style="font-family:\'Press Start 2P\',monospace;font-size:7px;padding:6px 10px;border-radius:6px;${style}">
-                    ${itemName} ${owned > 0 ? `(x${owned})` : ''}
-                </button>`;
-            }).join('')}
-        </div>
-    `;
-    container.appendChild(creditsPanel);
-
-    // Wire credit spend buttons
-    creditsPanel.querySelectorAll('.credit-spend-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const itemName = e.target.getAttribute('data-item');
-            if (!itemName) return;
-            if (!confirm(`Spend 1 credit to unlock: ${itemName}?`)) return;
+    // ── International Travel Unlock Panel ──
+    if (!window.playerUnlockedInternational) {
+        const intlPanel = document.createElement('div');
+        intlPanel.style.cssText = `
+            width: 100%; background: linear-gradient(135deg,rgba(0,100,200,0.95),rgba(0,50,100,0.95));
+            border: 2px solid #00aaff; border-radius: 12px; padding: 16px 20px;
+            margin-bottom: 18px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center;
+        `;
+        intlPanel.innerHTML = `
+            <div>
+                <div style="font-family:'Press Start 2P',monospace; font-size:9px; color:#00aaff; margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;">
+                    ✈️ INTERNATIONAL TRAVEL
+                </div>
+                <div style="font-family:'Press Start 2P',monospace; font-size:7px; color:#ddd; margin-bottom:12px;">
+                    Unlock the Airport building. Travel to Dahgbad and Cucaracha to gain international followers!
+                </div>
+            </div>
+            <button id="btn-unlock-international" class="btn" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:10px 15px;background:#00aa66;border-color:#008844;color:#fff;cursor:pointer;">
+                UNLOCK ($35,000)
+            </button>
+        `;
+        container.appendChild(intlPanel);
+        
+        const unlockBtn = intlPanel.querySelector('#btn-unlock-international');
+        if (playerBalance < 35000) {
+            unlockBtn.disabled = true;
+            unlockBtn.style.background = '#333';
+            unlockBtn.style.borderColor = '#222';
+            unlockBtn.style.cursor = 'not-allowed';
+        }
+        
+        unlockBtn.addEventListener('click', async () => {
+            if (!confirm('Unlock International Travel for $35,000?')) return;
             try {
-                const result = await apiCall('/api/game/spend-credit', 'POST', { item_name: itemName });
-                playerCredits = result.credits_remaining;
-                window.playerCredits = playerCredits;
+                await apiCall('/api/game/unlock-international', 'POST');
                 await refreshGameState();
-                renderStore();
             } catch (err) {
                 alert(err.message);
             }
         });
-    });
+    }
+
+    // ── Credits Unlock Panel ──
+    const creditsLeft = (window.playerCredits !== undefined ? window.playerCredits : playerCredits);
+    if (creditsLeft > 0) {
+        const creditsPanel = document.createElement('div');
+        creditsPanel.id = 'credits-unlock-panel';
+        creditsPanel.style.cssText = `
+            width: 100%; background: linear-gradient(135deg,rgba(20,40,80,0.95),rgba(10,20,50,0.95));
+            border: 2px solid #ffaa00; border-radius: 12px; padding: 16px 20px;
+            margin-bottom: 18px; box-sizing: border-box;
+        `;
+
+        const creditItems = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade'];
+
+        creditsPanel.innerHTML = `
+            <div style="font-family:'Press Start 2P',monospace; font-size:9px; color:#ffaa00; margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;">
+                🌟 Starting Credits: <span id="credits-remaining-display" style="color:#00ffcc;">${creditsLeft}</span> / 3 remaining
+            </div>
+            <div style="font-family:'Press Start 2P',monospace; font-size:7px; color:#aaa; margin-bottom:12px;">
+                Spend credits to unlock any item for free. Each player starts with 3 credits.
+            </div>
+            <div id="credit-item-buttons" style="display:flex; flex-wrap:wrap; gap:8px;">
+                ${creditItems.map(itemName => {
+                    const owned = playerInventory[itemName] || 0;
+                    const disabled = creditsLeft <= 0 ? 'disabled' : '';
+                    const style = creditsLeft <= 0
+                        ? 'background:#222;color:#555;border:2px solid #333;cursor:not-allowed;'
+                        : 'background:linear-gradient(135deg,#1a3a6a,#0a2040);color:#00ffcc;border:2px solid #00aaff;cursor:pointer;';
+                    return `<button class="btn credit-spend-btn" data-item="${itemName}" ${disabled}
+                        style="font-family:\'Press Start 2P\',monospace;font-size:7px;padding:6px 10px;border-radius:6px;${style}">
+                        ${itemName} ${owned > 0 ? `(x${owned})` : ''}
+                    </button>`;
+                }).join('')}
+            </div>
+        `;
+        container.appendChild(creditsPanel);
+
+        // Wire credit spend buttons
+        creditsPanel.querySelectorAll('.credit-spend-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const itemName = e.target.getAttribute('data-item');
+                if (!itemName) return;
+                if (!confirm(`Spend 1 credit to unlock: ${itemName}?`)) return;
+                try {
+                    const result = await apiCall('/api/game/spend-credit', 'POST', { item_name: itemName });
+                    playerCredits = result.credits_remaining;
+                    window.playerCredits = playerCredits;
+                    await refreshGameState();
+                    renderStore();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        });
+    }
 
     STORE_ITEMS.forEach(item => {
+        if (item.name === 'Price Fixing' && window.madeManStatus !== 'accepted') {
+            return;
+        }
         const div = document.createElement('div');
         div.className = 'store-item-card';
         
@@ -647,14 +927,6 @@ function renderStore() {
     document.querySelectorAll('.buy-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const itemName = e.target.getAttribute('data-name');
-            if (itemName === 'Hire Posse Member') {
-                if (!playerHasTruck) {
-                    alert("You need Bruno The Trash Truck to hire posse members!");
-                    return;
-                }
-                openHireDialog();
-                return;
-            }
             try {
                 await apiCall('/api/game/buy', 'POST', { item_name: itemName });
                 await refreshGameState();
@@ -857,6 +1129,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const hireDialog = document.getElementById('hire-dialog');
             if (hireDialog && !hireDialog.classList.contains('hidden')) {
                 hireDialog.classList.add('hidden');
+            }
+            const statsDialog = document.getElementById('stats-dialog');
+            if (statsDialog && !statsDialog.classList.contains('hidden')) {
+                statsDialog.classList.add('hidden');
             }
         }
     });
@@ -1098,3 +1374,263 @@ window.apiCall = apiCall;
 window.refreshGameState = refreshGameState;
 window.showScreen = showScreen;
 window.renderStore = renderStore;
+
+// ── Performance Stats Graph Custom Renderer ──
+function drawStatsGraph(category) {
+    const canvas = document.getElementById('stats-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear and set pixelated styles
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageRendering = 'pixelated';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textBaseline = 'middle';
+    
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    const padLeft = 60;
+    const padRight = 60;
+    const padTop = 30;
+    const padBottom = 35;
+    
+    const chartW = w - padLeft - padRight;
+    const chartH = h - padTop - padBottom;
+
+    if (!statsHistory || statsHistory.length === 0) {
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        ctx.fillText('NO ROUNDS PLAYED YET', w / 2, h / 2);
+        return;
+    }
+
+    let keyRound, keyCum, titleRound, titleCum, colorRound, colorCum;
+    if (category === 'trash') {
+        keyRound = 'trash_collected';
+        keyCum = 'cumulative_trash';
+        titleRound = 'Round Trash';
+        titleCum = 'Total Trash';
+        colorRound = '#4caf50'; // Green
+        colorCum = '#00ffcc'; // Cyan
+    } else if (category === 'money') {
+        keyRound = 'money_earned';
+        keyCum = 'cumulative_money';
+        titleRound = 'Round Revenue';
+        titleCum = 'Total Earnings';
+        colorRound = '#ffeb3b'; // Yellow
+        colorCum = '#ffaa00'; // Orange
+    } else if (category === 'bank') {
+        keyRound = 'bank_balance';
+        keyCum = 'bank_balance';
+        titleRound = 'Round End Cash';
+        titleCum = 'Bank Account';
+        colorRound = '#00ff44'; // Lime green
+        colorCum = '#00ffff'; // Cyan
+    } else {
+        keyRound = 'followers_gained';
+        keyCum = 'cumulative_followers';
+        titleRound = 'Round Followers';
+        titleCum = 'Total Followers';
+        colorRound = '#2196f3'; // Blue
+        colorCum = '#ffffff'; // White
+    }
+
+    let maxRound = 0;
+    let maxCum = 0;
+    statsHistory.forEach(r => {
+        if (r[keyRound] > maxRound) maxRound = r[keyRound];
+        if (r[keyCum] > maxCum) maxCum = r[keyCum];
+    });
+    
+    if (maxRound === 0) maxRound = 10;
+    if (maxCum === 0) maxCum = 10;
+
+    maxRound = Math.ceil(maxRound * 1.15);
+    maxCum = Math.ceil(maxCum * 1.15);
+
+    // Draw Grid Lines (horizontal)
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1;
+    const gridLines = 4;
+    for (let i = 0; i <= gridLines; i++) {
+        const y = padTop + chartH - (i / gridLines) * chartH;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(padLeft + chartW, y);
+        ctx.stroke();
+
+        // Left axis labels
+        const leftVal = Math.round((i / gridLines) * maxRound);
+        ctx.fillStyle = colorRound;
+        ctx.textAlign = 'right';
+        ctx.fillText(leftVal.toLocaleString(), padLeft - 10, y);
+
+        // Right axis labels
+        const rightVal = Math.round((i / gridLines) * maxCum);
+        ctx.fillStyle = colorCum;
+        ctx.textAlign = 'left';
+        ctx.fillText(rightVal.toLocaleString(), padLeft + chartW + 10, y);
+    }
+
+    // Draw X-axis line
+    ctx.strokeStyle = '#00aa66';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padLeft, padTop + chartH);
+    ctx.lineTo(padLeft + chartW, padTop + chartH);
+    ctx.stroke();
+
+    const n = statsHistory.length;
+    const colW = chartW / n;
+    const barW = Math.max(4, colW * 0.4);
+
+    // 1. Draw per-round bars
+    statsHistory.forEach((r, idx) => {
+        const val = r[keyRound];
+        const barH = (val / maxRound) * chartH;
+        const x = padLeft + idx * colW + (colW - barW) / 2;
+        const y = padTop + chartH - barH;
+
+        ctx.fillStyle = colorRound;
+        ctx.fillRect(x, y, barW, barH);
+
+        // X-axis round labels
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        if (n <= 10 || idx % Math.ceil(n / 10) === 0 || idx === n - 1) {
+            ctx.fillText(`R${r.round_number}`, padLeft + idx * colW + colW / 2, padTop + chartH + 12);
+        }
+    });
+
+    // 2. Draw cumulative line
+    ctx.strokeStyle = colorCum;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    
+    statsHistory.forEach((r, idx) => {
+        const val = r[keyCum];
+        const pointX = padLeft + idx * colW + colW / 2;
+        const pointY = padTop + chartH - (val / maxCum) * chartH;
+        
+        if (idx === 0) {
+            ctx.moveTo(pointX, pointY);
+        } else {
+            ctx.lineTo(pointX, pointY);
+        }
+    });
+    ctx.stroke();
+
+    // Draw points on the line
+    ctx.fillStyle = '#050805'; 
+    statsHistory.forEach((r, idx) => {
+        const val = r[keyCum];
+        const pointX = padLeft + idx * colW + colW / 2;
+        const pointY = padTop + chartH - (val / maxCum) * chartH;
+        
+        ctx.beginPath();
+        ctx.arc(pointX, pointY, 4, 0, Math.PI * 2);
+        ctx.strokeStyle = colorCum;
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+    });
+
+    // Draw Legend
+    ctx.textAlign = 'left';
+    ctx.fillStyle = colorRound;
+    ctx.fillRect(padLeft, 10, 8, 8);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(titleRound, padLeft + 15, 14);
+
+    ctx.fillStyle = colorCum;
+    ctx.beginPath();
+    ctx.moveTo(padLeft + 180, 14);
+    ctx.lineTo(padLeft + 195, 14);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(padLeft + 187.5, 14, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(titleCum, padLeft + 205, 14);
+}
+
+function updateStatsSummary(category) {
+    const summaryEl = document.getElementById('stats-summary');
+    if (!summaryEl) return;
+
+    if (!statsHistory || statsHistory.length === 0) {
+        summaryEl.innerHTML = '<div style="grid-column: span 4; text-align: center; color: #888;">No rounds logged yet. Complete a round of garbage picking to build statistics!</div>';
+        return;
+    }
+
+    const n = statsHistory.length;
+    let keyRound, labelRound, labelCum, suffix = '';
+    if (category === 'trash') {
+        keyRound = 'trash_collected';
+        labelRound = 'Round Trash';
+        labelCum = 'Total Trash';
+        suffix = ' pcs';
+    } else if (category === 'money') {
+        keyRound = 'money_earned';
+        labelRound = 'Round Earnings';
+        labelCum = 'Total Earnings';
+        suffix = '';
+    } else if (category === 'bank') {
+        keyRound = 'bank_balance';
+        labelRound = 'End Balance';
+        labelCum = 'Current Cash';
+        suffix = '';
+    } else {
+        keyRound = 'followers_gained';
+        labelRound = 'Round Followers';
+        labelCum = 'Total Followers';
+    }
+
+    let totalRoundVal = 0;
+    let maxRoundVal = 0;
+    statsHistory.forEach(r => {
+        totalRoundVal += r[keyRound];
+        if (r[keyRound] > maxRoundVal) maxRoundVal = r[keyRound];
+    });
+    const avgRoundVal = totalRoundVal / n;
+
+    const finalCum = statsHistory[n - 1][category === 'trash' ? 'cumulative_trash' : (category === 'money' ? 'cumulative_money' : (category === 'bank' ? 'bank_balance' : 'cumulative_followers'))];
+
+    const format = (v) => (category === 'money' || category === 'bank') ? `$${Math.round(v).toLocaleString()}` : `${Math.round(v).toLocaleString()}${suffix}`;
+
+    summaryEl.innerHTML = `
+        <div>
+            <span style="color: #888;">ROUNDS PLAYED:</span><br>
+            <b style="color: #fff; font-size: 10px;">${n}</b>
+        </div>
+        <div>
+            <span style="color: #888;">AVERAGE / ROUND:</span><br>
+            <b style="color: #00ffcc; font-size: 10px;">${format(avgRoundVal)}</b>
+        </div>
+        <div>
+            <span style="color: #888;">ROUND RECORD:</span><br>
+            <b style="color: #ffaa00; font-size: 10px;">${format(maxRoundVal)}</b>
+        </div>
+        <div>
+            <span style="color: #888;">CUMULATIVE TOTAL:</span><br>
+            <b style="color: #00ffcc; font-size: 10px;">${format(finalCum)}</b>
+        </div>
+    `;
+}
+
+function updateStatsTabStyles() {
+    document.querySelectorAll('.stats-tab-btn').forEach(btn => {
+        const cat = btn.getAttribute('data-category');
+        if (cat === activeStatsCategory) {
+            btn.style.background = '#00ffcc';
+            btn.style.borderColor = '#00aa88';
+            btn.style.color = '#111';
+        } else {
+            btn.style.background = '#222';
+            btn.style.borderColor = '#333';
+            btn.style.color = '#aaa';
+        }
+    });
+}

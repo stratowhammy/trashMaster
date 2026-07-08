@@ -30,7 +30,10 @@ class Car {
             const ty = Math.floor(nextY / TILE_SIZE);
             const tile = gameMap.getTile(tx, ty);
             
-            if (tile === TileType.ROAD_UP) this.dir = [0, -1];
+            const customDir = (gameMap.roadDirections && gameMap.roadDirections[ty] && gameMap.roadDirections[ty][tx]);
+            if (customDir) {
+                this.dir = [...customDir];
+            } else if (tile === TileType.ROAD_UP) this.dir = [0, -1];
             else if (tile === TileType.ROAD_DOWN) this.dir = [0, 1];
             else if (tile === TileType.ROAD_LEFT) this.dir = [-1, 0];
             else if (tile === TileType.ROAD_RIGHT) this.dir = [1, 0];
@@ -52,11 +55,8 @@ class Car {
         ctx.save();
         ctx.translate(screen.x, screen.y);
         
-        let angle = 0;
-        if (this.dir[0] === 1) angle = Math.PI / 2;
-        else if (this.dir[0] === -1) angle = -Math.PI / 2;
-        else if (this.dir[1] === 1) angle = Math.PI;
-        else if (this.dir[1] === -1) angle = 0;
+        // Dynamically compute the rotation angle to face any direction (diagonal, circular, grid)
+        let angle = Math.atan2(this.dir[0], -this.dir[1]);
         ctx.rotate(angle);
 
         ctx.fillStyle = this.color === 'green' ? '#22b14c' : '#ed1c24';
@@ -79,27 +79,58 @@ class CarManager {
         this.cars = [];
         const colors = ['green', 'green', 'green', 'green', 'green', 'green', 'red', 'red', 'red', 'red', 'red', 'red'];
         
-        const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
-        const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
-        
+        // Find all road tiles on the current map
+        const roadTiles = [];
+        if (gameMap) {
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const tile = gameMap.getTile(x, y);
+                    if (tile === TileType.ROAD || tile === TileType.CROSSWALK || 
+                        tile === TileType.ROAD_UP || tile === TileType.ROAD_DOWN || 
+                        tile === TileType.ROAD_LEFT || tile === TileType.ROAD_RIGHT) {
+                        roadTiles.push({ x, y });
+                    }
+                }
+            }
+        }
+
         for (let i = 0; i < colors.length; i++) {
             const speed = 80 + Math.random() * 60;
             let startX = 0;
             let startY = 0;
             let dir = [1, 0];
             
-            if (Math.random() < 0.5) {
-                // Horizontal spawn
-                const ry = hRoads[Math.floor(Math.random() * hRoads.length)];
-                startY = ry * TILE_SIZE + TILE_SIZE / 2;
-                startX = Math.random() * (MAP_WIDTH * TILE_SIZE);
-                dir = (ry % 2 === 0) ? [-1, 0] : [1, 0];
+            if (roadTiles.length > 0) {
+                const rt = roadTiles[Math.floor(Math.random() * roadTiles.length)];
+                startX = rt.x * TILE_SIZE + TILE_SIZE / 2;
+                startY = rt.y * TILE_SIZE + TILE_SIZE / 2;
+                
+                const customDir = (gameMap.roadDirections && gameMap.roadDirections[rt.y] && gameMap.roadDirections[rt.y][rt.x]);
+                if (customDir) {
+                    dir = [...customDir];
+                } else {
+                    const tile = gameMap.getTile(rt.x, rt.y);
+                    if (tile === TileType.ROAD_UP) dir = [0, -1];
+                    else if (tile === TileType.ROAD_DOWN) dir = [0, 1];
+                    else if (tile === TileType.ROAD_LEFT) dir = [-1, 0];
+                    else if (tile === TileType.ROAD_RIGHT) dir = [1, 0];
+                    else dir = Math.random() < 0.5 ? [1, 0] : [0, 1];
+                }
             } else {
-                // Vertical spawn
-                const rx = vRoads[Math.floor(Math.random() * vRoads.length)];
-                startX = rx * TILE_SIZE + TILE_SIZE / 2;
-                startY = Math.random() * (MAP_HEIGHT * TILE_SIZE);
-                dir = (rx % 2 === 0) ? [0, 1] : [0, -1];
+                // Fallback grid spawn
+                const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+                const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+                if (Math.random() < 0.5) {
+                    const ry = hRoads[Math.floor(Math.random() * hRoads.length)];
+                    startY = ry * TILE_SIZE + TILE_SIZE / 2;
+                    startX = Math.random() * (MAP_WIDTH * TILE_SIZE);
+                    dir = (ry % 2 === 0) ? [-1, 0] : [1, 0];
+                } else {
+                    const rx = vRoads[Math.floor(Math.random() * vRoads.length)];
+                    startX = rx * TILE_SIZE + TILE_SIZE / 2;
+                    startY = Math.random() * (MAP_HEIGHT * TILE_SIZE);
+                    dir = (rx % 2 === 0) ? [0, 1] : [0, -1];
+                }
             }
             
             this.cars.push(new Car(startX, startY, dir, speed, colors[i]));
@@ -130,9 +161,12 @@ class CarManager {
                 // Red Car: kills player or posse members
                 if (pDist < TILE_SIZE * 0.5) {
                     if (game.followerManager.getFollowerCount() > 0) {
-                        // Kill a follower instead of the player (posse member dies)
-                        game.followerManager.removeFollower();
-                        game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
+                        if (game.hasHealthInsurance) {
+                            game.hud.showFollowerNotification('Health Insurance saved a posse member from a car hit!', true);
+                        } else {
+                            game.followerManager.removeFollower();
+                            game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
+                        }
                         // Temporarily disable car to prevent multi-kills
                         car.active = false;
                         setTimeout(() => { car.active = true; }, 3000);
@@ -151,8 +185,12 @@ class CarManager {
                     const fDist = Math.sqrt(fdx * fdx + fdy * fdy);
                     
                     if (fDist < TILE_SIZE * 0.5) {
-                        game.followerManager.removeFollowerAt(i);
-                        game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
+                        if (game.hasHealthInsurance) {
+                            game.hud.showFollowerNotification('Health Insurance saved a posse member from a car hit!', true);
+                        } else {
+                            game.followerManager.removeFollowerAt(i);
+                            game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
+                        }
                         // Temporarily disable car
                         car.active = false;
                         setTimeout(() => { car.active = true; }, 3000);

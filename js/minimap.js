@@ -64,10 +64,14 @@ class MiniMap {
                 if (bldg) {
                     if (bldg.type === 'dump') {
                         color = '#8b5a2b'; // Dump: Brown
-                    } else if (bldg.type === 'city_hall') {
+                    } else if (bldg.type === 'city_hall' || bldg.type === 'cityhall') {
                         color = '#00ffff'; // City Hall: Cyan
-                    } else if (['art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station'].includes(bldg.type)) {
-                        color = '#ff88ff'; // Philly landmarks: Pink/Purple
+                    } else if ([
+                        'art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station',
+                        'burj_khalifa', 'petra', 'dome_of_rock', 'pyramids', 'burj_al_arab', 'kingdom_centre',
+                        'christ_redeemer', 'machu_picchu', 'obelisco_ba', 'torre_entel', 'palacio_salvo', 'congresso_nacional'
+                    ].includes(bldg.type)) {
+                        color = '#ff88ff'; // Landmarks: Pink/Purple
                     }
                 }
                 
@@ -187,6 +191,17 @@ class MiniMap {
                         ctx.fill();
                     }
                 }
+            } else if (task.type === 'illegal_dump' && task.targetParkId && gameMap.parkBlocks) {
+                const park = gameMap.parkBlocks.find(p => p.id === task.targetParkId);
+                if (park) {
+                    const pulse = Math.sin(performance.now() / 150) * 0.4 + 0.6;
+                    ctx.fillStyle = `rgba(255, 69, 0, ${pulse})`; // Pulsing orange-red
+                    const px = mapX + park.x1 * s;
+                    const py = mapY + park.y1 * s;
+                    const pw = (park.x2 - park.x1 + 1) * s;
+                    const ph = (park.y2 - park.y1 + 1) * s;
+                    ctx.fillRect(px, py, pw, ph);
+                }
             }
         }
 
@@ -200,6 +215,20 @@ class MiniMap {
                 ctx.fillRect(tx, ty, 1.5, 1.5);
             }
         }
+        
+        // Draw airplane icon for airport if international travel unlocked
+        if (window.playerUnlockedInternational && gameMap && gameMap.buildings) {
+            const airportBldg = gameMap.buildings.find(b => b.type === 'airport');
+            if (airportBldg && airportBldg.doorTiles && airportBldg.doorTiles.length > 0 && window.game && window.game.spriteManager) {
+                const door = airportBldg.doorTiles[0];
+                const cx = mapX + door.x * s;
+                const cy = mapY + door.y * s;
+                const airplaneImg = window.game.spriteManager.getImage('airplane_icon');
+                if (airplaneImg) {
+                    ctx.drawImage(airplaneImg, cx - 8, cy - 8, 16, 16);
+                }
+            }
+        }
 
         // Draw viewport rectangle (use wrapped coordinates)
         ctx.strokeStyle = 'rgba(255,255,255,0.6)';
@@ -211,6 +240,20 @@ class MiniMap {
         const vw = (camera.width / MAP_PIXEL_W) * this.width;
         const vh = (camera.height / MAP_PIXEL_H) * this.height;
         ctx.strokeRect(vx, vy, vw, vh);
+
+        // Draw NPCs as small cyan dots
+        if (window.game && window.game.npcManager && window.game.npcManager.npcs) {
+            ctx.fillStyle = '#00ffff';
+            for (const npc of window.game.npcManager.npcs) {
+                if (npc.npcType !== 'flower') {
+                    const nx = mapX + (npc.x / MAP_PIXEL_W) * this.width;
+                    const ny = mapY + (npc.y / MAP_PIXEL_H) * this.height;
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
 
         // Draw followers as blue dots
         if (followers) {

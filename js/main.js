@@ -69,15 +69,16 @@ class GarbageTruckFollower {
     render(ctx, camera, spriteManager) {
         if (!camera.isVisible(this.x - 50, this.y - 50, 100, 100)) return;
         const screen = camera.worldToScreen(this.x, this.y);
-        const img = spriteManager.getImage('red_truck'); // Parade truck / chained truck is red!
+        const img = spriteManager.getCharacterImage('char_truck'); // original green truck
         if (img) {
             ctx.save();
+            const scaledSize = this.size * 0.8;
             if (this.direction === 'left') {
                 ctx.translate(screen.x, screen.y);
                 ctx.scale(-1, 1);
-                ctx.drawImage(img, -this.size / 2, -this.size / 2, this.size, this.size);
+                ctx.drawImage(img, -scaledSize / 2, -scaledSize / 2, scaledSize, scaledSize);
             } else {
-                ctx.drawImage(img, screen.x - this.size / 2, screen.y - this.size / 2, this.size, this.size);
+                ctx.drawImage(img, screen.x - scaledSize / 2, screen.y - scaledSize / 2, scaledSize, scaledSize);
             }
             ctx.restore();
         }
@@ -85,6 +86,16 @@ class GarbageTruckFollower {
 }
 
 class Game {
+    get rivalCandidate() {
+        if (this.rivalCandidates && this.rivalCandidates.length > 0) {
+            return this.rivalCandidates.reduce((max, r) => r.votes > max.votes ? r : max, this.rivalCandidates[0]);
+        }
+        return null;
+    }
+    set rivalCandidate(val) {
+        // Do nothing/allow setter to prevent errors
+    }
+
     constructor(canvas) {
         if (window.gameLog) window.gameLog("Game class instantiation starting");
         this.canvas = canvas;
@@ -175,8 +186,18 @@ class Game {
                             }
                         }
                         if (nearDon) {
-                            if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'talk_don' && nearDon.id === this.crimeManager.activeTask.targetDonId) {
+                            if (!this.crimeManager.madeMan) {
+                                this.crimeManager.triggerMadeManOffer(nearDon.id);
+                            } else if (!this.crimeManager.activeTask && this.crimeManager.activeFamily === nearDon.id) {
+                                this.crimeManager.assignNextTask(this.gameMap);
+                            } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'talk_don' && nearDon.id === this.crimeManager.activeTask.targetDonId) {
                                 this.crimeManager.completeTask(this);
+                            } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'illegal_dump' && this.crimeManager.activeFamily === nearDon.id) {
+                                if (!this.crimeManager.activeTask.dumped) {
+                                    alert("Don: 'What are you doing back? Get out there and dump the trash in the highlighted park!'");
+                                } else {
+                                    this.crimeManager.completeTask(this);
+                                }
                             }
                             return;
                         }
@@ -191,9 +212,12 @@ class Game {
                         }
                     }
 
-                    if (window.frenzyMode || window.flowersMode) {
+                    if (window.frenzyMode || window.flowersMode || window.crimeMode) {
                         const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
                         if (result) {
+                            if (window.crimeMode && this.crimeManager && !this.crimeManager.madeMan) {
+                                this.crimeManager.triggerMadeManOffer(Math.floor(Math.random() * 2));
+                            }
                             if (window.frenzyMode && result.isInformant) {
                                 // Open door!
                                 this.gameMap.openBuildingDoor(result.buildingId);
@@ -231,32 +255,64 @@ class Game {
                     }
 
 
-                    // Fast Food & Hospital interaction
-                    if (window.fastFoodMode) {
+                    // Fast Food, Hospital, & Airport interaction
+                    if (window.fastFoodMode || window.playerUnlockedInternational) {
                         const px = wrapWorldX(this.player.x);
                         const py = wrapWorldY(this.player.y);
                         
                         // Check Hospital
-                        if (!this.hasHealthInsurance) {
-                            const hospital = this.gameMap.buildings.find(b => b.type === 'hospital');
-                            if (hospital && hospital.doorTiles.length > 0) {
-                                const hDoor = hospital.doorTiles[0];
-                                const dist = Math.sqrt((px - (hDoor.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (hDoor.y*TILE_SIZE + TILE_SIZE/2))**2);
-                                if (dist < TILE_SIZE * 1.5) {
-                                    window.triggerHospitalOffer();
-                                    return;
+                        if ((window.fastFoodMode || window.playerUnlockedInternational) && !this.hasHealthInsurance) {
+                            const hospitals = this.gameMap.buildings.filter(b => b.type === 'hospital');
+                            for (const hospital of hospitals) {
+                                if (hospital.doorTiles.length > 0) {
+                                    const hDoor = hospital.doorTiles[0];
+                                    const dist = Math.sqrt((px - (hDoor.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (hDoor.y*TILE_SIZE + TILE_SIZE/2))**2);
+                                    if (dist < TILE_SIZE * 1.5) {
+                                        window.triggerHospitalOffer();
+                                        return;
+                                    }
                                 }
                             }
                         }
 
                         // Check Fast Food
-                        const ffBuildings = this.gameMap.buildings.filter(b => b.type === 'fast_food');
-                        for (const ffBldg of ffBuildings) {
-                            if (ffBldg && ffBldg.doorTiles.length > 0) {
-                                const door = ffBldg.doorTiles[0];
-                                const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
+                        if (window.fastFoodMode) {
+                            const ffBuildings = this.gameMap.buildings.filter(b => b.type === 'fast_food');
+                            for (const ffBldg of ffBuildings) {
+                                if (ffBldg && ffBldg.doorTiles.length > 0) {
+                                    const door = ffBldg.doorTiles[0];
+                                    const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
+                                    if (dist < TILE_SIZE * 1.5) {
+                                        window.triggerFastFoodOffer(this.getRoundTotalFollowers());
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Check Airport
+                        if (window.playerUnlockedInternational) {
+                            const airport = this.gameMap.buildings.find(b => b.type === 'airport');
+                            if (airport && airport.doorTiles.length > 0) {
+                                const aDoor = airport.doorTiles[0];
+                                const dist = Math.sqrt((px - (aDoor.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (aDoor.y*TILE_SIZE + TILE_SIZE/2))**2);
                                 if (dist < TILE_SIZE * 1.5) {
-                                    window.triggerFastFoodOffer(this.getRoundTotalFollowers());
+                                const t = this.gameMap && this.gameMap.theme ? this.gameMap.theme.toLowerCase() : 'default';
+                                if (t === 'default' || t === 'filthadelphia') {
+                                    document.getElementById('btn-travel-filthadelphia').style.display = 'none';
+                                    document.getElementById('btn-travel-dahgbad').style.display = 'inline-block';
+                                    document.getElementById('btn-travel-cucaracha').style.display = 'inline-block';
+                                } else if (t === 'dahgbad') {
+                                    document.getElementById('btn-travel-filthadelphia').style.display = 'inline-block';
+                                    document.getElementById('btn-travel-dahgbad').style.display = 'none';
+                                    document.getElementById('btn-travel-cucaracha').style.display = 'inline-block';
+                                } else if (t === 'cucaracha') {
+                                    document.getElementById('btn-travel-filthadelphia').style.display = 'inline-block';
+                                    document.getElementById('btn-travel-dahgbad').style.display = 'inline-block';
+                                    document.getElementById('btn-travel-cucaracha').style.display = 'none';
+                                }
+                                document.getElementById('airport-dialog').classList.remove('hidden');
+                                this.hud.showFollowerNotification("Welcome to the Airport!", true);
                                     return;
                                 }
                             }
@@ -344,7 +400,22 @@ class Game {
                                     if (dist < TILE_SIZE * 1.5) {
                                         don.alive = false;
                                         this.hud.showFollowerNotification(`${don.name} has been killed!`, true);
+                                        
+                                        this.crimeManager.policeActive = true;
+                                        this.crimeManager.policeActiveTimer = 30.0;
+                                        const station = this.gameMap.buildings[1];
+                                        if (station && station.doorTiles.length > 0) {
+                                            const door = station.doorTiles[0];
+                                            this.crimeManager.police.push(new PoliceOfficer(door.x, door.y, true));
+                                            this.hud.showFollowerNotification('👮 Police officer dispatched for murder! They will chase for 30s!', true);
+                                        }
+
                                         this.crimeManager.spawnThugs(this.gameMap);
+                                        
+                                        if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'kill_don' && don.id === this.crimeManager.activeTask.targetDonId) {
+                                            this.crimeManager.completeTask(this);
+                                        }
+
                                         return;
                                     }
                                 }
@@ -500,13 +571,17 @@ class Game {
                     } else if (window.politicsMode) {
                         const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
                         if (npc && !npc.shaken) {
-                            npc.shaken = true;
-                            this.handshakesShaken = (this.handshakesShaken || 0) + 1;
-                            this.hud.showFollowerNotification(`Shook hands with ${npc.name}! (+1 Vote)`, true);
-                            
-                            // Remove the shaken NPC from list and spawn a new one
-                            this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== npc);
-                            this.npcManager.spawnSingleNPC(this.gameMap);
+                            if (npc.isRedRivalOnly) {
+                                this.hud.showFollowerNotification("This supporter only votes for your rival!", false);
+                            } else {
+                                npc.shaken = true;
+                                this.handshakesShaken = (this.handshakesShaken || 0) + 1;
+                                this.hud.showFollowerNotification(`Shook hands with ${npc.name}! (+1 Vote)`, true);
+                                
+                                // Remove the shaken NPC from list and spawn a new one
+                                this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== npc);
+                                this.npcManager.spawnSingleNPC(this.gameMap);
+                            }
                         }
                     }
                 }
@@ -516,6 +591,16 @@ class Game {
                 if (e.key === 'm' || e.key === 'M') this.useConsumable('Mushrooms');
                 if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
                 if (e.key === 'p' || e.key === 'P') this.useConsumable('Protection');
+                if (e.key === 'b' || e.key === 'B') {
+                    if (this.priceFixingActive) {
+                        this.triggerPriceFixingBribe();
+                    }
+                }
+                if (e.key === 'd' || e.key === 'D') {
+                    if (this.crimeManager && this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'illegal_dump') {
+                        this.performIllegalDump();
+                    }
+                }
 
                 // C key: Ranger animal capture (if near an animal node)
                 if ((e.key === 'c' || e.key === 'C') && this.player && this.player.characterClass === 'char1') {
@@ -614,7 +699,7 @@ class Game {
         if (window.playerHasTruck > 0) {
             // Reduce max truck capacity by 10 per captured animal (Ranger)
             const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
-            const maxCap = Math.max(0, window.playerHasTruck * 50 - animalPenalty);
+            const maxCap = Math.max(0, window.playerHasTruck * 100 - animalPenalty);
             maxToPick = Math.max(0, maxCap - this.trashCollectedInTruck);
             if (maxToPick <= 0) {
                 if (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000) {
@@ -633,7 +718,7 @@ class Game {
         if (picked.length > 0) {
             if (window.playerHasTruck > 0) {
                 this.trashCollectedInTruck += picked.length;
-                if (this.trashCollectedInTruck >= window.playerHasTruck * 50) {
+                if (this.trashCollectedInTruck >= window.playerHasTruck * 100) {
                     this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
                 }
             }
@@ -671,8 +756,139 @@ class Game {
         }
     }
 
+    triggerPriceFixingBribe() {
+        if (!this.priceFixingActive) return;
+        
+        const opt1 = Math.floor(200 + Math.random() * 200);
+        const opt2 = Math.floor(500 + Math.random() * 300);
+        const opt3 = Math.floor(1000 + Math.random() * 500);
+        
+        const dialog = document.getElementById('bribe-dialog');
+        if (!dialog) return;
+        
+        const oldState = this.state;
+        this.state = GameState.UI_OVERLAY;
+        
+        dialog.classList.remove('hidden');
+        
+        const titleEl = document.querySelector('#bribe-dialog h2');
+        const oldTitle = titleEl ? titleEl.innerText : "BRIBE POLICE CHIEF";
+        if (titleEl) titleEl.innerText = "BRIBE THE POLICE";
+        
+        const btn1 = document.getElementById('btn-bribe-1');
+        const btn2 = document.getElementById('btn-bribe-2');
+        const btn3 = document.getElementById('btn-bribe-3');
+        const btnCancel = document.getElementById('btn-bribe-cancel');
+        
+        if (btn1) btn1.innerText = `Offer $${opt1} (15s)`;
+        if (btn2) btn2.innerText = `Offer $${opt2} (30s)`;
+        if (btn3) btn3.innerText = `Offer $${opt3} (60s)`;
+        
+        const setupBtn = (btn, amount, time) => {
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+            clone.addEventListener('click', async () => {
+                if (window.playerBalance < amount) {
+                    alert("Insufficient balance to bribe police!");
+                    dialog.classList.add('hidden');
+                    if (titleEl) titleEl.innerText = oldTitle;
+                    this.state = oldState;
+                    return;
+                }
+                
+                try {
+                    const response = await window.apiCall('/api/game/bribe', 'POST', { amount });
+                    window.playerBalance = response.balance;
+                    window.renderStore();
+                    
+                    this.policeBribeCooldown = time;
+                    this.hud.showFollowerNotification(`Police paid off! Chasing stopped for ${time}s.`, true);
+                    
+                    if (this.crimeManager) {
+                        this.crimeManager.police = [];
+                    }
+                } catch (e) {
+                    alert("Bribe failed: " + e.message);
+                }
+                
+                dialog.classList.add('hidden');
+                if (titleEl) titleEl.innerText = oldTitle;
+                this.state = oldState;
+            });
+        };
+        
+        setupBtn(btn1, opt1, 15);
+        setupBtn(btn2, opt2, 30);
+        setupBtn(btn3, opt3, 60);
+        
+        const cancelClone = btnCancel.cloneNode(true);
+        btnCancel.parentNode.replaceChild(cancelClone, btnCancel);
+        cancelClone.addEventListener('click', () => {
+            dialog.classList.add('hidden');
+            if (titleEl) titleEl.innerText = oldTitle;
+            this.state = oldState;
+        });
+    }
+
+    performIllegalDump() {
+        const task = this.crimeManager.activeTask;
+        if (!task || task.type !== 'illegal_dump') return;
+
+        if (task.dumped) {
+            this.hud.showFollowerNotification("You have already dumped the trash!", false);
+            return;
+        }
+
+        const playerTX = this.player.getTileX();
+        const playerTY = this.player.getTileY();
+
+        const park = this.gameMap.parkBlocks.find(p => p.id === task.targetParkId);
+        if (!park) return;
+
+        if (playerTX < park.x1 || playerTX > park.x2 || playerTY < park.y1 || playerTY > park.y2) {
+            this.hud.showFollowerNotification("Must be inside the target park to dump!", false);
+            return;
+        }
+
+        task.dumped = true;
+
+        let totalParkTiles = 0;
+        let coveredParkTiles = 0;
+
+        for (let ty = park.y1; ty <= park.y2; ty++) {
+            for (let tx = park.x1; tx <= park.x2; tx++) {
+                totalParkTiles++;
+                const dx = Math.abs(tx - playerTX);
+                const dy = Math.abs(ty - playerTY);
+                if (dx <= 3 && dy <= 3) {
+                    coveredParkTiles++;
+                    this.trashManager.items.push({
+                        x: tx * TILE_SIZE + TILE_SIZE / 2,
+                        y: ty * TILE_SIZE + TILE_SIZE / 2,
+                        collected: false,
+                        isIllegalDumpTrash: true
+                    });
+                }
+            }
+        }
+
+        if (coveredParkTiles >= totalParkTiles) {
+            task.completed = true;
+            this.hud.showFollowerNotification("Park fully covered! Talk to Don to get paid.", true);
+        } else {
+            task.completed = false;
+            this.hud.showFollowerNotification("Dump incomplete! Missed areas. Don won't pay.", false);
+        }
+    }
+
     _update(dt) {
         if (this.state !== GameState.PLAYING) return;
+
+        // Price fixing bribe timer
+        if (this.policeBribeCooldown > 0) {
+            this.policeBribeCooldown -= dt;
+            if (this.policeBribeCooldown < 0) this.policeBribeCooldown = 0;
+        }
 
         // Consumable timers
         if (this.mushroomTimer > 0) {
@@ -767,39 +983,67 @@ class Game {
         }
 
         // Rival Candidate update logic
-        if (window.politicsMode && this.rivalCandidate) {
-            if (!this.rivalCandidate.targetNPC || !this.npcManager.npcs.includes(this.rivalCandidate.targetNPC) || this.rivalCandidate.targetNPC.shaken) {
-                let nearest = null;
-                let minDist = Infinity;
-                for (const npc of this.npcManager.npcs) {
-                    if (!npc.shaken) {
-                        const dx = npc.x - this.rivalCandidate.x;
-                        const dy = npc.y - this.rivalCandidate.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < minDist) {
-                            minDist = dist;
-                            nearest = npc;
+        if (window.politicsMode && this.rivalCandidates && this.rivalCandidates.length > 0) {
+            for (const rival of this.rivalCandidates) {
+                if (!rival.targetNPC || !this.npcManager.npcs.includes(rival.targetNPC) || rival.targetNPC.shaken) {
+                    let nearest = null;
+                    let minDist = Infinity;
+                    for (const npc of this.npcManager.npcs) {
+                        if (!npc.shaken) {
+                            const dx = npc.x - rival.x;
+                            const dy = npc.y - rival.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearest = npc;
+                            }
                         }
                     }
+                    rival.targetNPC = nearest;
                 }
-                this.rivalCandidate.targetNPC = nearest;
-            }
 
-            if (this.rivalCandidate.targetNPC) {
-                const target = this.rivalCandidate.targetNPC;
-                const dx = target.x - this.rivalCandidate.x;
-                const dy = target.y - this.rivalCandidate.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > 5) {
-                    const rSpeed = this.rivalCandidate.speed;
-                    this.rivalCandidate.x += (dx / dist) * rSpeed * 60 * dt;
-                    this.rivalCandidate.y += (dy / dist) * rSpeed * 60 * dt;
-                } else {
-                    this.rivalCandidate.votes++;
-                    this.hud.showFollowerNotification(`Rival shook hands with ${target.name}! (+1 Rival Vote)`, false);
-                    this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== target);
-                    this.npcManager.spawnSingleNPC(this.gameMap);
-                    this.rivalCandidate.targetNPC = null;
+                if (rival.targetNPC) {
+                    const target = rival.targetNPC;
+                    const dx = target.x - rival.x;
+                    const dy = target.y - rival.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 5) {
+                        const rSpeed = rival.speed;
+                        const vx = (dx / dist) * rSpeed;
+                        const vy = (dy / dist) * rSpeed;
+                        
+                        const nextX = rival.x + vx * 60 * dt;
+                        const nextY = rival.y + vy * 60 * dt;
+                        
+                        // Collision check for rivals
+                        const tx = Math.floor(nextX / TILE_SIZE);
+                        const ty = Math.floor(nextY / TILE_SIZE);
+                        const curTX = Math.floor(rival.x / TILE_SIZE);
+                        const curTY = Math.floor(rival.y / TILE_SIZE);
+                        
+                        if (this.gameMap.isWalkable(tx, ty, curTX, curTY)) {
+                            rival.x = nextX;
+                            rival.y = nextY;
+                        } else {
+                            const txX = Math.floor(nextX / TILE_SIZE);
+                            const tyX = Math.floor(rival.y / TILE_SIZE);
+                            if (this.gameMap.isWalkable(txX, tyX, curTX, curTY)) {
+                                rival.x = nextX;
+                            } else {
+                                const txY = Math.floor(rival.x / TILE_SIZE);
+                                const tyY = Math.floor(nextY / TILE_SIZE);
+                                if (this.gameMap.isWalkable(txY, tyY, curTX, curTY)) {
+                                    rival.y = nextY;
+                                }
+                            }
+                        }
+                    } else {
+                        rival.votes++;
+                        this.hud.showFollowerNotification(`Rival shook hands with ${target.name}! (+1 Rival Vote)`, false);
+                        this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== target);
+                        this.npcManager.spawnSingleNPC(this.gameMap);
+                        rival.targetNPC = null;
+                    }
                 }
             }
         }
@@ -851,7 +1095,7 @@ class Game {
         }
 
         // Crime or Politics (with mafia votes) updates
-        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes)) && this.crimeManager) {
+        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive) && this.crimeManager) {
             if (window.crimeMode) {
                 this.npcManager.update();
                 this.npcManager.checkInteraction(this.player.x, this.player.y);
@@ -958,15 +1202,18 @@ class Game {
 
         // Update truck chain
         if (this.truckChain && this.truckChain.length > 0) {
+            let possibleLeaders = [this.player];
+            if (this.organizers && this.organizers.length > 0) {
+                possibleLeaders.push(...this.organizers);
+            }
+            let tails = [...possibleLeaders];
+            
             for (let i = 0; i < this.truckChain.length; i++) {
                 const truck = this.truckChain[i];
-                let leaderHistory;
-                if (i === 0) {
-                    leaderHistory = this.player.positionHistory;
-                } else {
-                    leaderHistory = this.truckChain[i - 1].positionHistory;
-                }
+                const leaderIndex = i % possibleLeaders.length;
+                let leaderHistory = tails[leaderIndex].positionHistory;
                 truck.update(leaderHistory, this.gameMap);
+                tails[leaderIndex] = truck;
             }
         }
 
@@ -1022,7 +1269,7 @@ class Game {
         for (const follower of this.followerManager.followers) {
             let maxToPick = Infinity;
             if (window.playerHasTruck > 0) {
-                const maxCap = window.playerHasTruck * 50;
+                const maxCap = window.playerHasTruck * 100;
                 maxToPick = Math.max(0, maxCap - (this.trashCollectedInTruck + followerPicked.length));
             }
             if (maxToPick <= 0) {
@@ -1039,7 +1286,7 @@ class Game {
         if (followerPicked.length > 0) {
             if (window.playerHasTruck > 0) {
                 this.trashCollectedInTruck += followerPicked.length;
-                if (this.trashCollectedInTruck >= window.playerHasTruck * 50) {
+                if (this.trashCollectedInTruck >= window.playerHasTruck * 100) {
                     this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
                 }
             }
@@ -1053,12 +1300,33 @@ class Game {
         if (this.organizers) {
             for (const org of this.organizers) {
                 org.update(dt);
+                
+                let maxToPick = Infinity;
+                if (window.playerHasTruck > 0) {
+                    const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
+                    const maxCap = Math.max(0, window.playerHasTruck * 100 - animalPenalty);
+                    maxToPick = Math.max(0, maxCap - this.trashCollectedInTruck);
+                }
+                
                 let orgFollowerPicked = [];
                 for (const follower of org.followerManager.followers) {
-                    const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowers(), Infinity);
+                    if (maxToPick <= 0) {
+                        break;
+                    }
+                    const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowers(), maxToPick);
                     orgFollowerPicked = orgFollowerPicked.concat(picked);
+                    if (window.playerHasTruck > 0) {
+                        maxToPick = Math.max(0, maxToPick - picked.length);
+                    }
                 }
+                
                 if (orgFollowerPicked.length > 0) {
+                    if (window.playerHasTruck > 0) {
+                        this.trashCollectedInTruck += orgFollowerPicked.length;
+                        if (this.trashCollectedInTruck >= window.playerHasTruck * 100) {
+                            this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                        }
+                    }
                     this.hud.updateScore(this.trashManager.totalPoints);
                     this.trashCollectedInWindow += orgFollowerPicked.length;
                     this.trashCollectedInRound = (this.trashCollectedInRound || 0) + orgFollowerPicked.length;
@@ -1113,6 +1381,46 @@ class Game {
             // Fast Food Suspension Timer
             if (this.fastFoodSuspensionTimer > 0) {
                 this.fastFoodSuspensionTimer -= dt;
+            }
+        }
+        
+        // International Travel Sickness Timer & Logic
+        if (window.travelDestination) {
+            // Sickness slows down the player
+            this.player.speedMultiplier = this.sick ? 0.5 : 1.0;
+            
+            // Check if player has Quinine to cure sickness
+            if (this.sick) {
+                if (this.hasHealthInsurance) {
+                    this.sick = false;
+                    this.hud.showFollowerNotification("Health insurance covered your sickness!", true);
+                    this.player.speedMultiplier = 1.0;
+                } else if (window.playerInventory && window.playerInventory['Quinine'] > 0) {
+                    this.sick = false;
+                    window.playerInventory['Quinine'] -= 1;
+                    window.apiCall('/api/game/consume', 'POST', { item_name: 'Quinine' }).catch(e => console.error(e));
+                    this.hud.showFollowerNotification("Automatically consumed Quinine! Sickness cured.", true);
+                    this.player.speedMultiplier = 1.0;
+                }
+            }
+            
+            if (!this.sick) {
+                this.sicknessTimer -= dt;
+                if (this.sicknessTimer <= 0) {
+                    this.sicknessTimer = 30.0;
+                    const chance = 0.25; // 25% chance for all countries
+                    if (Math.random() < chance) {
+                        this.sick = true;
+                        this.hud.showFollowerNotification("You've fallen sick! Movement speed halved. Buy Quinine!", false);
+                    }
+                }
+            }
+            
+            // Check stranded condition
+            if (window.playerBalance < 0) {
+                document.getElementById('stranded-screen').classList.remove('hidden');
+                this.state = GameState.UI_OVERLAY;
+                return;
             }
         }
 
@@ -1360,6 +1668,9 @@ class Game {
 
     _startGame(spriteId) {
         if (window.gameLog) window.gameLog(`Game._startGame() called with spriteId: ${spriteId}`);
+        if (window.travelDestination) {
+            window.playerHasTruck = false; // Disable truck abroad
+        }
         this.gameMap = new GameMap();
         this.miniMap.buildStatic(this.gameMap);
         // Find a walkable spawn point — start on a road near center
@@ -1464,10 +1775,21 @@ class Game {
         this.npcManager = new NPCManager();
         this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
         this.pirateManager = new PirateManager();
-        this.carManager.spawnCars();
+        this.carManager.spawnCars(this.gameMap);
         // Retrieve and spawn organizers
         this.organizers = [];
-        const organizersCount = window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0;
+        let organizersCount = window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0;
+        
+        // Grant free organizers based on political rank
+        const office = window.politicalOffice || 'citizen';
+        let freeOrganizers = 0;
+        if (office.includes('council')) freeOrganizers = 1;
+        else if (office.includes('mayor')) freeOrganizers = 2;
+        else if (office.includes('senator')) freeOrganizers = 4;
+        else if (office.includes('president')) freeOrganizers = 8;
+        
+        organizersCount += freeOrganizers;
+        
         for (let i = 0; i < organizersCount; i++) {
             this.organizers.push(new GameOrganizer(this, i));
         }
@@ -1493,22 +1815,36 @@ class Game {
             });
         }
         this.nextFollowerGroupIndex = 0;
+        this.rivalCandidates = [];
         if (window.politicsMode) {
-            let speed = 2.0; // Council (slow)
             const office = window.politicalOffice || 'citizen';
-            if (office === 'candidate_mayor') speed = 4.0;
-            else if (office === 'candidate_senator') speed = 5.5;
-            else if (office === 'candidate_president') speed = 7.0;
+            let numRivals = 1;
+            let speed = 4.0; // Council (slow)
+            
+            if (office === 'candidate_mayor' || office === 'mayor') {
+                numRivals = 2;
+                speed = 8.0;
+            } else if (office === 'candidate_senator' || office === 'senator') {
+                numRivals = 3;
+                speed = 11.0;
+            } else if (office === 'candidate_president' || office === 'president') {
+                numRivals = 4;
+                speed = 14.0;
+            } else {
+                numRivals = 1;
+                speed = 4.0;
+            }
 
-            this.rivalCandidate = {
-                x: 20 * TILE_SIZE + TILE_SIZE / 2,
-                y: 20 * TILE_SIZE + TILE_SIZE / 2,
-                speed: speed,
-                targetNPC: null,
-                votes: 0
-            };
-        } else {
-            this.rivalCandidate = null;
+            for (let i = 0; i < numRivals; i++) {
+                this.rivalCandidates.push({
+                    id: i + 1,
+                    x: (20 + i * 2) * TILE_SIZE + TILE_SIZE / 2,
+                    y: (20 + i * 2) * TILE_SIZE + TILE_SIZE / 2,
+                    speed: speed,
+                    votes: 0,
+                    targetNPC: null,
+                });
+            }
         }
         if (this.crimeManager) {
             this.crimeManager.initialize(this.gameMap);
@@ -1542,6 +1878,32 @@ class Game {
             this.hud.showFollowerNotification('🧹 Trashpickers active! Double pickup this round!', true);
         }
 
+        // ── Price Fixing check inventory ──
+        this.priceFixingActive = false;
+        this.policeBribeCooldown = 0;
+        if (window.playerInventory && (window.playerInventory['Price Fixing'] || 0) > 0) {
+            this.priceFixingActive = true;
+            window.apiCall('/api/game/consume', 'POST', { item_name: 'Price Fixing' }).then(() => {
+                window.playerInventory['Price Fixing'] -= 1;
+                console.log('Price Fixing consumed: active for this round.');
+            }).catch(e => console.error(e));
+            this.hud.showFollowerNotification('🕶️ Price Fixing active! 1.25x trash value, but police are chasing!', true);
+            
+            if (this.crimeManager) {
+                this.crimeManager.police = [];
+                this.crimeManager.policeActive = true;
+                const station = this.gameMap.buildings[1];
+                let spawnX = 0, spawnY = 0;
+                if (station && station.doorTiles.length > 0) {
+                    spawnX = station.doorTiles[0].x;
+                    spawnY = station.doorTiles[0].y;
+                }
+                for (let i = 0; i < 4; i++) {
+                    this.crimeManager.police.push(new PoliceOfficer(spawnX, spawnY, false));
+                }
+            }
+        }
+
         // Fast Food Mode State
         this.hungerTimer = 45.0;
         this.hungerWarned25 = false;
@@ -1549,6 +1911,10 @@ class Game {
         this.fastFoodSuspensionTimer = 0.0;
         this.hasHealthInsurance = false;
         this.insurancePaymentTimer = 10.0;
+        
+        this.internationalFollowersCollected = 0;
+        this.sick = false;
+        this.sicknessTimer = 30.0;
 
         // ── Character Class Initialization Rules ──
         const charClass = this.player ? this.player.characterClass : spriteId;
@@ -1714,7 +2080,8 @@ class Game {
                 followers: this.getRoundTotalFollowers(),
                 trash_collected: this.trashCollectedInRound || 0,
                 handshakes: this.handshakesShaken || 0,
-                rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0
+                rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
+                international_followers_collected: this.internationalFollowersCollected || 0
             });
             window.employeesHired = 0;
             // Reset Trashpickers at round end
@@ -1773,6 +2140,11 @@ class Game {
                 } else if (bldg.type === 'fast_food' && ffImg) {
                     // Draw it much larger and centered
                     ctx.drawImage(ffImg, screen.x - 64, screen.y - 64, 128, 128);
+                } else if (bldg.type === 'airport' && this.spriteManager) {
+                    const aptImg = this.spriteManager.getImage('airport');
+                    if (aptImg) {
+                        ctx.drawImage(aptImg, screen.x - 128, screen.y - 128, 256, 256);
+                    }
                 }
             }
         }
@@ -1802,12 +2174,28 @@ class Game {
         // Draw Philadelphia Landmark buildings (visible at all times)
         if (this.spriteManager) {
             const landmarks = {
-                'city_hall': { img: 'philly_city_hall', label: 'CITY HALL' },
+                'cityhall': { img: 'philly_city_hall', label: 'CITY HALL' },
                 'art_museum': { img: 'philly_art_museum', label: 'ART MUSEUM' },
-                'liberty_bell': { img: 'philly_liberty_bell', label: 'INDEPENDENCE HALL' },
+                'liberty_bell': { img: 'philly_liberty_bell', label: 'LIBERTY BELL' },
                 'one_liberty': { img: 'philly_one_liberty', label: 'ONE LIBERTY' },
                 'franklin_institute': { img: 'philly_franklin_inst', label: 'FRANKLIN INST.' },
-                'station': { img: 'philly_station', label: '30TH ST STATION' }
+                'station': { img: 'philly_station', label: '30TH ST STATION' },
+                'airport': { img: 'airport', label: 'AIRPORT' },
+                'hospital': { img: 'hospital_landmark', label: 'HOSPITAL' },
+                // Dahgbad Landmarks
+                'burj_khalifa': { img: 'burj_khalifa', label: 'BURJ KHALIFA' },
+                'petra': { img: 'petra', label: 'PETRA' },
+                'dome_of_rock': { img: 'dome_of_rock', label: 'DOME OF THE ROCK' },
+                'pyramids': { img: 'pyramids', label: 'PYRAMIDS' },
+                'burj_al_arab': { img: 'burj_al_arab', label: 'BURJ AL ARAB' },
+                'kingdom_centre': { img: 'kingdom_centre', label: 'KINGDOM CENTRE' },
+                // Cucaracha Landmarks
+                'christ_redeemer': { img: 'christ_redeemer', label: 'CHRIST REDEEMER' },
+                'machu_picchu': { img: 'machu_picchu', label: 'MACHU PICCHU' },
+                'obelisco_ba': { img: 'obelisco_ba', label: 'OBELISCO' },
+                'torre_entel': { img: 'torre_entel', label: 'TORRE ENTEL' },
+                'palacio_salvo': { img: 'palacio_salvo', label: 'PALACIO SALVO' },
+                'congresso_nacional': { img: 'congresso_nacional', label: 'CONGRESSO NACIONAL' }
             };
 
             for (const bldg of this.gameMap.buildings) {
@@ -1845,28 +2233,30 @@ class Game {
             this.npcManager.render(ctx, this.camera, this.spriteManager);
         }
 
-        // Render rival Candidate in politics mode
-        if (window.politicsMode && this.rivalCandidate) {
-            const screen = this.camera.worldToScreen(this.rivalCandidate.x, this.rivalCandidate.y);
-            if (this.camera.isVisible(this.rivalCandidate.x - 20, this.rivalCandidate.y - 20, 40, 40)) {
-                ctx.save();
-                // Draw rival body
-                ctx.fillStyle = '#b000b0'; // Magenta suit
-                ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);
-                // Head
-                ctx.fillStyle = '#ffdbac';
-                ctx.beginPath();
-                ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
-                ctx.fill();
-                // Hair/Tie
-                ctx.fillStyle = '#00ffff';
-                ctx.fillRect(screen.x - 5, screen.y - 24, 10, 4);
-                // Label
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '8px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('RIVAL', screen.x, screen.y - 28);
-                ctx.restore();
+        // Render rival Candidates in politics mode
+        if (window.politicsMode && this.rivalCandidates && this.rivalCandidates.length > 0) {
+            for (const rival of this.rivalCandidates) {
+                const screen = this.camera.worldToScreen(rival.x, rival.y);
+                if (this.camera.isVisible(rival.x - 20, rival.y - 20, 40, 40)) {
+                    ctx.save();
+                    // Draw rival body
+                    ctx.fillStyle = '#cc0000'; // Red suit
+                    ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);
+                    // Head
+                    ctx.fillStyle = '#ffdbac';
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Hair/Tie
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillRect(screen.x - 5, screen.y - 24, 10, 4);
+                    // Label
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`RIVAL ${rival.id}`, screen.x, screen.y - 28);
+                    ctx.restore();
+                }
             }
         }
 
@@ -1909,7 +2299,7 @@ class Game {
             }
         }
 
-        if (window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes)) {
+        if (window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive) {
             if (window.crimeMode) {
                 this.gameMap.renderAddresses(ctx, this.camera);
                 this.npcManager.render(ctx, this.camera, this.spriteManager);
@@ -2132,6 +2522,11 @@ class Game {
             if (window.politicsMode) {
                 gifEl.style.display = 'none';
             } else {
+                if (!isPirateDefeat && title === "TIME'S UP!") {
+                    gifEl.src = "assets/sprites/thumbs_up_animation.gif";
+                } else {
+                    gifEl.src = "assets/sprites/defeat_animation.gif";
+                }
                 gifEl.style.display = 'block';
             }
         }
@@ -2466,7 +2861,20 @@ class Game {
         const gifEl = document.getElementById('defeat-gif');
         const artContainer = document.getElementById('defeat-art-container');
 
-        if (isMafiaArrest) {
+        const isPoliticsArrest = window.politicsMode;
+
+        if (isPoliticsArrest) {
+            if (titleEl) titleEl.innerText = "BUSTED BY THE POLICE";
+            if (gifEl) {
+                gifEl.src = "assets/sprites/arrest_crying.gif";
+                gifEl.style.width = "256px";
+                gifEl.style.height = "256px";
+            }
+            if (artContainer) artContainer.style.display = "none";
+            if (msgEl) {
+                msgEl.innerText = "You were caught by the police in politics mode! All campaign progress was lost and you are permanently banned from running for office.";
+            }
+        } else if (isMafiaArrest) {
             if (titleEl) titleEl.innerText = "BUSTED BY THE FEDS";
             if (gifEl) {
                 gifEl.src = "assets/sprites/arrest_crying.gif";
@@ -2500,8 +2908,8 @@ class Game {
         }
         const screenEl = document.getElementById('pirate-defeat-screen');
 
-        // Draw pixel art to defeat canvas: player behind bars (jail) if not mafia arrest
-        if (!isMafiaArrest) {
+        // Draw pixel art to defeat canvas: player behind bars (jail) if not mafia/politics arrest
+        if (!isMafiaArrest && !isPoliticsArrest) {
             const artCanvas = document.getElementById('defeatArtCanvas');
             if (artCanvas) {
                 const ctx = artCanvas.getContext('2d');
@@ -2549,11 +2957,12 @@ class Game {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
-                            lose_truck: isMafiaArrest, 
-                            followers: 0, // lost anyway
+                            lose_truck: isMafiaArrest || isPoliticsArrest, 
+                            followers: 0,
                             handshakes: this.handshakesShaken || 0,
                             rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
-                            mafia_arrest: isMafiaArrest
+                            mafia_arrest: isMafiaArrest,
+                            politics_arrest: isPoliticsArrest
                         });
                         window.employeesHired = 0;
                         await window.refreshGameState();
@@ -2565,17 +2974,66 @@ class Game {
                 
                 // Restore overlays and show store screen anyway to avoid black screen freeze
                 if (gifEl) {
-                    gifEl.src = "assets/sprites/defeat_animation.gif";
+                    gifEl.src = "assets/sprites/thumbs_up_animation.gif";
                     gifEl.style.width = "128px";
                     gifEl.style.height = "128px";
                     gifEl.style.display = "block";
                 }
                 if (artContainer) artContainer.style.display = "block";
-                if (titleEl) titleEl.innerText = "WASTED BY PIRATES";
+                if (titleEl) titleEl.innerText = "WASTED BY POLICE";
 
                 if (screenEl) screenEl.classList.add('hidden');
-                window.showScreen('store-screen');
-                this._restartGame();
+                
+                if (isPoliticsArrest) {
+                    window.politicsMode = false;
+
+                    const dialog = document.getElementById('made-man-dialog');
+                    const donText = document.querySelector('#made-man-dialog p');
+                    const donTitle = document.querySelector('#made-man-dialog h2');
+                    if (donTitle) donTitle.innerText = "OUT OF THE SLAMMER";
+                    if (donText) donText.innerText = "After getting out of slammer, the Don has some work for you to get you on your feet. Do you want to join the mafia or not?";
+
+                    if (dialog) dialog.classList.remove('hidden');
+
+                    const btnYes = document.getElementById('btn-made-man-yes');
+                    const btnNo = document.getElementById('btn-made-man-no');
+
+                    const yesClone = btnYes.cloneNode(true);
+                    btnYes.parentNode.replaceChild(yesClone, btnYes);
+                    const noClone = btnNo.cloneNode(true);
+                    btnNo.parentNode.replaceChild(noClone, btnNo);
+
+                    yesClone.addEventListener('click', async () => {
+                        try {
+                            await window.apiCall('/api/game/made-man-choice', 'POST', { choice: 'accepted' });
+                            dialog.classList.add('hidden');
+                            alert("Welcome to the family. Crime Mode is now unlocked!");
+                            await window.refreshGameState();
+                            window.renderStore();
+                        } catch (err) {
+                            alert(err.message);
+                        }
+                        window.showScreen('store-screen');
+                        this._restartGame();
+                    });
+
+                    noClone.addEventListener('click', async () => {
+                        try {
+                            await window.apiCall('/api/game/made-man-choice', 'POST', { choice: 'declined' });
+                            dialog.classList.add('hidden');
+                            alert("You declined the Don's offer.");
+                            await window.refreshGameState();
+                            window.renderStore();
+                        } catch (err) {
+                            alert(err.message);
+                        }
+                        window.showScreen('store-screen');
+                        this._restartGame();
+                    });
+                } else {
+                    window.showScreen('store-screen');
+                    this._restartGame();
+                }
             });
         }
     }
@@ -2607,8 +3065,12 @@ class Game {
         }
         this.nextFollowerGroupIndex = (this.nextFollowerGroupIndex + 1) % totalGroups;
 
-        // Phase 1: Track international followers globally
-        window.internationalFollowers = (window.internationalFollowers || 0) + 1;
+        // Phase 1: Track international followers globally if not abroad, else track locally
+        if (window.travelDestination) {
+            this.internationalFollowersCollected = (this.internationalFollowersCollected || 0) + 1;
+        } else {
+            window.internationalFollowers = (window.internationalFollowers || 0) + 1;
+        }
 
         // Trashpickers: deduct $20 from bank balance to equip the new recruit
         if (this.doubleTrashPickup) {
@@ -2676,47 +3138,75 @@ class GameOrganizer {
         if (this.collectTimer >= 2.0) {
             this.collectTimer -= 2.0;
             
-            // Find nearest uncollected trash
-            let nearest = null;
-            let minDist = Infinity;
-            for (const item of this.game.trashManager.items) {
-                if (!item.collected) {
-                    const dx = item.x - this.x;
-                    const dy = item.y - this.y;
-                    const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = item;
-                    }
+            let canPick = true;
+            if (window.playerHasTruck > 0) {
+                const animalPenalty = this.game.player.capturedAnimals ? this.game.player.capturedAnimals.length * 10 : 0;
+                const maxCap = Math.max(0, window.playerHasTruck * 100 - animalPenalty);
+                if (this.game.trashCollectedInTruck >= maxCap) {
+                    canPick = false;
                 }
             }
             
-            if (nearest) {
-                nearest.collected = true;
-                this.game.trashManager.totalCollected++;
+            if (canPick) {
+                // Find nearest uncollected trash
+                let nearest = null;
+                let minDist = Infinity;
+                for (const item of this.game.trashManager.items) {
+                    if (!item.collected) {
+                        const dx = item.x - this.x;
+                        const dy = item.y - this.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = item;
+                        }
+                    }
+                }
                 
-                const totalFollowers = this.game.getRoundTotalFollowers();
-                const pointValue = Math.max(1, Math.round(Math.sqrt(16 * totalFollowers)));
-                this.game.trashManager.totalPoints += pointValue;
-                
-                // Create pickup effect
-                const wrapped = nearestWrap(nearest.x, nearest.y, this.game.camera.getCenterX(), this.game.camera.getCenterY());
-                this.game.trashManager.pickupEffects.push({
-                    x: wrapped.x,
-                    y: wrapped.y,
-                    text: `+${pointValue}`,
-                    timer: 0,
-                    alpha: 1,
-                    color: '#00ff88',
-                });
-                
-                this.game.trashCollectedInWindow++;
-                this.game.trashCollectedInRound = (this.game.trashCollectedInRound || 0) + 1;
-                this.game.hud.updateScore(this.game.trashManager.totalPoints);
-                this.game.trashManager.spawnMore(this.game.gameMap, 1);
-                
-                // Clear target so we pick a new one
-                this.targetTrash = null;
+                if (nearest) {
+                    nearest.collected = true;
+                    this.game.trashManager.totalCollected++;
+                    
+                    const totalFollowers = this.game.getRoundTotalFollowers();
+                    const isPriceFixing = this.game.priceFixingActive;
+                    const basePointValue = Math.max(1, Math.round(Math.sqrt(16 * totalFollowers)));
+                    let pointValue = isPriceFixing ? Math.round(basePointValue * 1.25) : basePointValue;
+                    
+                    let text = `+${pointValue}`;
+                    let color = '#00ff88';
+                    if (nearest.isIllegalDumpTrash) {
+                        pointValue += 150;
+                        text = `+$${pointValue} Clean-up!`;
+                        color = '#ffd700';
+                    }
+                    this.game.trashManager.totalPoints += pointValue;
+                    
+                    // Create pickup effect
+                    const wrapped = nearestWrap(nearest.x, nearest.y, this.game.camera.getCenterX(), this.game.camera.getCenterY());
+                    this.game.trashManager.pickupEffects.push({
+                        x: wrapped.x,
+                        y: wrapped.y,
+                        text: text,
+                        timer: 0,
+                        alpha: 1,
+                        color: color,
+                    });
+                    
+                    if (window.playerHasTruck > 0) {
+                        this.game.trashCollectedInTruck++;
+                        if (this.game.trashCollectedInTruck >= window.playerHasTruck * 100) {
+                            this.game.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                        }
+                    }
+                    
+                    this.game.trashCollectedInWindow++;
+                    this.game.trashCollectedInRound = (this.game.trashCollectedInRound || 0) + 1;
+                    this.game.hud.updateScore(this.game.trashManager.totalPoints);
+                    this.game.trashManager.spawnMore(this.game.gameMap, 1);
+                    
+                    // Clear target so we pick a new one
+                    this.targetTrash = null;
+                }
             }
         }
 
@@ -2754,18 +3244,20 @@ class GameOrganizer {
                 // Simple wall collision check
                 const tx = Math.floor(nextX / TILE_SIZE);
                 const ty = Math.floor(nextY / TILE_SIZE);
-                if (this.game.gameMap.isWalkable(tx, ty)) {
+                const curTX = this.getTileX();
+                const curTY = this.getTileY();
+                if (this.game.gameMap.isWalkable(tx, ty, curTX, curTY)) {
                     this.x = nextX;
                     this.y = nextY;
                 } else {
                     const txX = Math.floor(nextX / TILE_SIZE);
                     const tyX = Math.floor(this.y / TILE_SIZE);
-                    if (this.game.gameMap.isWalkable(txX, tyX)) {
+                    if (this.game.gameMap.isWalkable(txX, tyX, curTX, curTY)) {
                         this.x = nextX;
                     } else {
                         const txY = Math.floor(this.x / TILE_SIZE);
                         const tyY = Math.floor(nextY / TILE_SIZE);
-                        if (this.game.gameMap.isWalkable(txY, tyY)) {
+                        if (this.game.gameMap.isWalkable(txY, tyY, curTX, curTY)) {
                             this.y = nextY;
                         }
                     }

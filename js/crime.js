@@ -341,7 +341,7 @@ class CrimeManager {
         this.madeMan = false;
         this.activeFamily = -1;
         this.activeTask = null;
-        this.completedJobsCount = 0;
+        this.completedJobsCount = window.completedMafiaJobs || 0;
         this.bankRobbed = false;
         this.policeActive = false;
         this.police = [];
@@ -387,22 +387,50 @@ class CrimeManager {
         });
     }
 
+    getMafiaRank() {
+        if (this.completedJobsCount < 4) return { index: 1, title: 'Soldier' };
+        if (this.completedJobsCount < 10) return { index: 2, title: 'Caporegime' };
+        if (this.completedJobsCount < 22) return { index: 3, title: 'Consigliere' };
+        if (this.completedJobsCount < 46) return { index: 4, title: 'Underboss' };
+        return { index: 5, title: 'Boss (Don)' };
+    }
+
     assignNextTask(gameMap) {
         const alliedDonId = this.activeFamily;
         const rivalDonId = 1 - this.activeFamily;
         const rivalName = rivalDonId === 0 ? "Don Salieri" : "Don Morello";
         const alliedName = alliedDonId === 0 ? "Don Salieri" : "Don Morello";
 
-        const tasks = [
+        const rank = this.getMafiaRank();
+
+        // Tier 1 (Soldier)
+        let tasks = [
             { type: 'collect_gold', desc: 'Collect gold from the target building.', targetBldgId: 2 + Math.floor(Math.random() * 8) },
             { type: 'intimidate', desc: 'Find and Intimidate [I] the rival mafia NPC.', targetNPCIndex: Math.floor(Math.random() * 10) },
             { type: 'rob_npc', desc: 'Find and Rob [R] the target citizen NPC.', targetNPCIndex: Math.floor(Math.random() * 10) },
             { type: 'steal_car', desc: 'Steal [S] a car at any street intersection.' },
-            { type: 'rob_bank', desc: 'Rob the city BANK. Get to the entrance!' },
-            { type: 'hit_npc_indoor', desc: 'Eliminate the target hiding inside the building.' },
-            { type: 'talk_don', desc: `Deliver a briefcase to ${alliedName} [E].`, targetDonId: alliedDonId },
-            { type: 'kill_don', desc: `Locate and Eliminate [K] rival ${rivalName}.`, targetDonId: rivalDonId }
+            { type: 'illegal_dump', desc: 'Go to target park & dump trash [D].', targetParkId: 'park_' + (1 + Math.floor(Math.random() * 6)) }
         ];
+
+        // Tier 2 (Caporegime)
+        if (rank.index >= 2) {
+            tasks.push({ type: 'rob_bank', desc: 'Rob the city BANK. Get to the entrance!' });
+            tasks.push({ type: 'hit_npc_indoor', desc: 'Eliminate the target hiding inside the building.' });
+            tasks.push({ type: 'travel_job', desc: 'Travel to Cucaracha and eliminate the target.', destination: 'cucaracha' });
+            tasks.push({ type: 'travel_job', desc: 'Travel to Dahgbad and eliminate the target.', destination: 'dahgbad' });
+        }
+
+        // Tier 3 & 4 (Consigliere, Underboss) - more travel jobs
+        if (rank.index >= 3) {
+            tasks.push({ type: 'travel_job', desc: 'Travel to Cucaracha and eliminate the target.', destination: 'cucaracha' });
+            tasks.push({ type: 'travel_job', desc: 'Travel to Dahgbad and eliminate the target.', destination: 'dahgbad' });
+            tasks.push({ type: 'talk_don', desc: `Deliver a briefcase to ${alliedName} [E].`, targetDonId: alliedDonId });
+        }
+
+        // Tier 5 (Boss)
+        if (rank.index >= 5) {
+            tasks.push({ type: 'kill_don', desc: `Locate and Eliminate [K] rival ${rivalName}.`, targetDonId: rivalDonId });
+        }
 
         this.activeTask = tasks[Math.floor(Math.random() * tasks.length)];
         this.taskStartClock = window.game.hud.timer; // current time
@@ -414,7 +442,7 @@ class CrimeManager {
         const taskTextHud = document.getElementById('mafia-task-text-hud');
         const avatarHud = document.getElementById('mafia-don-avatar-hud');
 
-        if (donNameHud) donNameHud.innerText = this.activeFamily === 0 ? "Don Salieri" : "Don Morello";
+        if (donNameHud) donNameHud.innerText = `[${rank.title}] ${this.activeFamily === 0 ? "Don Salieri" : "Don Morello"}`;
         if (taskTextHud) taskTextHud.innerText = this.activeTask.desc;
         if (avatarHud) {
             avatarHud.innerHTML = `<div style="width:100%; height:100%; background:${this.activeFamily === 0 ? '#111' : '#eee'}; border:2px solid #ff3333; display:flex; align-items:center; justify-content:center; color:${this.activeFamily === 0 ? '#fff' : '#000'}; font-family:'Press Start 2P', monospace; font-size:12px;">${this.activeFamily === 0 ? 'S' : 'M'}</div>`;
@@ -425,14 +453,12 @@ class CrimeManager {
             setTimeout(() => { popup.classList.add('hidden'); }, 6000); // hide after 6s
         }
 
-        // If robbing a bank, open the bank door!
+        // Setup specific tasks
         if (this.activeTask.type === 'rob_bank') {
             gameMap.openBuildingDoor(0); // Bank door open
-            // Spawn gold bags inside bank
             this.goldBags = [];
             const bank = gameMap.buildings[0];
             if (bank) {
-                // Spawn up to 18 bags inside bank interior tiles
                 const spawnTiles = bank.tiles.filter(t => !bank.doorTiles.some(d => d.x === t.x && d.y === t.y));
                 const count = Math.min(18, spawnTiles.length);
                 for (let i = 0; i < count; i++) {
@@ -441,7 +467,6 @@ class CrimeManager {
             }
         }
         
-        // If hitting NPC indoor
         if (this.activeTask.type === 'hit_npc_indoor') {
             this.activeTask.targetBldgId = 2 + Math.floor(Math.random() * 8);
             gameMap.openBuildingDoor(this.activeTask.targetBldgId);
@@ -454,15 +479,38 @@ class CrimeManager {
                 }
             }
         }
+
+        if (this.activeTask.type === 'travel_job') {
+            // Target coordinates for foreign hit
+            this.indoorTarget = { x: 30 * TILE_SIZE, y: 30 * TILE_SIZE, alive: true };
+        }
     }
 
     completeTask(game) {
-        const reward = 2000 * Math.pow(2, this.completedJobsCount);
+        if (this.activeTask && this.activeTask.type === 'illegal_dump') {
+            if (!this.activeTask.completed) {
+                game.hud.showFollowerNotification("Job Failed! The Don is furious and refuses to pay you.", false);
+                this.activeTask = null;
+                return;
+            }
+        }
+        
+        const rank = this.getMafiaRank();
+        // Base reward increases exponentially with rank index (1 to 5)
+        const reward = 2000 * Math.pow(1.5, rank.index - 1);
+        
         this.completedJobsCount++;
-        game.trashManager.totalPoints += reward;
+        window.completedMafiaJobs = this.completedJobsCount; // save globally
+        
+        const newRank = this.getMafiaRank();
+        if (newRank.index > rank.index) {
+            game.hud.showFollowerNotification(`Rank up! You are now a ${newRank.title}!`, true);
+        }
+
+        game.trashManager.totalPoints += Math.floor(reward);
         game.hud.updateScore(game.trashManager.totalPoints);
-        game.hud.showFollowerNotification(`Favor completed! Earned $${reward.toLocaleString()}!`, true);
-        this.assignNextTask(game.gameMap);
+        game.hud.showFollowerNotification(`Favor completed! Earned $${Math.floor(reward).toLocaleString()}!`, true);
+        this.activeTask = null; // Wait for player to talk to Don for next task
     }
 
     triggerBribeChief() {
@@ -528,7 +576,7 @@ class CrimeManager {
     }
 
     update(dt, game) {
-        if (!window.crimeMode && !(window.politicsMode && game.acceptedMafiaVotes)) return;
+        if (!window.crimeMode && !(window.politicsMode && game.acceptedMafiaVotes) && !game.priceFixingActive) return;
 
         // If robbing the bank, decay gold bags over time
         if (this.activeTask && this.activeTask.type === 'rob_bank' && this.goldBags.length > 0) {
@@ -537,6 +585,23 @@ class CrimeManager {
             if (this.goldBags.filter(b => !b.collected).length > expectedBags) {
                 const uncoll = this.goldBags.find(b => !b.collected);
                 if (uncoll) uncoll.collected = true;
+            }
+        }
+
+        // Price Fixing chasers maintenance
+        if (game.priceFixingActive) {
+            if (game.policeBribeCooldown > 0) {
+                this.police = [];
+            } else {
+                while (this.police.length < 4) {
+                    const station = game.gameMap.buildings[1];
+                    let sx = 0, sy = 0;
+                    if (station && station.doorTiles.length > 0) {
+                        sx = station.doorTiles[0].x;
+                        sy = station.doorTiles[0].y;
+                    }
+                    this.police.push(new PoliceOfficer(sx, sy, false));
+                }
             }
         }
 
@@ -585,7 +650,7 @@ class CrimeManager {
         const arrivedCops = this.police.filter(c => c.alive && Math.sqrt((c.x - wpx)**2 + (c.y - wpy)**2) < TILE_SIZE * 0.6);
         if (arrivedCops.length > 0) {
             for (const cop of arrivedCops) {
-                if (window.politicsMode && game.acceptedMafiaVotes) {
+                if (window.politicsMode) {
                     game._triggerArrestDefeat(true);
                     return;
                 }
@@ -644,21 +709,48 @@ class CrimeManager {
                 game.player.keys.k = false;
             }
         }
+        
+        // Travel Job Hit Check
+        if (this.activeTask && this.activeTask.type === 'travel_job' && this.indoorTarget && this.indoorTarget.alive) {
+            if (window.travelDestination && window.travelDestination.toLowerCase() === this.activeTask.destination.toLowerCase()) {
+                const dist = Math.sqrt((this.indoorTarget.x - wpx)**2 + (this.indoorTarget.y - wpy)**2);
+                if (dist < TILE_SIZE * 1.5 && game.player.keys.k) {
+                    this.indoorTarget.alive = false;
+                    this.activeTask.completed = true;
+                    game.hud.showFollowerNotification('International target eliminated! Return to the Don.', true);
+                    game.player.keys.k = false;
+                }
+            }
+        }
+
+        // Talk to Don for new mission or to complete travel job
+        if (this.madeMan && this.activeFamily !== null) {
+            const alliedDon = this.dons.find(d => d.id === this.activeFamily);
+            if (alliedDon && alliedDon.alive) {
+                const dist = Math.sqrt((alliedDon.x - wpx)**2 + (alliedDon.y - wpy)**2);
+                if (dist < TILE_SIZE * 1.5 && game.player.keys.k) {
+                    if (this.activeTask && this.activeTask.type === 'travel_job') {
+                        if (this.activeTask.completed) {
+                            this.completeTask(game);
+                        } else {
+                            game.hud.showFollowerNotification(`The Don is waiting! Get to ${this.activeTask.destination}!`, false);
+                        }
+                    } else if (!this.activeTask) {
+                        this.assignNextTask(game.gameMap);
+                    }
+                    game.player.keys.k = false;
+                }
+            }
+        }
     }
 
     render(ctx, camera) {
         if (!window.crimeMode && !(window.politicsMode && window.game && window.game.acceptedMafiaVotes)) return;
 
-        // Render alive Mafia Dons if they are the current task targets
+        // Render alive Mafia Dons permanently during crime mode
         for (const don of this.dons) {
             if (don.alive) {
-                let shouldRender = false;
-                if (this.activeTask) {
-                    if ((this.activeTask.type === 'talk_don' || this.activeTask.type === 'kill_don' || this.activeTask.type === 'intimidate_don') && this.activeTask.targetDonId === don.id) {
-                        shouldRender = true;
-                    }
-                }
-                if (shouldRender) don.render(ctx, camera);
+                don.render(ctx, camera);
             }
         }
 
@@ -715,6 +807,28 @@ class CrimeManager {
                 ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
+            }
+        }
+
+        // Render travel job target
+        if (this.activeTask && this.activeTask.type === 'travel_job' && this.indoorTarget && this.indoorTarget.alive) {
+            if (window.travelDestination && window.travelDestination.toLowerCase() === this.activeTask.destination.toLowerCase()) {
+                const screen = camera.worldToScreen(this.indoorTarget.x, this.indoorTarget.y);
+                if (camera.isVisible(this.indoorTarget.x - 20, this.indoorTarget.y - 20, 40, 40)) {
+                    ctx.save();
+                    // Fancy suit
+                    ctx.fillStyle = '#003366';
+                    ctx.fillRect(screen.x - 10, screen.y - 14, 20, 28);
+                    // Gold chain
+                    ctx.fillStyle = '#ffd700';
+                    ctx.fillRect(screen.x - 4, screen.y - 8, 8, 2);
+                    // Head
+                    ctx.fillStyle = '#ffdbac';
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y - 18, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
             }
         }
     }

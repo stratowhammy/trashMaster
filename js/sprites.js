@@ -36,7 +36,24 @@ const SPRITE_CONFIG = {
         { id: 'philly_franklin_inst', name: 'Franklin Institute', src: 'assets/sprites/philly_franklin_inst.png' },
         { id: 'philly_station', name: '30th Street Station', src: 'assets/sprites/philly_station.png' },
         { id: 'black_cadillac', name: 'Black Cadillac', src: 'assets/sprites/black_cadillac.png' },
-        { id: 'white_cadillac', name: 'White Cadillac', src: 'assets/sprites/white_cadillac.png' }
+        { id: 'black_suv', name: 'Black SUV', src: 'assets/sprites/black_suv.png' },
+        { id: 'airport', name: 'Airport', src: 'assets/sprites/airport.png' },
+        { id: 'airplane_icon', name: 'Airplane Icon', src: 'assets/sprites/airplane_icon.png' },
+        { id: 'hospital_landmark', name: 'Hospital', src: 'assets/sprites/hospital.png' },
+        // Dahgbad Landmarks
+        { id: 'burj_khalifa', name: 'Burj Khalifa', src: 'assets/sprites/burj_khalifa.jpg' },
+        { id: 'petra', name: 'Petra', src: 'assets/sprites/petra.jpg' },
+        { id: 'dome_of_rock', name: 'Dome of the Rock', src: 'assets/sprites/dome_of_rock.jpg' },
+        { id: 'pyramids', name: 'Pyramids', src: 'assets/sprites/pyramids.jpg' },
+        { id: 'burj_al_arab', name: 'Burj Al Arab', src: 'assets/sprites/burj_al_arab.jpg' },
+        { id: 'kingdom_centre', name: 'Kingdom Centre', src: 'assets/sprites/kingdom_centre.jpg' },
+        // Cucaracha Landmarks
+        { id: 'christ_redeemer', name: 'Christ Redeemer', src: 'assets/sprites/christ_redeemer.jpg' },
+        { id: 'machu_picchu', name: 'Machu Picchu', src: 'assets/sprites/machu_picchu.jpg' },
+        { id: 'obelisco_ba', name: 'Obelisco', src: 'assets/sprites/obelisco_ba.jpg' },
+        { id: 'torre_entel', name: 'Torre Entel', src: 'assets/sprites/torre_entel.jpg' },
+        { id: 'palacio_salvo', name: 'Palacio Salvo', src: 'assets/sprites/palacio_salvo.jpg' },
+        { id: 'congresso_nacional', name: 'Congresso Nacional', src: 'assets/sprites/congresso_nacional.jpg' }
     ]
 };
 

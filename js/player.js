@@ -151,7 +151,7 @@ class Player {
             imgId = 'black_cadillac';
             drawSize = 48; // Compact car size fitting the tiles
         } else if (window.politicsMode) {
-            imgId = 'white_cadillac';
+            imgId = 'black_suv';
             drawSize = 48;
         }
         

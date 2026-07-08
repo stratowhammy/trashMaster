@@ -91,6 +91,10 @@ def init_db():
         except sqlite3.OperationalError:
             pass
         try:
+            db.execute("ALTER TABLE users ADD COLUMN completed_mafia_jobs INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
             db.execute("ALTER TABLE users ADD COLUMN times_caught INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
@@ -100,6 +104,49 @@ def init_db():
             pass
         try:
             db.execute("ALTER TABLE users ADD COLUMN international_followers INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN total_rounds_played INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN election_state TEXT DEFAULT 'idle'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN rounds_in_state INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN unlocked_international INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN travel_destination TEXT DEFAULT 'filthadelphia'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN politics_banned INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS user_round_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                round_number INTEGER NOT NULL,
+                trash_collected INTEGER DEFAULT 0,
+                money_earned INTEGER DEFAULT 0,
+                followers_gained INTEGER DEFAULT 0,
+                cumulative_trash INTEGER DEFAULT 0,
+                cumulative_money INTEGER DEFAULT 0,
+                cumulative_followers INTEGER DEFAULT 0,
+                bank_balance INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+        try:
+            db.execute("ALTER TABLE user_round_stats ADD COLUMN bank_balance INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
         db.commit()
@@ -206,15 +253,16 @@ def sync_game():
     cursor = db.cursor()
     cursor.execute("""
         SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime,
-               made_man_status, political_office,
+               made_man_status, political_office, completed_mafia_jobs,
                stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers,
-               credits, international_followers
+               credits, international_followers, total_rounds_played, election_state,
+               rounds_in_state, unlocked_international, travel_destination, IFNULL(politics_banned, 0) AS politics_banned
         FROM users WHERE id=?
     """, (user_data['user_id'],))
     user = cursor.fetchone()
     
     cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id=?", (user_data['user_id'],))
-    inv = {row['item_name']: row['quantity'] for row in cursor.fetchall()}
+    inventory = {row['item_name']: row['quantity'] for row in cursor.fetchall()}
     
     return jsonify({
         'balance': user['balance'],
@@ -223,11 +271,15 @@ def sync_game():
         'movement_size': user['movement_size'] if user['movement_size'] else 0,
         'unlocked_fastfood': int(user['unlocked_fastfood'] or 0),
         'unlocked_crime': int(user['unlocked_crime'] or 0),
+        'unlocked_international': int(user['unlocked_international'] or 0),
+        'travel_destination': user['travel_destination'] or 'filthadelphia',
         'made_man_status': user['made_man_status'] or 'none',
         'political_office': user['political_office'] or 'citizen',
-        'credits': int(user['credits'] or 3),
+        'completed_mafia_jobs': int(user['completed_mafia_jobs'] or 0),
+        'credits': int(user['credits']) if user['credits'] is not None else 3,
         'international_followers': int(user['international_followers'] or 0),
-        'inventory': inv,
+        'politics_banned': int(user['politics_banned'] or 0),
+        'inventory': inventory,
         'stats': {
             'max_single_trash': user['stat_max_single_trash'] or 0,
             'cumulative_trash': user['stat_cumulative_trash'] or 0,
@@ -256,7 +308,8 @@ def buy_item():
         'Parade': 3000,
         'Organizer': 250,
         'Quinine': 750,
-        'Trashpickers': 1000
+        'Trashpickers': 1000,
+        'Price Fixing': 2000
     }
     
     if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
@@ -298,28 +351,72 @@ def buy_item():
         reqs = {1: 0, 2: 27, 3: 81, 4: 343}
         req_followers = reqs[next_truck_num]
         
+    if item_name == 'Bruno The Trash Truck':
+        current_trucks = user['has_truck']
+        if current_trucks >= 4:
+            return jsonify({'error': 'Maximum of 4 trash trucks allowed'}), 400
+            
+        next_truck_num = current_trucks + 1
+        reqs = {1: 0, 2: 27, 3: 81, 4: 343}
+        req_followers = reqs[next_truck_num]
+        
         if user['movement_size'] < req_followers:
             return jsonify({'error': f'Requires {req_followers} followers for truck #{next_truck_num}'}), 400
             
+        added_trucks = 1
         db.execute("UPDATE users SET balance = balance - ? WHERE id=?", (price, user_data['user_id']))
-        db.execute("UPDATE users SET has_truck = has_truck + 1 WHERE id=?", (user_data['user_id'],))
+        db.execute("UPDATE users SET has_truck = has_truck + ? WHERE id=?", (added_trucks, user_data['user_id']))
     else:
+        added_qty = 1
+        limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
+        if item_name in limited_items:
+            cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+            row = cursor.fetchone()
+            qty = row['quantity'] if row else 0
+            added_qty = min(1, 10 - qty)
+        elif item_name == 'Organizer':
+            cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
+            row = cursor.fetchone()
+            qty = row['quantity'] if row else 0
+            followers = user['movement_size'] or 0
+            max_allowed = followers // 50
+            added_qty = min(1, max(0, max_allowed - qty))
+
         db.execute("UPDATE users SET balance = balance - ? WHERE id=?", (price, user_data['user_id']))
-        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
-        row = cursor.fetchone()
-        if row:
-            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
-        else:
-            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], item_name))
-        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
-        row = cursor.fetchone()
-        if row:
-            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
-        else:
-            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], item_name))
+        if added_qty > 0:
+            cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+            row = cursor.fetchone()
+            if row:
+                db.execute("UPDATE inventory SET quantity = quantity + ? WHERE user_id=? AND item_name=?", (added_qty, user_data['user_id'], item_name))
+            else:
+                db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, ?)", (user_data['user_id'], item_name, added_qty))
             
     db.commit()
     return jsonify({'success': True})
+
+@app.route('/api/game/travel', methods=['POST'])
+def travel():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    destination = request.json.get('destination')
+    cost = int(request.json.get('cost', 0))
+    
+    if not destination: return jsonify({'error': 'Invalid destination'}), 400
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    
+    if user['balance'] < cost:
+        return jsonify({'error': 'Insufficient funds'}), 400
+        
+    new_balance = user['balance'] - cost
+    db.execute("UPDATE users SET balance=?, travel_destination=? WHERE id=?", (new_balance, destination.lower(), user_data['user_id']))
+    db.commit()
+    
+    return jsonify({'balance': new_balance, 'travel_destination': destination.lower()})
     
 @app.route('/api/game/sell-truck', methods=['POST'])
 def sell_truck():
@@ -359,12 +456,31 @@ def spend_credit():
 
     # Deduct credit and add item to inventory
     db.execute("UPDATE users SET credits = credits - 1 WHERE id=?", (user_data['user_id'],))
-    cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
-    row = cursor.fetchone()
-    if row:
-        db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
-    else:
-        db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], item_name))
+    
+    added_qty = 1
+    limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
+    if item_name in limited_items:
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+        row = cursor.fetchone()
+        qty = row['quantity'] if row else 0
+        added_qty = min(1, 10 - qty)
+    elif item_name == 'Organizer':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
+        row = cursor.fetchone()
+        qty = row['quantity'] if row else 0
+        cursor.execute("SELECT movement_size FROM users WHERE id=?", (user_data['user_id'],))
+        u_row = cursor.fetchone()
+        followers = u_row['movement_size'] or 0
+        max_allowed = followers // 50
+        added_qty = min(1, max(0, max_allowed - qty))
+        
+    if added_qty > 0:
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+        row = cursor.fetchone()
+        if row:
+            db.execute("UPDATE inventory SET quantity = quantity + ? WHERE user_id=? AND item_name=?", (added_qty, user_data['user_id'], item_name))
+        else:
+            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, ?)", (user_data['user_id'], item_name, added_qty))
     db.commit()
 
     cursor.execute("SELECT credits FROM users WHERE id=?", (user_data['user_id'],))
@@ -425,12 +541,17 @@ def end_round():
     trash_collected = int(request.json.get('trash_collected', 0))
     handshakes = int(request.json.get('handshakes', 0))
     mafia_arrest = bool(request.json.get('mafia_arrest', False))
+    politics_arrest = bool(request.json.get('politics_arrest', False))
+    is_international = bool(request.json.get('is_international', False))
+    international_followers_collected = int(request.json.get('international_followers_collected', 0))
+    completed_mafia_jobs = int(request.json.get('completed_mafia_jobs', 0))
     
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
         SELECT balance, has_truck, employee_death_penalty, movement_size, political_office, times_caught,
-               stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers
+               stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers,
+               made_man_status, election_state, rounds_in_state, total_rounds_played, international_followers, completed_mafia_jobs
         FROM users WHERE id=?
     """, (user_data['user_id'],))
     user = cursor.fetchone()
@@ -449,9 +570,17 @@ def end_round():
         multiplier = random.choices([1, 2, 3, 4, 5], weights=[40, 30, 15, 10, 5], k=1)[0]
         earned = earned * multiplier
 
+    # Role Perks (Made Man 5x multiplier)
+    if user['made_man_status'] == 'accepted':
+        earned = earned * 5
+
     adjusted_employee_cost = int(employee_cost * penalty)
     
-    if mafia_arrest:
+    if politics_arrest:
+        db.execute("UPDATE users SET politics_banned=1, has_truck=0 WHERE id=?", (user_data['user_id'],))
+        new_balance = max(0, user['balance'] - adjusted_employee_cost)
+        new_movement_size = 0
+    elif mafia_arrest:
         times_caught = (user['times_caught'] or 0) + 1
         db.execute("UPDATE users SET times_caught=? WHERE id=?", (times_caught, user_data['user_id']))
         fine_amount = times_caught * 50000
@@ -485,27 +614,88 @@ def end_round():
     new_cumulative_money = (user['stat_cumulative_money'] or 0) + earned
     
     new_max_single_followers = max(user['stat_max_single_followers'] or 0, followers)
+    new_international_followers = (user['international_followers'] or 0) + international_followers_collected
+    new_completed_mafia_jobs = max(user['completed_mafia_jobs'] or 0, completed_mafia_jobs)
 
-    # Political Office Promotion Logic
     current_office = user['political_office'] or 'citizen'
-    new_office = current_office
+    if current_office != 'citizen' and not current_office.startswith('candidate_'):
+        handshakes = int(handshakes * 1.5) # Vote injection for politicians
+    
+    # "Stranded" logic
+    stranded = False
+    if is_international and new_balance < 0:
+        stranded = True
+        new_balance = 0 # Cannot carry debt, just stranded
 
-    rival_handshakes = int(request.json.get('rival_handshakes', 0))
-    if current_office in ['candidate_council', 'candidate_mayor', 'candidate_senator', 'candidate_president']:
-        if handshakes > rival_handshakes:
-            promotions = {
-                'candidate_council': 'council',
-                'candidate_mayor': 'mayor',
-                'candidate_senator': 'senator',
-                'candidate_president': 'president'
-            }
-            new_office = promotions[current_office]
+    if politics_arrest:
+        election_state = 'idle'
+        rounds_in_state = 0
+        total_rounds_played = (user['total_rounds_played'] or 0) + 1
+        new_office = 'citizen'
+        primary_won = False
+        primary_lost = False
+    else:
+        # Election State Machine
+        election_state = user['election_state'] or 'idle'
+        rounds_in_state = (user['rounds_in_state'] or 0) + 1
+        total_rounds_played = (user['total_rounds_played'] or 0) + 1
+        new_office = current_office
+        primary_won = False
+        primary_lost = False
+
+        rival_handshakes = int(request.json.get('rival_handshakes', 0))
+
+        if election_state == 'idle' and current_office != 'citizen':
+            if rounds_in_state >= 4:
+                election_state = 'primary'
+                rounds_in_state = 0
+                new_office = f"candidate_{current_office}"
+        elif election_state == 'primary':
+            if handshakes > rival_handshakes:
+                election_state = 'waiting_main'
+                primary_won = True
+            else:
+                election_state = 'cooldown_primary'
+                new_office = current_office.replace('candidate_', '') # Revert title on loss
+                primary_lost = True
+            rounds_in_state = 0
+        elif election_state == 'waiting_main':
+            if rounds_in_state >= 4:
+                election_state = 'main'
+                rounds_in_state = 0
+        elif election_state == 'main':
+            if handshakes > rival_handshakes:
+                election_state = 'idle'
+                # Promote logic
+                promotions = {
+                    'candidate_council': 'mayor',
+                    'candidate_mayor': 'senator',
+                    'candidate_senator': 'president',
+                    'candidate_president': 'president' # Keep President
+                }
+                if current_office in promotions:
+                    new_office = promotions[current_office]
+                else:
+                    new_office = current_office.replace('candidate_', '')
+            else:
+                election_state = 'cooldown_main'
+                new_office = current_office.replace('candidate_', '')
+            rounds_in_state = 0
+
+        # Catch-all for lingering candidate title outside of election
+        if election_state not in ['primary', 'main', 'waiting_main'] and new_office.startswith('candidate_'):
+            new_office = new_office.replace('candidate_', '')
 
     db.execute("""
         UPDATE users SET 
             balance=?, 
             movement_size = ?,
             political_office = ?,
+            election_state = ?,
+            rounds_in_state = ?,
+            total_rounds_played = ?,
+            international_followers = ?,
+            completed_mafia_jobs = ?,
             stat_max_single_trash=?,
             stat_cumulative_trash=?,
             stat_max_single_money=?,
@@ -516,6 +706,10 @@ def end_round():
         new_balance, 
         new_movement_size,
         new_office,
+        election_state,
+        rounds_in_state,
+        total_rounds_played,
+        new_international_followers,
         new_max_single_trash,
         new_cumulative_trash,
         new_max_single_money,
@@ -524,6 +718,22 @@ def end_round():
         user_data['user_id']
     ))
     db.execute("DELETE FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
+    db.execute("""
+        INSERT INTO user_round_stats (
+            user_id, round_number, trash_collected, money_earned, followers_gained,
+            cumulative_trash, cumulative_money, cumulative_followers, bank_balance
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_data['user_id'],
+        total_rounds_played,
+        trash_collected,
+        earned,
+        followers,
+        new_cumulative_trash,
+        new_cumulative_money,
+        new_movement_size,
+        new_balance
+    ))
     db.commit()
     
     return jsonify({
@@ -531,8 +741,64 @@ def end_round():
         'balance': new_balance, 
         'employee_death_penalty': penalty, 
         'multiplier': multiplier,
-        'political_office': new_office
+        'political_office': new_office,
+        'election_state': election_state,
+        'rounds_in_state': rounds_in_state,
+        'primary_won': primary_won,
+        'primary_lost': primary_lost,
+        'stranded': stranded
     })
+
+@app.route('/api/game/stats-history', methods=['GET'])
+def get_stats_history():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        SELECT round_number, trash_collected, money_earned, followers_gained, cumulative_trash, cumulative_money, cumulative_followers, IFNULL(bank_balance, 0) AS bank_balance
+        FROM user_round_stats
+        WHERE user_id = ?
+        ORDER BY round_number ASC
+    """, (user_data['user_id'],))
+    rows = cursor.fetchall()
+    
+    history = []
+    for r in rows:
+        history.append({
+            'round_number': r['round_number'],
+            'trash_collected': r['trash_collected'],
+            'money_earned': r['money_earned'],
+            'followers_gained': r['followers_gained'],
+            'cumulative_trash': r['cumulative_trash'],
+            'cumulative_money': r['cumulative_money'],
+            'cumulative_followers': r['cumulative_followers'],
+            'bank_balance': r['bank_balance']
+        })
+    return jsonify({'success': True, 'history': history})
+
+@app.route('/api/game/unlock-international', methods=['POST'])
+def unlock_international():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance, unlocked_international FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    
+    if user['unlocked_international']:
+        return jsonify({'error': 'Already unlocked'}), 400
+        
+    cost = 35000
+    if user['balance'] < cost:
+        return jsonify({'error': 'Insufficient funds'}), 400
+        
+    db.execute("UPDATE users SET balance = balance - ?, unlocked_international = 1 WHERE id=?", (cost, user_data['user_id']))
+    db.commit()
+    
+    return jsonify({'success': True})
 
 @app.route('/api/game/unlock-mode', methods=['POST'])
 def unlock_mode():
@@ -596,19 +862,32 @@ def political_choice():
         
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT political_office FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT political_office, international_followers, IFNULL(politics_banned, 0) AS politics_banned FROM users WHERE id=?", (user_data['user_id'],))
     row = cursor.fetchone()
+    if row and row['politics_banned'] == 1:
+        return jsonify({'error': 'You are permanently banned from running for office!'}), 400
     current_office = row['political_office'] if row else 'citizen'
+    international_followers = int(row['international_followers'] or 0)
     
+    election_state = 'idle'
+    rounds_in_state = 0
     if choice == 'accepted':
         if current_office == 'citizen':
             office = 'candidate_council'
+            election_state = 'primary'
         elif current_office == 'council':
             office = 'candidate_mayor'
+            election_state = 'primary'
         elif current_office == 'mayor':
+            if international_followers < 25:
+                return jsonify({'error': 'Need 25 international followers to run for Senate'}), 400
             office = 'candidate_senator'
+            election_state = 'primary'
         elif current_office == 'senator':
+            if international_followers < 100:
+                return jsonify({'error': 'Need 100 international followers to run for President'}), 400
             office = 'candidate_president'
+            election_state = 'primary'
         else:
             office = current_office
     else:
@@ -616,11 +895,11 @@ def political_choice():
         
     db.execute("""
         UPDATE users 
-        SET political_office = ?
+        SET political_office = ?, election_state = ?, rounds_in_state = ?
         WHERE id = ?
-    """, (office, user_data['user_id']))
+    """, (office, election_state, rounds_in_state, user_data['user_id']))
     db.commit()
-    return jsonify({'success': True, 'political_office': office})
+    return jsonify({'success': True, 'political_office': office, 'election_state': election_state})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)

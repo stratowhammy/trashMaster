@@ -100,8 +100,11 @@
             <div class="store-layout">
                 <div class="store-sidebar">
                     <h2 id="store-balance">$0</h2>
-                    <div id="movement-size-container" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ffcc; margin: 10px 0 20px 0; line-height: 1.5;">
+                    <div id="movement-size-container" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ffcc; margin: 10px 0 10px 0; line-height: 1.5;">
                         Movement: <span id="store-movement-size">0</span> followers
+                    </div>
+                    <div id="international-followers-container" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ffaa00; margin: 0 0 20px 0; line-height: 1.5;">
+                        Intl Followers: <span id="store-international-followers">0</span>
                     </div>
                     <div id="store-inventory"></div>
                     <div id="frenzy-toggle-container" class="toggle-container" style="margin-bottom: 8px;">
@@ -141,6 +144,7 @@
                     </div>
                     <button id="btn-start-game" class="btn play-btn">Play Game</button>
                     <button id="btn-view-trophies" class="btn secondary" style="margin-bottom: 12px; background: #ffaa00; border: 2px solid #cc7700; color: #111; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Trophy Case</button>
+                    <button id="btn-view-stats" class="btn secondary" style="margin-bottom: 12px; background: #00aa66; border: 2px solid #007744; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Performance Stats</button>
                     <button id="btn-store-logout" class="btn secondary">Logout</button>
                 </div>
                 <div class="store-items">
@@ -155,9 +159,9 @@
                 <h2 style="color: #00ffcc; font-size: 12px; margin-bottom: 20px; letter-spacing: 1px;">HIRE POSSE</h2>
                 
                 <div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 20px;">
-                    <button id="hire-minus-btn" onclick="handleHireMinus()" class="btn" style="background: #ff3333; border: 2px solid #aa0000; color: #fff; width: 40px; height: 40px; font-size: 18px; cursor: pointer; padding: 0; font-family: 'Press Start 2P', monospace;">-</button>
+                    <button id="hire-minus-btn" class="btn" style="background: #ff3333; border: 2px solid #aa0000; color: #fff; width: 40px; height: 40px; font-size: 18px; cursor: pointer; padding: 0; font-family: 'Press Start 2P', monospace;">-</button>
                     <span id="hire-qty" style="font-size: 24px; color: #fff; min-width: 40px;">0</span>
-                    <button id="hire-plus-btn" onclick="handleHirePlus()" class="btn" style="background: #00cc66; border: 2px solid #008844; color: #fff; width: 40px; height: 40px; font-size: 18px; cursor: pointer; padding: 0; font-family: 'Press Start 2P', monospace;">+</button>
+                    <button id="hire-plus-btn" class="btn" style="background: #00cc66; border: 2px solid #008844; color: #fff; width: 40px; height: 40px; font-size: 18px; cursor: pointer; padding: 0; font-family: 'Press Start 2P', monospace;">+</button>
                 </div>
                 
                 <div id="hire-limit-text" style="font-size: 8px; color: #888; margin-bottom: 10px; line-height: 1.6;">
@@ -166,8 +170,8 @@
                 </div>
                 
                 <div style="display: flex; gap: 15px; justify-content: center; margin-top: 25px;">
-                    <button id="btn-hire-confirm" onclick="handleHireConfirm()" class="btn" style="background: #00ffcc; border: 2px solid #00aa88; color: #111; padding: 8px 16px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CONFIRM</button>
-                    <button id="btn-hire-cancel" onclick="handleHireCancel()" class="btn secondary" style="padding: 8px 16px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CANCEL</button>
+                    <button id="btn-hire-confirm" class="btn" style="background: #00ffcc; border: 2px solid #00aa88; color: #111; padding: 8px 16px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CONFIRM</button>
+                    <button id="btn-hire-cancel" class="btn secondary" style="padding: 8px 16px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CANCEL</button>
                 </div>
             </div>
         </div>
@@ -184,6 +188,33 @@
                 </div>
                 
                 <button id="btn-trophy-close" class="btn" style="background: #8b5a2b; border: 3px solid #4a2e1b; color: #fff; padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">RETURN TO STORE</button>
+            </div>
+        </div>
+
+        <!-- Performance Stats Dialog -->
+        <div id="stats-dialog" class="hidden" style="position: fixed; z-index: 1003; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+            <div class="dialog-box" style="background: #101810; border: 6px solid #00aa66; padding: 25px; border-radius: 8px; text-align: center; width: 720px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(0, 170, 102, 0.6); position: relative;">
+                <h2 style="color: #00ffcc; font-size: 14px; margin-bottom: 20px; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0,255,204,0.5);">PERFORMANCE GRAPHS</h2>
+                
+                <!-- Category Tabs -->
+                <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn stats-tab-btn" data-category="trash" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">TRASH</button>
+                    <button class="btn stats-tab-btn" data-category="money" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">MONEY</button>
+                    <button class="btn stats-tab-btn" data-category="followers" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">FOLLOWERS</button>
+                    <button class="btn stats-tab-btn" data-category="bank" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">BANK</button>
+                </div>
+                
+                <!-- Graph Canvas -->
+                <div style="background: #050805; border: 3px solid #00ffcc; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                    <canvas id="stats-canvas" width="660" height="260" style="display: block; width: 100%; image-rendering: pixelated;"></canvas>
+                </div>
+                
+                <!-- Stats Summary -->
+                <div id="stats-summary" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; font-size: 8px; color: #fff; line-height: 1.8; border-top: 2px dashed #00aa66; padding-top: 15px; margin-bottom: 20px; text-align: left;">
+                    <!-- Populated dynamically -->
+                </div>
+                
+                <button id="btn-stats-close" class="btn" style="background: #00aa66; border: 3px solid #007744; color: #fff; padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">RETURN TO STORE</button>
             </div>
         </div>
 
@@ -316,20 +347,78 @@
 
     <canvas id="gameCanvas" tabindex="0" class="hidden"></canvas>
 
+    <!-- Airport Travel Dialog -->
+    <div id="airport-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #222; border: 4px solid #00aaff; border-radius: 12px; padding: 25px; width: 480px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
+            <div style="font-size: 48px; margin-bottom: 15px;">✈️</div>
+            <h2 style="color: #00aaff; margin-bottom: 15px; font-size: 16px; font-family: 'Press Start 2P', monospace;">INTERNATIONAL TERMINAL</h2>
+            <p style="color: #ddd; font-size: 8px; line-height: 1.6; margin-bottom: 25px; font-family: 'Press Start 2P', monospace;">
+                Where are we flying to today, boss? Traveling costs money per posse member and leaves the truck behind!
+            </p>
+            <div style="display: flex; gap: 15px; justify-content: center; flex-direction: column;">
+                <button id="btn-travel-filthadelphia" class="btn" style="background: #4a5c88; border-color: #2b395e; font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; cursor: pointer; padding: 12px; display: none;">FILTHADELPHIA ($800/member)</button>
+                <button id="btn-travel-dahgbad" class="btn" style="background: #a67c52; border-color: #6a492e; font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; cursor: pointer; padding: 12px;">DAHGBAD ($1,000/member)</button>
+                <button id="btn-travel-cucaracha" class="btn" style="background: #2b5e2b; border-color: #173b17; font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; cursor: pointer; padding: 12px;">CUCARACHA ($500/member)</button>
+                <button id="btn-travel-cancel" class="btn secondary" style="font-family: 'Press Start 2P', monospace; font-size: 8px; cursor: pointer; padding: 12px; margin-top: 10px;">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Election Loss Dialog (Mafia style) -->
+    <div id="election-loss-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #222; border: 4px solid #cc0000; border-radius: 12px; padding: 25px; width: 420px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
+            <div style="font-size: 48px; margin-bottom: 15px;">📉</div>
+            <h2 style="color: #ff3333; margin-bottom: 15px; font-size: 16px; font-family: 'Press Start 2P', monospace;">CAMPAIGN RELAUNCH</h2>
+            <p style="color: #ddd; font-size: 8px; line-height: 1.6; margin-bottom: 25px; font-family: 'Press Start 2P', monospace; text-align: left;">
+                "Hey boss, it's been 8 weeks since the election loss. The voters have short memories. Should we start campaigning for the primary again?"
+            </p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-election-loss-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">RUN AGAIN</button>
+                <button id="btn-election-loss-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">NOT YET</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stranded Defeat Screen -->
+    <div id="stranded-screen" class="screen hidden" style="background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; pointer-events: auto;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; background: rgba(20,20,40,0.9); padding: 40px; border: 4px solid #4444ff; border-radius: 8px; text-align: center; max-width: 500px;">
+            <div style="font-size: 64px; margin-bottom: 10px;">🏝️</div>
+            <h1 style="color: #6688ff; text-shadow: 0 0 10px rgba(100, 150, 255, 0.7); font-family: 'Press Start 2P', monospace; font-size: 24px; margin: 0;">STRANDED!</h1>
+            <p style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: #aaccff; line-height: 1.8; margin: 20px 0;">
+                You ran out of money while abroad and couldn't pay your posse! You are stranded and have lost all earnings for this round.
+            </p>
+            <button id="btn-stranded-return" class="btn play-btn" style="background: #3366cc; border: 2px solid #1144aa; box-shadow: 0 4px #002266; padding: 15px 30px; font-family: 'Press Start 2P', monospace; font-size: 12px; color: #fff; cursor: pointer;">DEPORT ME</button>
+        </div>
+    </div>
+
+    <!-- Primary Win Screen -->
+    <div id="primary-win-screen" class="screen hidden" style="background: rgba(0, 50, 0, 0.95); display: flex; align-items: center; justify-content: center; height: 100vh; pointer-events: auto; z-index: 1010;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; max-width: 600px;">
+            <div style="font-size: 80px; margin-bottom: 20px;">🎊</div>
+            <h1 style="color: #00ffcc; text-shadow: 0 0 15px rgba(0, 255, 204, 0.8); font-family: 'Press Start 2P', monospace; font-size: 28px; margin: 0;">PRIMARY VICTORY!</h1>
+            <p id="primary-win-text" style="font-family: 'Press Start 2P', monospace; font-size: 12px; color: #fff; line-height: 1.8; margin: 30px 0;">
+                Your party nominated you to run for Office!
+            </p>
+            <button id="btn-primary-win-continue" class="btn play-btn" style="background: #00aa66; border: 2px solid #007744; box-shadow: 0 4px #005522; padding: 15px 30px; font-family: 'Press Start 2P', monospace; font-size: 12px; color: #fff; cursor: pointer;">CONTINUE TO MAIN ELECTION</button>
+        </div>
+    </div>
+
     <!-- Game scripts loaded in dependency order -->
-    <script src="js/api.js?v=3"></script>
-    <script src="js/map.js?v=3"></script>
+    <script src="js/api.js?v=12"></script>
+    <script src="js/map.js?v=8"></script>
+    <script src="js/map_dahgbad.js?v=2"></script>
+    <script src="js/map_cucaracha.js?v=2"></script>
     <script src="js/camera.js?v=3"></script>
-    <script src="js/sprites.js?v=3"></script>
-    <script src="js/player.js?v=3"></script>
+    <script src="js/sprites.js?v=8"></script>
+    <script src="js/player.js?v=4"></script>
     <script src="js/follower.js?v=3"></script>
     <script src="js/trash.js?v=3"></script>
-    <script src="js/minimap.js?v=3"></script>
+    <script src="js/minimap.js?v=8"></script>
     <script src="js/hud.js?v=3"></script>
-    <script src="js/npc.js?v=3"></script>
+    <script src="js/npc.js?v=6"></script>
     <script src="js/pirate.js?v=3"></script>
-    <script src="js/car.js?v=3"></script>
-    <script src="js/crime.js?v=3"></script>
-    <script src="js/main.js?v=3"></script>
+    <script src="js/car.js?v=6"></script>
+    <script src="js/crime.js?v=4"></script>
+    <script src="js/main.js?v=11"></script>
 </body>
 </html>

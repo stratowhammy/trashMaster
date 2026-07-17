@@ -3799,6 +3799,19 @@ class Game {
         const container = document.getElementById('word-game-slots-container');
         container.innerHTML = '';
 
+        const CLUES = {
+            'WASTE': "Discarded materials; garbage or trash.",
+            'LITTER': "Trash left lying in a public place.",
+            'DEBRIS': "Scattered waste or wreckage remains.",
+            'REFUSE': "Worthless matter thrown away.",
+            'GARBAGE': "Spoiled food and kitchen waste.",
+            'PLASTIC': "Polymer pollutant threatening oceans.",
+            'RECYCLE': "Convert waste into reusable materials.",
+            'COMPOST': "Decayed organic matter used as fertilizer.",
+            'LANDFILL': "A place where waste is buried in soil.",
+            'POLLUTION': "Harmful contaminants in the environment."
+        };
+
         this.wordList.forEach((word, wordIndex) => {
             const isCompleted = this.completedWords.includes(word);
             const row = document.createElement('div');
@@ -3810,15 +3823,20 @@ class Game {
 
             const leftSide = document.createElement('div');
             leftSide.style.display = 'flex';
-            leftSide.style.alignItems = 'center';
-            leftSide.style.gap = '15px';
+            leftSide.style.flexDirection = 'column';
+            leftSide.style.gap = '4px';
+
+            const slotsRow = document.createElement('div');
+            slotsRow.style.display = 'flex';
+            slotsRow.style.alignItems = 'center';
+            slotsRow.style.gap = '15px';
 
             const numLabel = document.createElement('span');
             numLabel.style.fontSize = '8px';
             numLabel.style.color = '#888';
             numLabel.style.width = '25px';
             numLabel.innerText = `${wordIndex + 1}.`;
-            leftSide.appendChild(numLabel);
+            slotsRow.appendChild(numLabel);
 
             const slotsDiv = document.createElement('div');
             slotsDiv.style.display = 'flex';
@@ -3907,7 +3925,17 @@ class Game {
 
                 slotsDiv.appendChild(input);
             }
-            leftSide.appendChild(slotsDiv);
+            slotsRow.appendChild(slotsDiv);
+            leftSide.appendChild(slotsRow);
+
+            const clueLabel = document.createElement('div');
+            clueLabel.style.fontSize = '7px';
+            clueLabel.style.color = '#777';
+            clueLabel.style.paddingLeft = '40px';
+            clueLabel.style.fontStyle = 'italic';
+            clueLabel.innerText = `Clue: ${CLUES[word]}`;
+            leftSide.appendChild(clueLabel);
+
             row.appendChild(leftSide);
 
             const prizeLabel = document.createElement('span');

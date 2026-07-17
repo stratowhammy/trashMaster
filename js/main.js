@@ -3287,6 +3287,69 @@ class Game {
         }
     }
 
+    drawTrashCan(ctx, x, y, width, height, fraction) {
+        ctx.save();
+        
+        ctx.strokeStyle = '#888888';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = '#222222';
+        
+        ctx.beginPath();
+        ctx.moveTo(x + width * 0.1, y + height * 0.2);
+        ctx.lineTo(x + width * 0.9, y + height * 0.2);
+        ctx.lineTo(x + width * 0.8, y + height * 0.9);
+        ctx.lineTo(x + width * 0.2, y + height * 0.9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + width * 0.35, y + height * 0.25);
+        ctx.lineTo(x + width * 0.35, y + height * 0.85);
+        ctx.moveTo(x + width * 0.5, y + height * 0.25);
+        ctx.lineTo(x + width * 0.5, y + height * 0.85);
+        ctx.moveTo(x + width * 0.65, y + height * 0.25);
+        ctx.lineTo(x + width * 0.65, y + height * 0.85);
+        ctx.stroke();
+
+        if (fraction > 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x + width * 0.1, y + height * 0.2);
+            ctx.lineTo(x + width * 0.9, y + height * 0.2);
+            ctx.lineTo(x + width * 0.8, y + height * 0.9);
+            ctx.lineTo(x + width * 0.2, y + height * 0.9);
+            ctx.closePath();
+            ctx.clip();
+
+            const fillHeight = height * 0.7 * fraction;
+            const fillY = y + height * 0.9 - fillHeight;
+            
+            ctx.fillStyle = '#16a34a';
+            ctx.fillRect(x, fillY, width, fillHeight);
+            
+            ctx.fillStyle = '#d97706';
+            for (let i = 0; i < 5; i++) {
+                const rx = x + width * 0.2 + (i * 2.3) % (width * 0.5);
+                const ry = fillY + (i * 3.7) % fillHeight;
+                ctx.fillRect(rx, ry, 2, 2);
+            }
+            ctx.restore();
+        }
+
+        ctx.strokeStyle = '#aaaaaa';
+        ctx.fillStyle = '#666666';
+        ctx.lineWidth = 2;
+        ctx.fillRect(x + width * 0.05, y + height * 0.12, width * 0.9, height * 0.08);
+        ctx.strokeRect(x + width * 0.05, y + height * 0.12, width * 0.9, height * 0.08);
+        ctx.fillRect(x + width * 0.4, y + height * 0.04, width * 0.2, height * 0.08);
+        ctx.strokeRect(x + width * 0.4, y + height * 0.04, width * 0.2, height * 0.08);
+
+        ctx.restore();
+    }
+
     async _triggerCarDefeat() {
         this.state = GameState.UI_OVERLAY;
         if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };

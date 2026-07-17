@@ -1905,15 +1905,22 @@ class Game {
         }
 
         // Title
-        ctx.fillStyle = '#0f8';
-        ctx.font = 'bold 36px "Press Start 2P", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('TRASH MASTER', w / 2, 80);
+        const splashImg = this.spriteManager.getImage('splash');
+        if (splashImg && (splashImg.complete || splashImg instanceof HTMLCanvasElement)) {
+            const splashW = 400;
+            const splashH = 225;
+            ctx.drawImage(splashImg, w / 2 - splashW / 2, 10, splashW, splashH);
+        } else {
+            ctx.fillStyle = '#0f8';
+            ctx.font = 'bold 36px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('TRASH MASTER', w / 2, 80);
+        }
 
         // Subtitle glow
         ctx.fillStyle = '#68f';
         ctx.font = '12px "Press Start 2P", monospace';
-        ctx.fillText('Choose Your Character', w / 2, 120);
+        ctx.fillText('Choose Your Character', w / 2, 260);
 
         // Character cards
         const cardW = 140;
@@ -1921,7 +1928,7 @@ class Game {
         const cardGap = 20;
         const totalW = SPRITE_CONFIG.characters.length * (cardW + cardGap) - cardGap;
         const startX = (w - totalW) / 2;
-        const startY = (h - cardH) / 2 - 10;
+        const startY = (h - cardH) / 2 + 80;
 
         for (let i = 0; i < SPRITE_CONFIG.characters.length; i++) {
             const char = SPRITE_CONFIG.characters[i];
@@ -3054,11 +3061,6 @@ class Game {
                     ctx.fill();
                     ctx.restore();
                 }
-            } else {
-                const img = this.spriteManager.getCharacterImage('char_student');
-                if (img) {
-                    ctx.drawImage(img, screen.x - 16, screen.y - 16, 32, 32);
-                }
             }
         }
     }
@@ -3100,7 +3102,7 @@ class Game {
                 gifEl.style.display = 'none';
             } else {
                 if (!isPirateDefeat && title === "TIME'S UP!") {
-                    gifEl.src = "assets/sprites/thumbs_up_animation.gif";
+                    gifEl.src = "assets/sprites/defeat_animation.gif";
                 } else {
                     gifEl.src = "assets/sprites/defeat_animation.gif";
                 }
@@ -3108,203 +3110,130 @@ class Game {
             }
         }
 
-        // Draw pixel art to defeat canvas
+        // Render trash cans count based on trashCollectedInRound
+        const totalTrash = this.trashCollectedInRound || 0;
+        const roundTrashCount = document.getElementById('round-trash-count');
+        if (roundTrashCount) roundTrashCount.innerText = totalTrash;
+
+        const cansCanvas = document.getElementById('trashCansCountCanvas');
+        if (cansCanvas) {
+            const cctx = cansCanvas.getContext('2d');
+            cctx.fillStyle = '#000';
+            cctx.fillRect(0, 0, cansCanvas.width, cansCanvas.height);
+
+            const cansCount = totalTrash / 10;
+            const canW = 20;
+            const canH = 26;
+            const gap = 6;
+            const startX = 10;
+            const startY = 7;
+
+            for (let i = 0; i < Math.ceil(cansCount); i++) {
+                const fraction = Math.min(1.0, cansCount - i);
+                this.drawTrashCan(cctx, startX + i * (canW + gap), startY, canW, canH, fraction);
+            }
+        }
+
+        // Cancel previous animation loop if active
+        if (window.defeatAnimationId) {
+            cancelAnimationFrame(window.defeatAnimationId);
+            window.defeatAnimationId = null;
+        }
+
+        const beatPrevious = (this.trashCollectedInRound || 0) > (window.lastRoundTrash || 0);
+        window.lastRoundTrash = this.trashCollectedInRound || 0;
+
+        // Draw animated pixel art to defeat canvas
         const artCanvas = document.getElementById('defeatArtCanvas');
         if (artCanvas) {
             document.getElementById('defeat-art-container').style.display = 'block';
             const ctx = artCanvas.getContext('2d');
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, 256, 128);
-
+            const playerImg = this.spriteManager.getCharacterImage(this.player ? this.player.spriteId : 'char1');
             const pirateImg = this.spriteManager.getCharacterImage('char_pirate');
             const truckImg = this.spriteManager.getCharacterImage('char_truck');
-            
-            if (isPirateDefeat) {
-                // Ground
-                ctx.fillStyle = '#222222';
-                ctx.fillRect(0, 96, 256, 32);
 
-                if (hadTruck && truckImg && pirateImg) {
-                    // Draw road lines
-                    ctx.strokeStyle = '#444';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath(); ctx.moveTo(0, 108); ctx.lineTo(256, 108); ctx.stroke();
-    
-                    // Draw trash truck driving away
-                    ctx.drawImage(truckImg, 96, 36, 64, 64);
-                    
-                    // Draw pirate driving
-                    ctx.drawImage(pirateImg, 112, 24, 32, 32);
-                    // Draw another pirate waving from the back
-                    ctx.drawImage(pirateImg, 140, 28, 32, 32);
-                } else {
-                    // Draw ground red blob for shapeless body
-                    ctx.fillStyle = '#aa2222';
-                    ctx.fillRect(96, 90, 48, 10);
-                    ctx.fillStyle = '#666666';
-                    ctx.fillRect(104, 84, 16, 6);
-                    ctx.fillRect(124, 86, 10, 4);
-    
-                    if (pirateImg) {
-                        // Two pirates standing triumphantly over body
-                        ctx.drawImage(pirateImg, 90, 52, 32, 32);
-                        ctx.drawImage(pirateImg, 130, 50, 32, 32);
-                    }
-                }
-            } else if (window.politicsMode || window.elPresidenteElection) {
-                // Politics campaign result pixel art
-                const playerVotes = this.handshakesShaken || 0;
-                const rivalVotes = this.rivalCandidate ? this.rivalCandidate.votes : 0;
-                const isWinner = playerVotes > rivalVotes;
-
-                ctx.fillStyle = '#0f172a'; // Deep dark slate background
+            let startTime = performance.now();
+            const animateDefeat = (timestamp) => {
+                const elapsed = timestamp - startTime;
+                
+                // Clear
+                ctx.fillStyle = '#0a0e1a';
                 ctx.fillRect(0, 0, 256, 128);
 
-                // Draw ground
-                ctx.fillStyle = '#1e293b'; // Slate ground
-                ctx.fillRect(0, 100, 256, 28);
+                if (isPirateDefeat) {
+                    ctx.fillStyle = '#222222';
+                    ctx.fillRect(0, 96, 256, 32);
 
-                if (isWinner) {
-                    // Victorious person standing with hands up
-                    // Confetti particles
-                    for (let i = 0; i < 24; i++) {
-                        ctx.fillStyle = ['#ff0055', '#00ffcc', '#ffaa00', '#0088ff', '#ffff00'][i % 5];
-                        ctx.fillRect(Math.floor(Math.random() * 256), Math.floor(Math.random() * 95), 3, 3);
+                    if (hadTruck && truckImg && pirateImg) {
+                        ctx.strokeStyle = '#444';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.moveTo(0, 108); ctx.lineTo(256, 108); ctx.stroke();
+        
+                        ctx.drawImage(truckImg, 96, 36, 64, 64);
+                        ctx.drawImage(pirateImg, 112, 24, 32, 32);
+                        ctx.drawImage(pirateImg, 140, 28, 32, 32);
+                    } else {
+                        ctx.fillStyle = '#aa2222';
+                        ctx.fillRect(96, 90, 48, 10);
+                        ctx.fillStyle = '#666666';
+                        ctx.fillRect(104, 84, 16, 6);
+                        ctx.fillRect(124, 86, 10, 4);
+        
+                        if (pirateImg) {
+                            ctx.drawImage(pirateImg, 90, 52, 32, 32);
+                            ctx.drawImage(pirateImg, 130, 50, 32, 32);
+                        }
                     }
-
-                    // Torso/Shirt (green)
-                    ctx.fillStyle = '#10b981';
-                    ctx.fillRect(120, 72, 16, 28);
-
-                    // Head (skin)
-                    ctx.fillStyle = '#fbcfe8';
-                    ctx.beginPath();
-                    ctx.arc(128, 58, 9, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Happy Eyes
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(124, 56, 2, 2);
-                    ctx.fillRect(130, 56, 2, 2);
-                    
-                    // Smile
-                    ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.arc(128, 60, 4, 0, Math.PI, false);
-                    ctx.stroke();
-
-                    // Victorious Raised Arms
-                    ctx.strokeStyle = '#fbcfe8';
-                    ctx.lineWidth = 3;
-                    ctx.lineCap = 'round';
-                    // Left raised arm
-                    ctx.beginPath();
-                    ctx.moveTo(120, 76);
-                    ctx.lineTo(110, 52);
-                    ctx.stroke();
-                    // Right raised arm
-                    ctx.beginPath();
-                    ctx.moveTo(136, 76);
-                    ctx.lineTo(146, 52);
-                    ctx.stroke();
-
-                    // Pants (blue)
-                    ctx.fillStyle = '#3b82f6';
-                    ctx.fillRect(121, 100, 6, 12);
-                    ctx.fillRect(129, 100, 6, 12);
                 } else {
-                    // Dejected sad loser wearing a party hat
-                    // Rain drops
-                    ctx.strokeStyle = '#60a5fa';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i < 15; i++) {
-                        const rx = Math.floor(Math.random() * 256);
-                        const ry = Math.floor(Math.random() * 100);
-                        ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 2, ry + 6); ctx.stroke();
+                    ctx.fillStyle = '#333333';
+                    ctx.fillRect(0, 100, 256, 28);
+                    ctx.fillStyle = '#555555';
+                    ctx.fillRect(0, 96, 256, 4);
+
+                    if (beatPrevious) {
+                        const jumpY = 96 - 48 - Math.abs(Math.sin(elapsed * 0.005) * 35);
+                        
+                        const shadowW = Math.max(8, 24 - Math.abs(Math.sin(elapsed * 0.005) * 16));
+                        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                        ctx.fillRect(128 - shadowW/2, 98, shadowW, 4);
+
+                        if (playerImg && playerImg.complete) {
+                            ctx.save();
+                            const scaleY = 1 + Math.sin(elapsed * 0.005) * 0.1;
+                            ctx.drawImage(playerImg, 128 - 16, jumpY, 32, 32 * scaleY);
+                            ctx.restore();
+                        }
+                        
+                        ctx.fillStyle = '#ffcc00';
+                        for (let i = 0; i < 6; i++) {
+                            const sx = 128 + Math.sin(elapsed * 0.002 + i) * 40;
+                            const sy = 40 + Math.cos(elapsed * 0.003 + i * 1.5) * 20;
+                            ctx.fillRect(sx, sy, 2, 2);
+                        }
+                    } else {
+                        if (playerImg && playerImg.complete) {
+                            ctx.save();
+                            ctx.translate(128, 96 - 12);
+                            ctx.rotate(0.12 * Math.sin(elapsed * 0.001));
+                            ctx.drawImage(playerImg, -16, -16, 32, 32);
+                            ctx.restore();
+                        }
+                        
+                        const tearY = 96 - 16 + (elapsed * 0.025) % 18;
+                        if (tearY < 96) {
+                            ctx.fillStyle = '#00ffff';
+                            ctx.fillRect(133, tearY, 2, 3);
+                        }
                     }
-
-                    // Torso/Shirt (slouched red)
-                    ctx.fillStyle = '#ef4444';
-                    ctx.fillRect(122, 76, 14, 24);
-
-                    // Head (sad tilted skin)
-                    ctx.fillStyle = '#fbcfe8';
-                    ctx.beginPath();
-                    ctx.arc(128, 64, 9, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Sad slouched eyes
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 1;
-                    // Left eye (slanted down)
-                    ctx.beginPath(); ctx.moveTo(122, 61); ctx.lineTo(125, 63); ctx.stroke();
-                    // Right eye (slanted down)
-                    ctx.beginPath(); ctx.moveTo(134, 61); ctx.lineTo(131, 63); ctx.stroke();
-                    
-                    // Frown
-                    ctx.beginPath();
-                    ctx.arc(128, 69, 3, Math.PI, 0, true);
-                    ctx.stroke();
-
-                    // Party Hat (yellow/gold cone)
-                    ctx.fillStyle = '#fbbf24';
-                    ctx.beginPath();
-                    ctx.moveTo(121, 56);
-                    ctx.lineTo(128, 32); // apex
-                    ctx.lineTo(135, 56);
-                    ctx.closePath();
-                    ctx.fill();
-                    // Pom pom on top of hat
-                    ctx.fillStyle = '#ec4899';
-                    ctx.beginPath();
-                    ctx.arc(128, 32, 3, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Slouched Arms
-                    ctx.strokeStyle = '#fbcfe8';
-                    ctx.lineWidth = 3;
-                    ctx.lineCap = 'round';
-                    // Left arm hanging down
-                    ctx.beginPath();
-                    ctx.moveTo(122, 78);
-                    ctx.lineTo(118, 92);
-                    ctx.stroke();
-                    // Right arm hanging down
-                    ctx.beginPath();
-                    ctx.moveTo(136, 78);
-                    ctx.lineTo(140, 92);
-                    ctx.stroke();
-
-                    // Pants (dark gray)
-                    ctx.fillStyle = '#4b5563';
-                    ctx.fillRect(123, 100, 5, 10);
-                    ctx.fillRect(129, 100, 5, 10);
                 }
-            } else {
-                // Time's Up art
-                // Draw night sky
-                ctx.fillStyle = '#111122';
-                ctx.fillRect(0, 0, 256, 128);
-                
-                // Draw moon
-                ctx.fillStyle = '#ffeeaa';
-                ctx.beginPath();
-                ctx.arc(200, 30, 15, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw city skyline silhouette
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(20, 60, 40, 68);
-                ctx.fillRect(65, 40, 30, 88);
-                ctx.fillRect(100, 70, 50, 58);
-                ctx.fillRect(155, 50, 35, 78);
-                ctx.fillRect(195, 80, 45, 48);
-                
-                // Draw ground
-                ctx.fillStyle = '#221100';
-                ctx.fillRect(0, 110, 256, 18);
-            }
+
+                const checkEl = document.getElementById('pirate-defeat-screen');
+                if (checkEl && checkEl.classList.contains('hidden')) {
+                    return;
+                }
+                window.defeatAnimationId = requestAnimationFrame(animateDefeat);
+            };
+            window.defeatAnimationId = requestAnimationFrame(animateDefeat);
         }
 
         // Setup the return button listener

@@ -267,6 +267,11 @@
                         <canvas id="defeatArtCanvas" width="256" height="128" style="width: 256px; height: 128px; image-rendering: pixelated; display: block;"></canvas>
                     </div>
                 </div>
+                <!-- Trash cans canvas container -->
+                <div id="trash-cans-container" style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 5px;">
+                    <div style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ffcc;">Trash Collected: <span id="round-trash-count">0</span></div>
+                    <canvas id="trashCansCountCanvas" width="320" height="40" style="width: 320px; height: 40px; image-rendering: pixelated; display: block; background: #000; border: 2px solid #333; border-radius: 4px;"></canvas>
+                </div>
                 <p id="defeat-message" style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ff8888; text-align: center; max-width: 400px; line-height: 1.8; margin: 10px 0;"></p>
                 <button id="btn-defeat-return" class="btn play-btn" style="background: #ff3333; border: 2px solid #990000; box-shadow: 0 4px #660000; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Return to Store</button>
             </div>

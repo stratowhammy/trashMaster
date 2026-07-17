@@ -18,6 +18,7 @@ const SPRITE_CONFIG = {
         { id: 'trash4', name: 'Banana Peel', src: 'assets/sprites/trash4.png' },
     ],
     other: [
+        { id: 'splash', name: 'Splash Screen', src: 'assets/sprites/splash.jpg' },
         { id: 'cult_white_robe', name: 'Cult Robe', src: 'assets/sprites/cult_white_robe.png', color: '#ffffff' },
         { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' },
         { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },

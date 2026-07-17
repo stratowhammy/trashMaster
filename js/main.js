@@ -3699,6 +3699,14 @@ class Game {
             tile.style.boxSizing = 'border-box';
             tile.innerText = letter;
 
+            if (count > 0) {
+                tile.draggable = true;
+                tile.style.cursor = 'grab';
+                tile.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', letter);
+                });
+            }
+
             const badge = document.createElement('span');
             badge.style.position = 'absolute';
             badge.style.right = '2px';
@@ -3805,10 +3813,7 @@ class Game {
                     input.style.border = '2px solid #555';
                     input.style.color = '#fff';
 
-                    input.addEventListener('input', (e) => {
-                        const char = e.target.value.toUpperCase();
-                        e.target.value = '';
-
+                    const submitLetter = (char) => {
                         const targetLetter = word[i];
                         const statusEl = document.getElementById('word-game-status-text');
 
@@ -3849,6 +3854,22 @@ class Game {
                                 }
                             }
                         }, 50);
+                    };
+
+                    input.addEventListener('input', (e) => {
+                        const char = e.target.value.toUpperCase();
+                        e.target.value = '';
+                        submitLetter(char);
+                    });
+
+                    input.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                    });
+
+                    input.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const char = e.dataTransfer.getData('text/plain').toUpperCase();
+                        submitLetter(char);
                     });
                 }
 

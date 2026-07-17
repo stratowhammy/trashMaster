@@ -126,12 +126,11 @@ class Game {
         this.player = null;
 
         // Word Game State
-        this.collectedLetters = {};
-        this.completedWords = [];
         this.wordList = [
             'GARBAGE', 'PLASTIC', 'RECYCLE', 'COMPOST', 'LANDFILL',
             'POLLUTION', 'LITTER', 'DEBRIS', 'REFUSE', 'WASTE'
         ];
+        this.loadWordGameState();
         this.letterSpawnPool = [
             'A','A','A','A','A',
             'B','B',
@@ -2149,6 +2148,7 @@ class Game {
         this.npcManager.spawnChildQuest(this.gameMap, this.gameMap.buildings);
 
         // ── Phase 3: Cult Mode ──
+        this.loadWordGameState();
         this.happiness = (window.playerHappiness !== undefined ? window.playerHappiness : 100.0);
         this.cultLeavingTimer = 20.0 + Math.random() * 15.0; // first leaving dialog after 20-35s
         this.cultHappinessBufferTimer = 0;
@@ -3659,6 +3659,41 @@ class Game {
         }
     }
 
+    loadWordGameState() {
+        const state = window.wordGameState || {
+            collected_letters: {},
+            completed_words: [],
+            word_slots_state: {}
+        };
+        this.collectedLetters = state.collected_letters || {};
+        this.completedWords = state.completed_words || [];
+        this.wordSlotsState = state.word_slots_state || {};
+        
+        // Ensure all words are represented in slots state
+        this.wordList.forEach(w => {
+            if (!this.wordSlotsState[w]) {
+                this.wordSlotsState[w] = Array(w.length).fill('');
+            }
+        });
+    }
+
+    async saveWordGameState() {
+        // Sync global copy
+        window.wordGameState = {
+            collected_letters: this.collectedLetters,
+            completed_words: this.completedWords,
+            word_slots_state: this.wordSlotsState
+        };
+        // Save to backend
+        try {
+            if (window.apiCall) {
+                await window.apiCall('/api/game/save-word-game', 'POST', window.wordGameState);
+            }
+        } catch (e) {
+            console.error("Failed to save word game state", e);
+        }
+    }
+
     openWordGameDialog() {
         this.preDialogState = this.state;
         this.state = GameState.UI_OVERLAY;
@@ -3839,6 +3874,7 @@ class Game {
                             this.awardWordGamePrize(prize);
                         }
 
+                        this.saveWordGameState();
                         this.renderWordGameDialog();
 
                         setTimeout(() => {
@@ -4340,11 +4376,20 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (window.cultMode) {
                     window.game.lastEatenFastFoodId = window.game.pendingFastFoodId;
                     window.game.visitedDifferentRestaurantSinceLastEat = false;
-                    window.game.cultHappinessBufferTimer = 10.0;
+                    
                     const currentH = window.game.happiness || 0;
-                    const boost = Math.round(15 + (1 - (currentH / 100)) * 20);
-                    window.game.pendingHappinessBoost = boost;
-                    window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Happiness will increase in 10s!`, true);
+                    const totalBoost = Math.round(15 + (1 - (currentH / 100)) * 20);
+                    
+                    // Immediate boost of 5%
+                    const immediateBoost = 5;
+                    window.game.happiness = Math.min(100, currentH + immediateBoost);
+                    
+                    // Pending boost stacked
+                    const remainingBoost = Math.max(0, totalBoost - immediateBoost);
+                    window.game.pendingHappinessBoost = (window.game.pendingHappinessBoost || 0) + remainingBoost;
+                    window.game.cultHappinessBufferTimer = 10.0;
+                    
+                    window.game.hud.showFollowerNotification(`Fed posse! +5% Happiness instantly! Digesting remainder (+${remainingBoost}%) in 10s!`, true);
                 } else {
                     window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 15s.`, true);
                 }

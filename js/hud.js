@@ -425,7 +425,12 @@ class HUD {
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`HAPPINESS ${Math.round(happiness)}%`, canvasWidth / 2, barY + barH / 2 + 1);
+            
+            let label = `HAPPINESS ${Math.round(happiness)}%`;
+            if (window.game.cultHappinessBufferTimer > 0) {
+                label = `DIGESTING... +${window.game.pendingHappinessBoost}% IN ${Math.ceil(window.game.cultHappinessBufferTimer)}s`;
+            }
+            ctx.fillText(label, canvasWidth / 2, barY + barH / 2 + 1);
         }
     }
 

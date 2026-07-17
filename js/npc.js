@@ -53,6 +53,9 @@ class NPC {
                 window.game.collectedLetters = window.game.collectedLetters || {};
                 window.game.collectedLetters[this.assignedLetter] = (window.game.collectedLetters[this.assignedLetter] || 0) + 1;
                 window.game.hud.showFollowerNotification(`Collected letter '${this.assignedLetter}' from ${this.name}!`, true);
+                if (window.game.saveWordGameState) {
+                    window.game.saveWordGameState();
+                }
             }
         }
         return {

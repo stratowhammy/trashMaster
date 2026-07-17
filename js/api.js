@@ -766,6 +766,11 @@ async function refreshGameState() {
         window.playerUnlockedFantasy = data.unlocked_fantasy || 0;
         window.playerHappiness = data.happiness !== undefined ? data.happiness : 100.0;
         window.cultLeavesCumulative = data.cult_leaves_cumulative || 0;
+        window.wordGameState = data.word_game_state || {
+            collected_letters: {},
+            completed_words: [],
+            word_slots_state: {}
+        };
         try {
             const bldgData = await apiCall('/api/game/buildings');
             window._serverOwnedBuildings = bldgData.buildings || [];

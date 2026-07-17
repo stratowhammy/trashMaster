@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import random
 import string
@@ -138,6 +139,16 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN travel_destination TEXT DEFAULT 'filthadelphia'")
         except sqlite3.OperationalError:
             pass
+            
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS user_word_game (
+                user_id INTEGER PRIMARY KEY,
+                collected_letters TEXT DEFAULT '{}',
+                completed_words TEXT DEFAULT '[]',
+                word_slots_state TEXT DEFAULT '{}',
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
         try:
             db.execute("ALTER TABLE users ADD COLUMN politics_banned INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
@@ -298,8 +309,23 @@ def sync_game():
     
     cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id=?", (user_data['user_id'],))
     inventory = {row['item_name']: row['quantity'] for row in cursor.fetchall()}
+
+    cursor.execute("SELECT collected_letters, completed_words, word_slots_state FROM user_word_game WHERE user_id=?", (user_data['user_id'],))
+    word_game = cursor.fetchone()
+    if not word_game:
+        try:
+            cursor.execute("INSERT OR IGNORE INTO user_word_game (user_id) VALUES (?)", (user_data['user_id'],))
+            db.commit()
+        except Exception:
+            pass
+        word_game = {'collected_letters': '{}', 'completed_words': '[]', 'word_slots_state': '{}'}
     
     return jsonify({
+        'word_game_state': {
+            'collected_letters': json.loads(word_game['collected_letters'] or '{}'),
+            'completed_words': json.loads(word_game['completed_words'] or '[]'),
+            'word_slots_state': json.loads(word_game['word_slots_state'] or '{}')
+        },
         'balance': user['balance'],
         'has_truck': int(user['has_truck']),
         'employee_death_penalty': user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0,
@@ -609,6 +635,29 @@ def award_prize():
     elif prize_type == 'truck':
         db.execute("UPDATE users SET has_truck = MIN(4, has_truck + 1) WHERE id=?", (user_data['user_id'],))
         
+    db.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/game/save-word-game', methods=['POST'])
+def save_word_game():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json or {}
+    collected_letters = json.dumps(data.get('collected_letters', {}))
+    completed_words = json.dumps(data.get('completed_words', []))
+    word_slots_state = json.dumps(data.get('word_slots_state', {}))
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO user_word_game (user_id, collected_letters, completed_words, word_slots_state)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            collected_letters = excluded.collected_letters,
+            completed_words = excluded.completed_words,
+            word_slots_state = excluded.word_slots_state
+    """, (user_data['user_id'], collected_letters, completed_words, word_slots_state))
     db.commit()
     return jsonify({'success': True})
 

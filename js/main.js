@@ -72,7 +72,7 @@ class GarbageTruckFollower {
         const img = spriteManager.getCharacterImage('char_truck'); // original green truck
         if (img) {
             ctx.save();
-            const scaledSize = 36;
+            const scaledSize = 32;
             if (this.direction === 'left') {
                 ctx.translate(screen.x, screen.y);
                 ctx.scale(-1, 1);
@@ -841,7 +841,8 @@ class Game {
         this.state = GameState.UI_OVERLAY;
         this.player.keys = { up: false, down: false, left: false, right: false };
 
-        const loss = Math.pow(2, this.cultLeavesCumulative || 0);
+        const xVal = this.cultLeavesCumulative || 0;
+        const loss = Math.ceil(Math.pow(1.1, xVal) * 10);
         
         const narratives = [
             "A member of the Church has been talking to others about leaving, what do you do?",
@@ -873,13 +874,14 @@ class Game {
 
         const leaveAction = () => {
             cleanup();
-            const lossVal = Math.pow(2, this.cultLeavesCumulative || 0);
+            const currentX = this.cultLeavesCumulative || 0;
+            const lossVal = Math.ceil(Math.pow(1.1, currentX) * 10);
             const actualLoss = Math.min(this.getRoundTotalFollowers(), lossVal);
             for (let i = 0; i < actualLoss; i++) {
                 this._removeSequentialFollower();
             }
             this.hud.followerCount = this.getRoundTotalFollowers();
-            this.cultLeavesCumulative = (this.cultLeavesCumulative || 0) + actualLoss;
+            this.cultLeavesCumulative = currentX + 1;
             this.hud.showFollowerNotification(`🚶 Allowed to leave. -${actualLoss} Followers.`, false);
         };
 
@@ -3931,7 +3933,7 @@ class GameOrganizer {
                     bobY = Math.sin(this.animTimer * 0.8) * 1.5;
                 }
                 ctx.save();
-                const drawSize = 30;
+                const drawSize = 32;
                 if (this.direction === 'left') {
                     ctx.translate(screen.x, screen.y + bobY);
                     ctx.scale(-1, 1);
@@ -3954,19 +3956,19 @@ class GameOrganizer {
         }
 
         ctx.save();
-        // Body (Blue shirt) - matching 30px height, centered
+        // Body (Blue shirt) - matching 32px height, centered
         ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(screen.x - 10, screen.y - 10, 20, 20);
+        ctx.fillRect(screen.x - 10, screen.y - 11, 20, 22);
         
         // Head
         ctx.fillStyle = '#ffdbac';
         ctx.beginPath();
-        ctx.arc(screen.x, screen.y - 14, 6, 0, Math.PI * 2);
+        ctx.arc(screen.x, screen.y - 15, 6, 0, Math.PI * 2);
         ctx.fill();
 
         // Hair/Cap (distinct gold/orange cap)
         ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(screen.x - 5, screen.y - 20, 10, 3);
+        ctx.fillRect(screen.x - 5, screen.y - 21, 10, 3);
 
         // Label
         ctx.fillStyle = '#ffffff';

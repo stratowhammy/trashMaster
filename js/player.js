@@ -144,15 +144,13 @@ class Player {
 
     render(ctx, camera, spriteManager) {
         const screen = camera.worldToScreen(this.x, this.y);
-        let drawSize = this.size + 8;
+        let drawSize = 32;
         
         let imgId = this.spriteId;
         if (window.crimeMode) {
             imgId = 'black_cadillac';
-            drawSize = 48; // Compact car size fitting the tiles
         } else if (window.politicsMode) {
             imgId = 'black_suv';
-            drawSize = 48;
         }
         
         const img = spriteManager.getImage(imgId);

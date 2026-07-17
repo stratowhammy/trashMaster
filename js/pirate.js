@@ -84,7 +84,7 @@ class Pirate {
         if (!this.alive) return;
 
         const screen = camera.worldToScreen(this.x, this.y);
-        const drawSize = this.size + 4;
+        const drawSize = 32;
         const img = spriteManager.getCharacterImage(this.spriteId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {

@@ -59,7 +59,7 @@ class NPC {
 
     render(ctx, camera, spriteManager) {
         const screen = camera.worldToScreen(this.x, this.y);
-        const drawSize = this.size + 4;
+        const drawSize = 32;
 
         const img = spriteManager.getCharacterImage(this.spriteId);
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
@@ -538,7 +538,7 @@ class NPCManager {
         if (!this.childNPC || this.childDelivered) return;
         const child = this.childNPC;
         const screen = camera.worldToScreen(child.x, child.y);
-        const drawSize = child.size + 4;
+        const drawSize = 32;
 
         // Render child with golden tint
         if (!NPC._tintCanvas2) NPC._tintCanvas2 = document.createElement('canvas');
@@ -573,7 +573,7 @@ class NPCManager {
         for (const parent of this.parentNPCs) {
             if (!this.childFollowing) continue; // don't render parents until child is following
             const ps = camera.worldToScreen(parent.x, parent.y);
-            const pDrawSize = parent.size + 4;
+            const pDrawSize = 32;
             if (img && img.complete) ctx.drawImage(img, ps.x - pDrawSize / 2, ps.y - pDrawSize / 2, pDrawSize, pDrawSize);
             ctx.fillStyle = '#ff88ff';
             ctx.font = '6px "Press Start 2P", monospace';

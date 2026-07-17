@@ -72,7 +72,7 @@ class GarbageTruckFollower {
         const img = spriteManager.getCharacterImage('char_truck'); // original green truck
         if (img) {
             ctx.save();
-            const scaledSize = 32;
+            const scaledSize = 64;
             if (this.direction === 'left') {
                 ctx.translate(screen.x, screen.y);
                 ctx.scale(-1, 1);
@@ -3933,7 +3933,7 @@ class GameOrganizer {
                     bobY = Math.sin(this.animTimer * 0.8) * 1.5;
                 }
                 ctx.save();
-                const drawSize = 32;
+                const drawSize = 64;
                 if (this.direction === 'left') {
                     ctx.translate(screen.x, screen.y + bobY);
                     ctx.scale(-1, 1);
@@ -3947,7 +3947,7 @@ class GameOrganizer {
                 ctx.fillStyle = '#ffffff';
                 ctx.font = '6px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 26);
+                ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 36);
                 ctx.restore();
                 
                 this.followerManager.render(ctx, camera, this.game.spriteManager);
@@ -3956,25 +3956,25 @@ class GameOrganizer {
         }
 
         ctx.save();
-        // Body (Blue shirt) - matching 32px height, centered
+        // Body (Blue shirt) - matching 64px height, centered
         ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(screen.x - 10, screen.y - 11, 20, 22);
+        ctx.fillRect(screen.x - 20, screen.y - 22, 40, 44);
         
         // Head
         ctx.fillStyle = '#ffdbac';
         ctx.beginPath();
-        ctx.arc(screen.x, screen.y - 15, 6, 0, Math.PI * 2);
+        ctx.arc(screen.x, screen.y - 30, 12, 0, Math.PI * 2);
         ctx.fill();
 
         // Hair/Cap (distinct gold/orange cap)
         ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(screen.x - 5, screen.y - 21, 10, 3);
+        ctx.fillRect(screen.x - 10, screen.y - 42, 20, 6);
 
         // Label
         ctx.fillStyle = '#ffffff';
         ctx.font = '6px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 26);
+        ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 48);
         ctx.restore();
 
         // Render its followers

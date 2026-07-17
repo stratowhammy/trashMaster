@@ -144,7 +144,7 @@ class Player {
 
     render(ctx, camera, spriteManager) {
         const screen = camera.worldToScreen(this.x, this.y);
-        let drawSize = 32;
+        let drawSize = 64;
         
         let imgId = this.spriteId;
         if (window.crimeMode) {

@@ -72,7 +72,7 @@ class GarbageTruckFollower {
         const img = spriteManager.getCharacterImage('char_truck'); // original green truck
         if (img) {
             ctx.save();
-            const scaledSize = this.size * 0.8;
+            const scaledSize = 36;
             if (this.direction === 'left') {
                 ctx.translate(screen.x, screen.y);
                 ctx.scale(-1, 1);
@@ -299,7 +299,9 @@ class Game {
                                     const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
                                     if (dist < TILE_SIZE * 1.5) {
                                         if (window.cultMode) {
-                                            this.lastVisitedFastFoodId = ffBldg.id;
+                                            if (this.lastEatenFastFoodId !== null && this.lastEatenFastFoodId !== ffBldg.id) {
+                                                this.visitedDifferentRestaurantSinceLastEat = true;
+                                            }
                                         }
                                         this.pendingFastFoodId = ffBldg.id;
                                         window.triggerFastFoodOffer(this.getRoundTotalFollowers());
@@ -1170,11 +1172,11 @@ class Game {
 
         // ── Phase 3: Cult Mode — happiness decay + family miss timer ──
         if (window.cultMode) {
-            // Gradual happiness decay (2 points per 3s)
+            // Gradual happiness decay (1 point per 5s)
             this.happinessDecayTimer = (this.happinessDecayTimer || 0) + dt;
-            if (this.happinessDecayTimer >= 3) {
-                this.happinessDecayTimer -= 3;
-                this.happiness = Math.max(0, (this.happiness || 100) - 2);
+            if (this.happinessDecayTimer >= 5) {
+                this.happinessDecayTimer -= 5;
+                this.happiness = Math.max(0, (this.happiness || 100) - 1);
             }
 
             // Happiness hits 0: halve the posse
@@ -2108,7 +2110,7 @@ class Game {
         this.cultLeavingTimer = 20.0 + Math.random() * 15.0; // first leaving dialog after 20-35s
         this.cultHappinessBufferTimer = 0;
         this.lastEatenFastFoodId = null;
-        this.lastVisitedFastFoodId = null;
+        this.visitedDifferentRestaurantSinceLastEat = false;
         this.cultLeavesCumulative = window.cultLeavesCumulative || 0;
         if (window.cultMode) {
             this.hud.showFollowerNotification('⛪ Cult Mode: Church of Grimetology is active!', true);
@@ -3929,7 +3931,7 @@ class GameOrganizer {
                     bobY = Math.sin(this.animTimer * 0.8) * 1.5;
                 }
                 ctx.save();
-                const drawSize = 24;
+                const drawSize = 30;
                 if (this.direction === 'left') {
                     ctx.translate(screen.x, screen.y + bobY);
                     ctx.scale(-1, 1);
@@ -3952,19 +3954,19 @@ class GameOrganizer {
         }
 
         ctx.save();
-        // Body (Blue shirt)
+        // Body (Blue shirt) - matching 30px height, centered
         ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(screen.x - 10, screen.y - 12, 20, 24);
+        ctx.fillRect(screen.x - 10, screen.y - 10, 20, 20);
         
         // Head
         ctx.fillStyle = '#ffdbac';
         ctx.beginPath();
-        ctx.arc(screen.x, screen.y - 16, 7, 0, Math.PI * 2);
+        ctx.arc(screen.x, screen.y - 14, 6, 0, Math.PI * 2);
         ctx.fill();
 
         // Hair/Cap (distinct gold/orange cap)
         ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(screen.x - 6, screen.y - 23, 12, 4);
+        ctx.fillRect(screen.x - 5, screen.y - 20, 10, 3);
 
         // Label
         ctx.fillStyle = '#ffffff';
@@ -4011,8 +4013,7 @@ window.triggerFastFoodOffer = function(posseCount) {
         if (window.cultMode && window.game) {
             const lastEaten = window.game.lastEatenFastFoodId;
             const pending = window.game.pendingFastFoodId;
-            const lastVisited = window.game.lastVisitedFastFoodId;
-            if (lastEaten !== undefined && lastEaten !== null && lastEaten === pending && lastVisited === lastEaten) {
+            if (lastEaten !== undefined && lastEaten !== null && lastEaten === pending && !window.game.visitedDifferentRestaurantSinceLastEat) {
                 isBlocked = true;
             }
         }
@@ -4101,8 +4102,11 @@ window.addEventListener('DOMContentLoaded', () => {
             } else {
                 if (window.cultMode) {
                     window.game.lastEatenFastFoodId = window.game.pendingFastFoodId;
+                    window.game.visitedDifferentRestaurantSinceLastEat = false;
                     window.game.cultHappinessBufferTimer = 10.0;
-                    window.game.pendingHappinessBoost = 15 + Math.floor(Math.random() * 11);
+                    const currentH = window.game.happiness || 0;
+                    const boost = Math.round(15 + (1 - (currentH / 100)) * 20);
+                    window.game.pendingHappinessBoost = boost;
                     window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Happiness will increase in 10s!`, true);
                 } else {
                     window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 15s.`, true);

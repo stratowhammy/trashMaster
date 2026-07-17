@@ -3731,6 +3731,7 @@ class Game {
     }
 
     openWordGameDialog() {
+        this.preDialogState = this.state;
         this.state = GameState.UI_OVERLAY;
         this.resetKeys();
 
@@ -4470,12 +4471,21 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const btnStoreViewInventory = document.getElementById('btn-store-view-inventory');
+    if (btnStoreViewInventory) {
+        btnStoreViewInventory.addEventListener('click', () => {
+            if (window.game) {
+                window.game.openWordGameDialog();
+            }
+        });
+    }
+
     const btnWordGameClose = document.getElementById('btn-word-game-close');
     if (btnWordGameClose) {
         btnWordGameClose.addEventListener('click', () => {
             document.getElementById('trash-word-game-dialog').classList.add('hidden');
             if (window.game) {
-                window.game.state = GameState.PLAYING;
+                window.game.state = window.game.preDialogState || GameState.PLAYING;
             }
             canvas.focus();
         });

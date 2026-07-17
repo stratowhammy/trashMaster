@@ -125,6 +125,35 @@ class Game {
         this.crimeManager = new CrimeManager();
         this.player = null;
 
+        // Word Game State
+        this.collectedLetters = {};
+        this.completedWords = [];
+        this.wordList = [
+            'GARBAGE', 'PLASTIC', 'RECYCLE', 'COMPOST', 'LANDFILL',
+            'POLLUTION', 'LITTER', 'DEBRIS', 'REFUSE', 'WASTE'
+        ];
+        this.letterSpawnPool = [
+            'A','A','A','A','A',
+            'B','B',
+            'C','C','C','C',
+            'D','D',
+            'E','E','E','E','E','E','E','E',
+            'F','F',
+            'G','G',
+            'I','I','I','I','I',
+            'L','L','L','L','L','L','L','L',
+            'M',
+            'N','N',
+            'O','O','O','O',
+            'P','P','P',
+            'R','R','R','R','R',
+            'S','S','S','S','S',
+            'T','T','T','T','T','T',
+            'U','U',
+            'W',
+            'Y'
+        ];
+
         // Timing
         this.lastTime = 0;
 
@@ -1794,6 +1823,11 @@ class Game {
     }
 
     _render() {
+        const btnWordGame = document.getElementById('btn-open-word-game');
+        if (btnWordGame) {
+            btnWordGame.style.display = (this.state === GameState.PLAYING) ? 'block' : 'none';
+        }
+
         const ctx = this.ctx;
         const w = this.canvas.width;
         const h = this.canvas.height;
@@ -3696,6 +3730,196 @@ class Game {
         }
     }
 
+    openWordGameDialog() {
+        this.state = GameState.UI_OVERLAY;
+        this.resetKeys();
+
+        this.wordSlotsState = this.wordSlotsState || {};
+        this.wordList.forEach(w => {
+            if (!this.wordSlotsState[w]) {
+                this.wordSlotsState[w] = Array(w.length).fill('');
+            }
+        });
+
+        this.renderWordGameDialog();
+        document.getElementById('trash-word-game-dialog').classList.remove('hidden');
+    }
+
+    renderWordGameDialog() {
+        const uniqueLetters = ['A','B','C','D','E','F','G','I','L','M','N','O','P','R','S','T','U','W','Y'];
+        const invText = 'Available Letters: ' + uniqueLetters.map(l => `${l}(${this.collectedLetters[l] || 0})`).join(' | ');
+        document.getElementById('letter-inventory-display').innerText = invText;
+
+        const PRIZES = {
+            'WASTE': { name: '$15,000 Cash', type: 'cash', val: 15000 },
+            'LITTER': { name: 'Quinine + $10,000 Cash', type: 'quinine_cash', val: 10000 },
+            'DEBRIS': { name: 'Flower + $10,000 Cash', type: 'flower_cash', val: 10000 },
+            'REFUSE': { name: 'Protection + $10,000 Cash', type: 'protection_cash', val: 10000 },
+            'GARBAGE': { name: '$50,000 Cash', type: 'cash', val: 50000 },
+            'PLASTIC': { name: '$50,000 Cash', type: 'cash', val: 50000 },
+            'RECYCLE': { name: '$60,000 Cash', type: 'cash', val: 60000 },
+            'COMPOST': { name: '$60,000 Cash', type: 'cash', val: 60000 },
+            'LANDFILL': { name: 'Bruno Trash Truck + $30,000 Cash', type: 'truck_cash', val: 30000 },
+            'POLLUTION': { name: '$150,000 Cash', type: 'cash', val: 150000 }
+        };
+
+        const container = document.getElementById('word-game-slots-container');
+        container.innerHTML = '';
+
+        this.wordList.forEach((word, wordIndex) => {
+            const isCompleted = this.completedWords.includes(word);
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.padding = '8px 0';
+            row.style.borderBottom = '1px solid #333';
+
+            const leftSide = document.createElement('div');
+            leftSide.style.display = 'flex';
+            leftSide.style.alignItems = 'center';
+            leftSide.style.gap = '15px';
+
+            const numLabel = document.createElement('span');
+            numLabel.style.fontSize = '8px';
+            numLabel.style.color = '#888';
+            numLabel.style.width = '25px';
+            numLabel.innerText = `${wordIndex + 1}.`;
+            leftSide.appendChild(numLabel);
+
+            const slotsDiv = document.createElement('div');
+            slotsDiv.style.display = 'flex';
+
+            for (let i = 0; i < word.length; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.maxLength = 1;
+                input.style.width = '22px';
+                input.style.height = '22px';
+                input.style.textAlign = 'center';
+                input.style.fontFamily = '"Press Start 2P", monospace';
+                input.style.fontSize = '9px';
+                input.style.marginRight = '4px';
+                input.style.boxSizing = 'border-box';
+                
+                input.setAttribute('data-word', word);
+                input.setAttribute('data-index', i);
+
+                const currentVal = this.wordSlotsState[word][i];
+
+                if (isCompleted) {
+                    input.value = word[i];
+                    input.disabled = true;
+                    input.style.background = '#1b4a22';
+                    input.style.border = '2px solid #00ff55';
+                    input.style.color = '#00ff55';
+                } else if (currentVal !== '') {
+                    input.value = currentVal;
+                    input.disabled = true;
+                    input.style.background = '#2a2a2a';
+                    input.style.border = '2px solid #888';
+                    input.style.color = '#ccc';
+                } else {
+                    input.value = '';
+                    input.style.background = '#222';
+                    input.style.border = '2px solid #555';
+                    input.style.color = '#fff';
+
+                    input.addEventListener('input', (e) => {
+                        const char = e.target.value.toUpperCase();
+                        e.target.value = '';
+
+                        const targetLetter = word[i];
+                        const statusEl = document.getElementById('word-game-status-text');
+
+                        if (!char.match(/^[A-Z]$/)) return;
+
+                        if (char !== targetLetter) {
+                            statusEl.innerText = `Incorrect letter for this slot! Expected: ${targetLetter}`;
+                            return;
+                        }
+
+                        if ((this.collectedLetters[char] || 0) <= 0) {
+                            statusEl.innerText = `You do not have letter "${char}" in your inventory!`;
+                            return;
+                        }
+
+                        statusEl.innerText = '';
+                        this.collectedLetters[char]--;
+                        this.wordSlotsState[word][i] = char;
+
+                        if (this.wordSlotsState[word].join('') === word) {
+                            this.completedWords.push(word);
+                            const prize = PRIZES[word];
+                            this.awardWordGamePrize(prize);
+                        }
+
+                        this.renderWordGameDialog();
+
+                        setTimeout(() => {
+                            const nextIndex = i + 1;
+                            const nextInput = document.querySelector(`input[data-word="${word}"][data-index="${nextIndex}"]`);
+                            if (nextInput && !nextInput.disabled) {
+                                nextInput.focus();
+                            } else {
+                                const firstEmptyIdx = this.wordSlotsState[word].findIndex(c => c === '');
+                                if (firstEmptyIdx !== -1) {
+                                    const emptyInput = document.querySelector(`input[data-word="${word}"][data-index="${firstEmptyIdx}"]`);
+                                    if (emptyInput) emptyInput.focus();
+                                }
+                            }
+                        }, 50);
+                    });
+                }
+
+                slotsDiv.appendChild(input);
+            }
+            leftSide.appendChild(slotsDiv);
+            row.appendChild(leftSide);
+
+            const prizeLabel = document.createElement('span');
+            prizeLabel.style.fontSize = '7px';
+            if (isCompleted) {
+                prizeLabel.style.color = '#00ff55';
+                prizeLabel.innerText = `[COMPLETED] ${PRIZES[word].name}`;
+            } else {
+                prizeLabel.style.color = '#aaa';
+                prizeLabel.innerText = `Prize: ${PRIZES[word].name}`;
+            }
+            row.appendChild(prizeLabel);
+
+            container.appendChild(row);
+        });
+    }
+
+    async awardWordGamePrize(prize) {
+        if (prize.val > 0) {
+            this.trashManager.totalPoints += prize.val;
+            this.hud.updateScore(this.trashManager.totalPoints);
+        }
+
+        if (prize.type === 'quinine_cash') {
+            window.playerInventory = window.playerInventory || {};
+            window.playerInventory['Quinine'] = (window.playerInventory['Quinine'] || 0) + 1;
+            await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'quinine' });
+        } else if (prize.type === 'flower_cash') {
+            window.playerInventory = window.playerInventory || {};
+            window.playerInventory['Flower'] = (window.playerInventory['Flower'] || 0) + 1;
+            await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'flower' });
+        } else if (prize.type === 'protection_cash') {
+            window.playerInventory = window.playerInventory || {};
+            window.playerInventory['Protection'] = (window.playerInventory['Protection'] || 0) + 1;
+            await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'protection' });
+        } else if (prize.type === 'truck_cash') {
+            window.playerHasTruck = (window.playerHasTruck || 0) + 1;
+            window.playerInventory = window.playerInventory || {};
+            window.playerInventory['Bruno The Trash Truck'] = (window.playerInventory['Bruno The Trash Truck'] || 0) + 1;
+            await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'truck' });
+        }
+
+        this.hud.showFollowerNotification(`🎉 Word Completed! Unlocked: ${prize.name}`, true);
+    }
+
     _removeSequentialFollower() {
         const organizersCount = this.organizers ? this.organizers.length : 0;
         const dragonsCount = this.dragons ? this.dragons.length : 0;
@@ -4199,6 +4423,27 @@ window.addEventListener('DOMContentLoaded', () => {
             if (window.game) {
                 window.game.state = GameState.PLAYING;
                 window.game.acceptedMafiaVotes = false;
+            }
+            canvas.focus();
+        });
+    }
+
+    // Word Game Modal Event Listeners
+    const btnOpenWordGame = document.getElementById('btn-open-word-game');
+    if (btnOpenWordGame) {
+        btnOpenWordGame.addEventListener('click', () => {
+            if (window.game) {
+                window.game.openWordGameDialog();
+            }
+        });
+    }
+
+    const btnWordGameClose = document.getElementById('btn-word-game-close');
+    if (btnWordGameClose) {
+        btnWordGameClose.addEventListener('click', () => {
+            document.getElementById('trash-word-game-dialog').classList.add('hidden');
+            if (window.game) {
+                window.game.state = GameState.PLAYING;
             }
             canvas.focus();
         });

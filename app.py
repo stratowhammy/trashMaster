@@ -576,6 +576,42 @@ def bribe_police():
     db.commit()
     return jsonify({'success': True, 'balance': new_balance})
 
+@app.route('/api/game/award-prize', methods=['POST'])
+def award_prize():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    prize_type = request.json.get('prize_type')
+    db = get_db()
+    cursor = db.cursor()
+    
+    if prize_type == 'quinine':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Quinine'))
+        row = cursor.fetchone()
+        if row:
+            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Quinine'))
+        else:
+            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], 'Quinine'))
+    elif prize_type == 'flower':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Flower'))
+        row = cursor.fetchone()
+        if row:
+            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Flower'))
+        else:
+            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], 'Flower'))
+    elif prize_type == 'protection':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Protection'))
+        row = cursor.fetchone()
+        if row:
+            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Protection'))
+        else:
+            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], 'Protection'))
+    elif prize_type == 'truck':
+        db.execute("UPDATE users SET has_truck = MIN(4, has_truck + 1) WHERE id=?", (user_data['user_id'],))
+        
+    db.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/game/end-round', methods=['POST'])
 def end_round():
     user_data = verify_token(request)

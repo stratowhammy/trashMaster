@@ -47,6 +47,14 @@ class NPC {
 
     interact() {
         this.interacted = true;
+        if (this.assignedLetter && !this.givenLetter) {
+            this.givenLetter = true;
+            if (window.game) {
+                window.game.collectedLetters = window.game.collectedLetters || {};
+                window.game.collectedLetters[this.assignedLetter] = (window.game.collectedLetters[this.assignedLetter] || 0) + 1;
+                window.game.hud.showFollowerNotification(`Collected letter '${this.assignedLetter}' from ${this.name}!`, true);
+            }
+        }
         return {
             lines: this.dialogueLines,
             isInformant: this.isInformant,
@@ -267,6 +275,10 @@ class NPCManager {
                 const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false);
                 if ((window.politicsMode || window.elPresidenteElection) && Math.random() < 0.6) {
                     npc.isRedRivalOnly = true;
+                }
+                if (!npc.isRedRivalOnly && window.game && window.game.letterSpawnPool) {
+                    const pool = window.game.letterSpawnPool;
+                    npc.assignedLetter = pool[Math.floor(Math.random() * pool.length)];
                 }
                 this.npcs.push(npc);
             }

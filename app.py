@@ -71,6 +71,18 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN unlocked_crime INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN unlocked_cult INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN unlocked_builder INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN unlocked_fantasy INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         for col in [
             'stat_max_single_trash',
             'stat_cumulative_trash',
@@ -149,6 +161,25 @@ def init_db():
             db.execute("ALTER TABLE user_round_stats ADD COLUMN bank_balance INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        # Phase 3: Cult happiness, Builder buildings
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN happiness FLOAT DEFAULT 100.0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN cult_leaves_cumulative INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS user_buildings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                building_idx INTEGER NOT NULL,
+                address TEXT NOT NULL,
+                tenants INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
         db.commit()
         
         # Create default admin if not exists
@@ -256,7 +287,11 @@ def sync_game():
                made_man_status, political_office, completed_mafia_jobs,
                stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers,
                credits, international_followers, total_rounds_played, election_state,
-               rounds_in_state, unlocked_international, travel_destination, IFNULL(politics_banned, 0) AS politics_banned
+               rounds_in_state, unlocked_international, travel_destination, IFNULL(politics_banned, 0) AS politics_banned,
+               IFNULL(unlocked_cult, 0) AS unlocked_cult, IFNULL(unlocked_builder, 0) AS unlocked_builder,
+               IFNULL(unlocked_fantasy, 0) AS unlocked_fantasy,
+               IFNULL(cult_leaves_cumulative, 0) AS cult_leaves_cumulative,
+               IFNULL(happiness, 100.0) AS happiness
         FROM users WHERE id=?
     """, (user_data['user_id'],))
     user = cursor.fetchone()
@@ -271,6 +306,9 @@ def sync_game():
         'movement_size': user['movement_size'] if user['movement_size'] else 0,
         'unlocked_fastfood': int(user['unlocked_fastfood'] or 0),
         'unlocked_crime': int(user['unlocked_crime'] or 0),
+        'unlocked_cult': int(user['unlocked_cult'] or 0),
+        'unlocked_builder': int(user['unlocked_builder'] or 0),
+        'unlocked_fantasy': int(user['unlocked_fantasy'] or 0),
         'unlocked_international': int(user['unlocked_international'] or 0),
         'travel_destination': user['travel_destination'] or 'filthadelphia',
         'made_man_status': user['made_man_status'] or 'none',
@@ -279,6 +317,8 @@ def sync_game():
         'credits': int(user['credits']) if user['credits'] is not None else 3,
         'international_followers': int(user['international_followers'] or 0),
         'politics_banned': int(user['politics_banned'] or 0),
+        'happiness': float(user['happiness']),
+        'cult_leaves_cumulative': int(user['cult_leaves_cumulative']),
         'inventory': inventory,
         'stats': {
             'max_single_trash': user['stat_max_single_trash'] or 0,
@@ -309,7 +349,8 @@ def buy_item():
         'Organizer': 250,
         'Quinine': 750,
         'Trashpickers': 1000,
-        'Price Fixing': 2000
+        'Price Fixing': 2000,
+        'Burninator': 1000000
     }
     
     if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
@@ -322,6 +363,13 @@ def buy_item():
     
     if user['balance'] < price:
         return jsonify({'error': 'Insufficient funds'}), 400
+        
+    if item_name == 'Burninator':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Burninator'))
+        row = cursor.fetchone()
+        qty = row['quantity'] if row else 0
+        if qty >= 1:
+            return jsonify({'error': 'You already own Burninator!'}), 400
         
     limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
     if item_name in limited_items:
@@ -545,6 +593,12 @@ def end_round():
     is_international = bool(request.json.get('is_international', False))
     international_followers_collected = int(request.json.get('international_followers_collected', 0))
     completed_mafia_jobs = int(request.json.get('completed_mafia_jobs', 0))
+    cult_mode_active = bool(request.json.get('cult_mode_active', False))
+    new_happiness = float(request.json.get('happiness', 100.0))
+    dragon_mode_active = bool(request.json.get('dragon_mode_active', False))
+    sacrifice_dragon = bool(request.json.get('sacrifice_dragon', False))
+    dragon_lost = False
+    cult_leaves_cumulative = request.json.get('cult_leaves_cumulative')
     
     db = get_db()
     cursor = db.cursor()
@@ -606,12 +660,73 @@ def end_round():
         new_movement_size = (user['movement_size'] or 0) + followers
             
     if new_balance < 0: new_balance = 0
+
+    # Cult Mode: 1.5x follower multiplier — apply BEFORE movement_size is finalized
+    if cult_mode_active and not mafia_arrest and not politics_arrest:
+        followers = int(followers * 1.5)
+        # Update movement_size with the multiplied follower count
+        if not mafia_arrest and not politics_arrest:
+            new_movement_size = (user['movement_size'] or 0) + followers
+
+    if dragon_mode_active:
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name='Burninator'", (user_data['user_id'],))
+        row = cursor.fetchone()
+        if row and row['quantity'] > 0:
+            if sacrifice_dragon:
+                if new_movement_size >= 5:
+                    new_movement_size -= 5
+                    if new_happiness >= 90.0:
+                        new_happiness = 100.0
+                    elif new_happiness <= 70.0:
+                        new_happiness -= 50.0
+                        if new_happiness < 0.0:
+                            new_movement_size = int(new_movement_size * 0.5)
+                else:
+                    db.execute("DELETE FROM inventory WHERE user_id=? AND item_name='Burninator'", (user_data['user_id'],))
+                    new_movement_size = 0
+                    dragon_lost = True
+            else:
+                db.execute("DELETE FROM inventory WHERE user_id=? AND item_name='Burninator'", (user_data['user_id'],))
+                dragon_lost = True
+
+    if new_happiness < 0.0:
+        new_happiness = 50.0
+
+    # Builder Mode: tenant revenue ($1000 per tenant per building per round)
+    db_cursor2 = db.cursor()
+    db_cursor2.execute("SELECT id, tenants FROM user_buildings WHERE user_id=?", (user_data['user_id'],))
+    owned_buildings = db_cursor2.fetchall()
+    total_tenant_revenue = sum(int(b['tenants']) * 1000 for b in owned_buildings)
+    # Capture earned BEFORE tenant revenue for clean stat tracking
+    earned_for_stats = earned
+    if not mafia_arrest and not politics_arrest:
+        new_balance += total_tenant_revenue
+        earned_for_stats = earned + total_tenant_revenue  # include in cumulative money
+
+    # Builder Mode: tax every 4 rounds ($750 per owned building)
+    current_total_rounds = (user['total_rounds_played'] or 0) + 1
+    if len(owned_buildings) > 0 and current_total_rounds % 4 == 0:
+        tax_owed = 750 * len(owned_buildings)
+        if new_balance >= tax_owed:
+            new_balance -= tax_owed
+        else:
+            # Iteratively delete buildings until debt is cleared
+            remaining_tax = tax_owed - new_balance
+            new_balance = 0
+            db_cursor3 = db.cursor()
+            db_cursor3.execute("SELECT id FROM user_buildings WHERE user_id=? ORDER BY id DESC", (user_data['user_id'],))
+            bldg_rows = db_cursor3.fetchall()
+            for brow in bldg_rows:
+                db.execute("DELETE FROM user_buildings WHERE id=?", (brow['id'],))
+                remaining_tax -= 750
+                if remaining_tax <= 0:
+                    break
             
     # Calculate stat updates
     new_max_single_trash = max(user['stat_max_single_trash'] or 0, trash_collected)
     new_cumulative_trash = (user['stat_cumulative_trash'] or 0) + trash_collected
-    new_max_single_money = max(user['stat_max_single_money'] or 0, earned)
-    new_cumulative_money = (user['stat_cumulative_money'] or 0) + earned
+    new_max_single_money = max(user['stat_max_single_money'] or 0, earned)  # 8-ball multiplied value
+    new_cumulative_money = (user['stat_cumulative_money'] or 0) + earned_for_stats  # includes tenant revenue
     
     new_max_single_followers = max(user['stat_max_single_followers'] or 0, followers)
     new_international_followers = (user['international_followers'] or 0) + international_followers_collected
@@ -651,13 +766,23 @@ def end_round():
                 rounds_in_state = 0
                 new_office = f"candidate_{current_office}"
         elif election_state == 'primary':
-            if handshakes > rival_handshakes:
-                election_state = 'waiting_main'
-                primary_won = True
+            if current_office.startswith('candidate_el_presidente_'):
+                if handshakes > rival_handshakes:
+                    election_state = 'idle'
+                    new_office = 'el_presidente'
+                    primary_won = True
+                else:
+                    election_state = 'idle'
+                    new_office = 'citizen'
+                    primary_lost = True
             else:
-                election_state = 'cooldown_primary'
-                new_office = current_office.replace('candidate_', '') # Revert title on loss
-                primary_lost = True
+                if handshakes > rival_handshakes:
+                    election_state = 'waiting_main'
+                    primary_won = True
+                else:
+                    election_state = 'cooldown_primary'
+                    new_office = current_office.replace('candidate_', '') # Revert title on loss
+                    primary_lost = True
             rounds_in_state = 0
         elif election_state == 'waiting_main':
             if rounds_in_state >= 4:
@@ -696,6 +821,8 @@ def end_round():
             total_rounds_played = ?,
             international_followers = ?,
             completed_mafia_jobs = ?,
+            travel_destination = 'filthadelphia',
+            happiness = ?,
             stat_max_single_trash=?,
             stat_cumulative_trash=?,
             stat_max_single_money=?,
@@ -710,6 +837,8 @@ def end_round():
         rounds_in_state,
         total_rounds_played,
         new_international_followers,
+        new_completed_mafia_jobs,
+        min(100.0, max(0.0, new_happiness)),
         new_max_single_trash,
         new_cumulative_trash,
         new_max_single_money,
@@ -717,6 +846,8 @@ def end_round():
         new_max_single_followers,
         user_data['user_id']
     ))
+    if cult_leaves_cumulative is not None:
+        db.execute("UPDATE users SET cult_leaves_cumulative=? WHERE id=?", (int(cult_leaves_cumulative), user_data['user_id']))
     db.execute("DELETE FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
     db.execute("""
         INSERT INTO user_round_stats (
@@ -727,7 +858,7 @@ def end_round():
         user_data['user_id'],
         total_rounds_played,
         trash_collected,
-        earned,
+        earned_for_stats,
         followers,
         new_cumulative_trash,
         new_cumulative_money,
@@ -746,8 +877,62 @@ def end_round():
         'rounds_in_state': rounds_in_state,
         'primary_won': primary_won,
         'primary_lost': primary_lost,
-        'stranded': stranded
+        'stranded': stranded,
+        'dragon_lost': dragon_lost
     })
+
+@app.route('/api/game/buildings', methods=['GET'])
+def get_buildings():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT id, building_idx, address, tenants FROM user_buildings WHERE user_id=? ORDER BY id ASC", (user_data['user_id'],))
+    rows = cursor.fetchall()
+    buildings = [{'id': r['id'], 'building_idx': r['building_idx'], 'address': r['address'], 'tenants': r['tenants']} for r in rows]
+    return jsonify({'success': True, 'buildings': buildings})
+
+@app.route('/api/game/buy-building', methods=['POST'])
+def buy_building():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    building_idx = request.json.get('building_idx')
+    address = request.json.get('address', '')
+    cost = int(request.json.get('cost', 0))
+    if building_idx is None or cost <= 0:
+        return jsonify({'error': 'Invalid building data'}), 400
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    if user['balance'] < cost:
+        return jsonify({'error': 'Insufficient funds'}), 400
+    # Check not already owned
+    cursor.execute("SELECT id FROM user_buildings WHERE user_id=? AND building_idx=?", (user_data['user_id'], building_idx))
+    if cursor.fetchone():
+        return jsonify({'error': 'Already own this building'}), 400
+    new_balance = user['balance'] - cost
+    db.execute("UPDATE users SET balance=? WHERE id=?", (new_balance, user_data['user_id']))
+    db.execute("INSERT INTO user_buildings (user_id, building_idx, address, tenants) VALUES (?, ?, ?, 0)", (user_data['user_id'], building_idx, address))
+    db.commit()
+    return jsonify({'success': True, 'balance': new_balance})
+
+@app.route('/api/game/add-tenant', methods=['POST'])
+def add_tenant():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    building_idx = request.json.get('building_idx')
+    if building_idx is None:
+        return jsonify({'error': 'Invalid building'}), 400
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT id, tenants FROM user_buildings WHERE user_id=? AND building_idx=?", (user_data['user_id'], building_idx))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({'error': 'Building not owned'}), 400
+    db.execute("UPDATE user_buildings SET tenants = tenants + 1 WHERE id=?", (row['id'],))
+    db.commit()
+    return jsonify({'success': True, 'tenants': row['tenants'] + 1})
 
 @app.route('/api/game/stats-history', methods=['GET'])
 def get_stats_history():
@@ -806,17 +991,37 @@ def unlock_mode():
     if not user_data: return jsonify({'error': 'Unauthorized'}), 401
     
     mode = request.json.get('mode')
-    if mode not in ['fastfood', 'crime']:
+    if mode not in ['fastfood', 'crime', 'cult', 'builder', 'fantasy']:
         return jsonify({'error': 'Invalid mode'}), 400
         
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance, movement_size, unlocked_fastfood, unlocked_crime FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("""
+        SELECT balance, movement_size, unlocked_fastfood, unlocked_crime,
+               IFNULL(unlocked_cult, 0) AS unlocked_cult, IFNULL(unlocked_builder, 0) AS unlocked_builder,
+               IFNULL(unlocked_fantasy, 0) AS unlocked_fantasy
+        FROM users WHERE id=?
+    """, (user_data['user_id'],))
     user = cursor.fetchone()
     
-    cost = 20000 if mode == 'fastfood' else 35000
-    req_followers = 25 if mode == 'fastfood' else 50
-    col_name = 'unlocked_fastfood' if mode == 'fastfood' else 'unlocked_crime'
+    costs = {
+        'fastfood': 20000,
+        'crime': 35000,
+        'cult': 15000,
+        'builder': 25000,
+        'fantasy': 30000
+    }
+    reqs = {
+        'fastfood': 25,
+        'crime': 50,
+        'cult': 40,
+        'builder': 60,
+        'fantasy': 75
+    }
+    
+    cost = costs[mode]
+    req_followers = reqs[mode]
+    col_name = f'unlocked_{mode}'
     
     if user[col_name]:
         return jsonify({'error': 'Already unlocked'}), 400
@@ -872,7 +1077,11 @@ def political_choice():
     election_state = 'idle'
     rounds_in_state = 0
     if choice == 'accepted':
-        if current_office == 'citizen':
+        office_param = request.json.get('office')
+        if office_param and office_param.startswith('candidate_el_presidente_'):
+            office = office_param
+            election_state = 'primary'
+        elif current_office == 'citizen':
             office = 'candidate_council'
             election_state = 'primary'
         elif current_office == 'council':

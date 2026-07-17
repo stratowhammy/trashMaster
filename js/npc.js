@@ -39,10 +39,9 @@ class NPC {
     }
 
     isPlayerNear(playerX, playerY) {
-        const px = ((playerX % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
-        const py = ((playerY % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
-        const dx = this.x - px;
-        const dy = this.y - py;
+        const wrapped = typeof nearestWrap === 'function' ? nearestWrap(this.x, this.y, playerX, playerY) : {x: this.x, y: this.y};
+        const dx = wrapped.x - playerX;
+        const dy = wrapped.y - playerY;
         return Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 1.5;
     }
 
@@ -122,16 +121,24 @@ class NPC {
         ctx.textAlign = 'center';
         ctx.fillText(this.name + (this.isRedRivalOnly ? " (R)" : ""), screen.x, screen.y - drawSize / 2 - 6);
 
-        if (window.politicsMode && !this.shaken) {
+        if ((window.politicsMode || window.elPresidenteElection) && !this.shaken) {
             ctx.save();
             ctx.font = '12px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const bobY = Math.sin(Date.now() / 200) * 3;
-            if (this.isRedRivalOnly) {
-                ctx.fillText('🤝🔴', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+            if (window.elPresidenteElection) {
+                if (this.isRedRivalOnly) {
+                    ctx.fillText('😡🔴', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+                } else {
+                    ctx.fillText('😡', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+                }
             } else {
-                ctx.fillText('🤝', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+                if (this.isRedRivalOnly) {
+                    ctx.fillText('🤝🔴', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+                } else {
+                    ctx.fillText('🤝', screen.x, screen.y - drawSize / 2 - 18 + bobY);
+                }
             }
             ctx.restore();
         }
@@ -172,12 +179,12 @@ class NPCManager {
             [sidewalks[i], sidewalks[j]] = [sidewalks[j], sidewalks[i]];
         }
 
-        const maxPositions = window.politicsMode ? 150 : 20;
+        const maxPositions = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? 150 : 20;
         const positions = [];
         for (const pos of sidewalks) {
             let tooClose = false;
             for (const p of positions) {
-                const minDist = window.politicsMode ? 5 : 10;
+                const minDist = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? 5 : 10;
                 if (Math.hypot(pos.x - p.x, pos.y - p.y) < minDist) {
                     tooClose = true;
                     break;
@@ -192,7 +199,7 @@ class NPCManager {
         const informantIndices = new Set();
         const flowerIndices = new Set();
 
-        const numNPCsToSpawn = window.politicsMode ? Math.min(100, positions.length) : Math.min(10, positions.length);
+        const numNPCsToSpawn = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? Math.min(60, positions.length) : Math.min(10, positions.length);
 
         if (frenzyMode && buildings && buildings.length >= 5) {
             // Pick 5 random NPCs to be informants
@@ -258,7 +265,7 @@ class NPCManager {
             } else {
                 dialogue = NPC_DIALOGUES[i % NPC_DIALOGUES.length];
                 const npc = new NPC(pos.x, pos.y, 'char_npc', dialogue, npcName, false);
-                if (window.politicsMode && Math.random() < 0.6) {
+                if ((window.politicsMode || window.elPresidenteElection) && Math.random() < 0.6) {
                     npc.isRedRivalOnly = true;
                 }
                 this.npcs.push(npc);
@@ -280,8 +287,9 @@ class NPCManager {
 
         for (const npc of this.npcs) {
             if (npc.isPlayerNear(playerX, playerY)) {
-                const dx = npc.x - px;
-                const dy = npc.y - py;
+                const wrapped = typeof nearestWrap === 'function' ? nearestWrap(npc.x, npc.y, playerX, playerY) : {x: npc.x, y: npc.y};
+                const dx = wrapped.x - playerX;
+                const dy = wrapped.y - playerY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < nearestDist) {
                     nearestDist = dist;
@@ -331,9 +339,16 @@ class NPCManager {
 
     render(ctx, camera, spriteManager) {
         for (const npc of this.npcs) {
+            const origX = npc.x;
+            const origY = npc.y;
+            const wrapped = typeof nearestWrap === 'function' ? nearestWrap(npc.x, npc.y, camera.getCenterX(), camera.getCenterY()) : {x: npc.x, y: npc.y};
+            npc.x = wrapped.x;
+            npc.y = wrapped.y;
             if (camera.isVisible(npc.x - npc.size, npc.y - npc.size, npc.size * 2, npc.size * 2)) {
                 npc.render(ctx, camera, spriteManager);
             }
+            npc.x = origX;
+            npc.y = origY;
         }
     }
 
@@ -408,11 +423,184 @@ class NPCManager {
         ];
         const npcName = nameList[Math.floor(Math.random() * nameList.length)];
         const npc = new NPC(tx, ty, 'char_npc', ["Go Trash Party!", "Vote for the Council!"], npcName);
-        if (window.politicsMode && Math.random() < 0.6) {
+        if ((window.politicsMode || window.elPresidenteElection) && Math.random() < 0.6) {
             npc.isRedRivalOnly = true;
         }
         npc.shaken = false;
         this.npcs.push(npc);
         return npc;
     }
+
+    // ── Lost Child Quest ──
+    spawnChildQuest(gameMap, buildings) {
+        this.childNPC = null;
+        this.parentNPCs = [];
+        this.childQuestBuilding = null;
+        this.childDelivered = false;
+        this.childFollowing = false;
+
+        // Pick a target building (not bank, not police, not airport, not hospital)
+        const eligible = buildings.filter(b => 
+            b.type !== 'bank' && b.type !== 'police' && b.type !== 'airport' &&
+            b.type !== 'hospital' && b.doorTiles.length > 0
+        );
+        if (eligible.length === 0) return;
+        const targetBldg = eligible[Math.floor(Math.random() * eligible.length)];
+        this.childQuestBuilding = targetBldg;
+
+        // Spawn child on a random sidewalk tile far from building
+        let childTX = 0, childTY = 0;
+        for (let attempt = 0; attempt < 500; attempt++) {
+            childTX = Math.floor(Math.random() * MAP_WIDTH);
+            childTY = Math.floor(Math.random() * MAP_HEIGHT);
+            if (gameMap.getTile(childTX, childTY) === TileType.SIDEWALK) {
+                const doorTile = targetBldg.doorTiles[0];
+                if (Math.hypot(childTX - doorTile.x, childTY - doorTile.y) > 15) break;
+            }
+        }
+        const child = new NPC(childTX, childTY, 'char_npc', ["I am looking for my parents."], "Little Timmy", false);
+        child.npcType = 'child';
+        child.interacted = false;
+        child._tintColor = 'rgba(255, 220, 80, 0.65)'; // golden tint
+        this.childNPC = child;
+
+        // Spawn parents near the target building door
+        const door = targetBldg.doorTiles[0];
+        const parent1 = new NPC(door.x + 1, door.y, 'char_npc', ["Thank you for bringing our child home!", "You've earned your reward!"], "Mother", false);
+        parent1.npcType = 'parent';
+        parent1.interacted = true; // don't show '!' until child is following
+        const parent2 = new NPC(door.x, door.y + 1, 'char_npc', ["Our child is safe! Bless you!", "Take these followers as thanks!"], "Father", false);
+        parent2.npcType = 'parent';
+        parent2.interacted = true;
+        this.parentNPCs = [parent1, parent2];
+    }
+
+    // ── Cult Families ──
+    spawnCultFamilies(gameMap) {
+        this.cultFamilies = [];
+        const numFamilies = 4 + Math.floor(Math.random() * 3); // 4-6 families
+        
+        const sidewalks = [];
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (gameMap.tiles[y][x] === TileType.SIDEWALK) sidewalks.push({ x, y });
+            }
+        }
+
+        for (let f = 0; f < numFamilies; f++) {
+            if (sidewalks.length < 2) break;
+            const pos = sidewalks.splice(Math.floor(Math.random() * sidewalks.length), 1)[0];
+            const pos2 = sidewalks.splice(Math.floor(Math.random() * sidewalks.length), 1)[0];
+            const familyId = f;
+            
+            const member1 = new NPC(pos.x, pos.y, 'char_npc', 
+                ["We got separated from our family!", "Can you help us reunite?"], 
+                `Family ${f+1} Mom`, false);
+            member1.npcType = 'cult_family';
+            member1.familyId = familyId;
+            member1._tintColor = 'rgba(180, 80, 255, 0.55)'; // purple tint
+
+            const member2 = new NPC(pos2.x, pos2.y, 'char_npc', 
+                ["I'm looking for my family!", "They were right behind me..."], 
+                `Family ${f+1} Dad`, false);
+            member2.npcType = 'cult_family';
+            member2.familyId = familyId;
+            member2._tintColor = 'rgba(180, 80, 255, 0.55)';
+
+            this.cultFamilies.push({ id: familyId, members: [member1, member2], reunited: false });
+            this.npcs.push(member1);
+            this.npcs.push(member2);
+        }
+    }
+
+    updateChildFollow(playerX, playerY, gameMap) {
+        if (!this.childNPC || !this.childFollowing || this.childDelivered) return;
+        const child = this.childNPC;
+        const px = wrapWorldX(playerX);
+        const py = wrapWorldY(playerY);
+        const dx = px - child.x;
+        const dy = py - child.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > TILE_SIZE * 1.2) {
+            const speed = 2.5;
+            const nx = child.x + (dx / dist) * speed;
+            const ny = child.y + (dy / dist) * speed;
+            const nextTX = Math.floor(nx / TILE_SIZE);
+            const nextTY = Math.floor(ny / TILE_SIZE);
+            if (gameMap.isWalkable(nextTX, nextTY)) {
+                child.x = nx;
+                child.y = ny;
+            }
+        }
+    }
+
+    renderChildAndParents(ctx, camera, spriteManager) {
+        if (!this.childNPC || this.childDelivered) return;
+        const child = this.childNPC;
+        const screen = camera.worldToScreen(child.x, child.y);
+        const drawSize = child.size + 4;
+
+        // Render child with golden tint
+        if (!NPC._tintCanvas2) NPC._tintCanvas2 = document.createElement('canvas');
+        const off = NPC._tintCanvas2;
+        off.width = drawSize; off.height = drawSize;
+        const octx = off.getContext('2d');
+        const img = spriteManager.getCharacterImage(child.spriteId);
+        octx.clearRect(0, 0, drawSize, drawSize);
+        if (img && img.complete) octx.drawImage(img, 0, 0, drawSize, drawSize);
+        octx.save();
+        octx.globalCompositeOperation = 'source-atop';
+        octx.fillStyle = child._tintColor || 'rgba(255,220,80,0.65)';
+        octx.fillRect(0, 0, drawSize, drawSize);
+        octx.restore();
+        ctx.drawImage(off, screen.x - drawSize / 2, screen.y - drawSize / 2);
+
+        // Child label
+        ctx.fillStyle = '#ffd700';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('👦 ' + child.name, screen.x, screen.y - drawSize / 2 - 6);
+
+        // Show "Press E" if player near and not following
+        if (!this.childFollowing && child._showPrompt) {
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Press E', screen.x, screen.y + drawSize / 2 + 12);
+        }
+
+        // Render parents
+        for (const parent of this.parentNPCs) {
+            if (!this.childFollowing) continue; // don't render parents until child is following
+            const ps = camera.worldToScreen(parent.x, parent.y);
+            const pDrawSize = parent.size + 4;
+            if (img && img.complete) ctx.drawImage(img, ps.x - pDrawSize / 2, ps.y - pDrawSize / 2, pDrawSize, pDrawSize);
+            ctx.fillStyle = '#ff88ff';
+            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('👨‍👩 ' + parent.name, ps.x, ps.y - pDrawSize / 2 - 6);
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.fillText('Press E', ps.x, ps.y + pDrawSize / 2 + 12);
+        }
+    }
+
+    checkChildInteraction(playerX, playerY) {
+        if (!this.childNPC || this.childDelivered) return null;
+        if (this.childNPC.isPlayerNear(playerX, playerY)) {
+            this.childNPC._showPrompt = true;
+            return this.childNPC;
+        }
+        this.childNPC._showPrompt = false;
+        return null;
+    }
+
+    checkParentInteraction(playerX, playerY) {
+        if (!this.childFollowing || this.childDelivered || this.parentNPCs.length === 0) return null;
+        for (const parent of this.parentNPCs) {
+            if (parent.isPlayerNear(playerX, playerY)) return parent;
+        }
+        return null;
+    }
 }
+

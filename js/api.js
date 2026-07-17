@@ -111,6 +111,30 @@ function initUI() {
     if (btnAdminLogout) btnAdminLogout.addEventListener('click', logout);
     if (btnStoreLogout) btnStoreLogout.addEventListener('click', logout);
 
+    // Store Terminal Event Handler
+    const terminalInput = document.getElementById('terminal-input');
+    const terminalHistory = document.getElementById('terminal-history');
+    if (terminalInput) {
+        terminalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = terminalInput.value.trim();
+                terminalInput.value = '';
+                if (cmd) {
+                    if (terminalHistory) {
+                        terminalHistory.innerHTML += `\n> ${cmd}`;
+                        if (cmd.toLowerCase() === 'dragon ho!') {
+                            window.dragonHoCheat = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #ffff00;">Dragon Ho! Activated!</span>`;
+                        } else {
+                            terminalHistory.innerHTML += `\n<span style="color: #ff0055;">Unknown command.</span>`;
+                        }
+                        terminalHistory.scrollTop = terminalHistory.scrollHeight;
+                    }
+                }
+            }
+        });
+    }
+
     let currentSlideIndex = 0;
     let activeSlides = [];
 
@@ -167,6 +191,18 @@ function initUI() {
         const flowersToggle = document.getElementById('flowers-toggle');
         window.flowersMode = flowersToggle ? flowersToggle.checked : false;
 
+        const cultToggle = document.getElementById('cult-toggle');
+        window.cultMode = cultToggle ? cultToggle.checked : false;
+
+        const builderToggle = document.getElementById('builder-toggle');
+        window.builderMode = builderToggle ? builderToggle.checked : false;
+
+        const fantasyToggle = document.getElementById('fantasy-toggle');
+        window.fantasyMode = fantasyToggle ? fantasyToggle.checked : false;
+
+        const dragonToggle = document.getElementById('dragon-toggle');
+        window.dragonMode = dragonToggle ? dragonToggle.checked : false;
+
         activeSlides = [];
 
         // Welcome / Introduction
@@ -179,6 +215,17 @@ function initUI() {
                 "If playing with a trash truck, find the brown tile on the minimap, this is the dump. Your truck is fast, but it fills up fast, press 'e' at the entrance to empty your load."
             ]
         });
+
+        if (window.fantasyMode) {
+            activeSlides.push({
+                title: "FANTASY MODE",
+                desc: "Welcome to a world of wonder! Posse members have a chance to be Dragon Masters, who can transform into giant Flying Dragons!",
+                controls: [
+                    "Incineration: Dragons incinerate trash using fire, earning money directly without clogging your inventory!",
+                    "Organizers: Dragons act as massive flying organizers that posse members will follow."
+                ]
+            });
+        }
 
         // Mode explanations
         if (window.frenzyMode) {
@@ -236,6 +283,31 @@ function initUI() {
             });
         }
 
+        if (window.cultMode) {
+            activeSlides.push({
+                title: "THE CHURCH OF GRIMETOLOGY",
+                desc: "The Church of Grimetology is a charismatic-led cult dedicated to cleaning up trash. As its leader, you believe that raising $1,000,000 will summon a dragon (Burninator) to do your bidding. The path of Grimetology demands many sacrifices...",
+                controls: [
+                    "Reunite Families: Interacting with separated members rolls 75% join / 25% leave chance.",
+                    "Happiness Bar: Keep followers happy. Proximity, reunions, and food boost happiness. If it hits 0, half of your posse leaves!",
+                    "Follower Multiplier: Clean round yields a 1.5x multiplier on followers gained!",
+                    "Summon the Dragon: Once cult mode is unlocked, 'Burninator' (the dragon) is added to the store for $1,000,000. It requires a 5-follower sacrifice every round."
+                ]
+            });
+        }
+
+        if (window.builderMode) {
+            activeSlides.push({
+                title: "BUILDER MODE",
+                desc: "Invest your hard-earned cash in real estate! Purchase buildings on the map, recruit tenants, and collect rent.",
+                controls: [
+                    "Buy Buildings: Stand near a building door and press E to purchase it. Ownership persists across rounds!",
+                    "Rent & Revenue: Stand near a street NPC and press A to offer them an apartment (50% chance). Earn $1,000 per tenant per round!",
+                    "Taxes: A property tax of $750 per building is assessed every 4 rounds. Don't go bankrupt, or your properties will be seized!"
+                ]
+            });
+        }
+
         // Keys & Items Summary
         activeSlides.push({
             title: "KEYS & KEYBINDINGS",
@@ -244,6 +316,7 @@ function initUI() {
                 "E: Interact with anything (Dump, Fast Food joints, Hospital, NPCs, Cars, Mafia Don)",
                 "Q: Pick up trash (when alone on foot)",
                 "F: Plant Flower (Flowers Mode)",
+                "A: Offer apartment to street NPC (Builder Mode)",
                 "T: Use Borrowed Time (+20s to timer)",
                 "M: Use Mushrooms (Slow timer for 20s)",
                 "W: Use Wings (1.5x speed boost for 15s)",
@@ -462,16 +535,46 @@ function initUI() {
                 followers = window.game.followerManager.followers.length;
             }
         }
-        const totalCost = costPerMember * followers;
+        const totalCost = costPerMember;
         if (window.playerBalance < totalCost) {
-            alert(`You need $${totalCost} to fly ${followers} posse members to ${destination}!`);
+            alert(`You need $${totalCost} to fly to ${destination}!`);
             return;
         }
-        if (confirm(`Fly to ${destination} with ${followers} posse members for $${totalCost}?`)) {
+        if (confirm(`Fly to ${destination} for $${totalCost}?`)) {
             apiCall('/api/game/travel', 'POST', { destination: destination, cost: totalCost })
                 .then(data => {
                     window.playerBalance = data.balance;
                     const isFilth = destination.toLowerCase() === 'filthadelphia';
+                    
+                    if (window.game) {
+                        if (!isFilth) {
+                            if (!window.travelDestination) {
+                                window.game.savedPhillyFollowers = [...window.game.followerManager.followers];
+                                window.game.followerManager.followers = [];
+                                if (window.game.organizers) {
+                                    window.game.savedOrganizerFollowers = window.game.organizers.map(org => [...org.followerManager.followers]);
+                                    window.game.organizers.forEach(org => org.followerManager.followers = []);
+                                }
+                            } else {
+                                window.game.followerManager.followers = [];
+                                if (window.game.organizers) {
+                                    window.game.organizers.forEach(org => org.followerManager.followers = []);
+                                }
+                            }
+                        } else {
+                            window.game.followerManager.followers = window.game.savedPhillyFollowers || [];
+                            window.game.savedPhillyFollowers = null;
+                            if (window.game.organizers && window.game.savedOrganizerFollowers) {
+                                window.game.organizers.forEach((org, idx) => {
+                                    if (window.game.savedOrganizerFollowers[idx]) {
+                                        org.followerManager.followers = window.game.savedOrganizerFollowers[idx];
+                                    }
+                                });
+                                window.game.savedOrganizerFollowers = null;
+                            }
+                        }
+                    }
+
                     window.travelDestination = isFilth ? null : destination;
                     document.getElementById('airport-dialog').classList.add('hidden');
                     
@@ -651,11 +754,25 @@ async function refreshGameState() {
         window.playerStats = playerStats;
         playerCredits = data.credits !== undefined ? data.credits : 3;
         window.playerCredits = playerCredits;
+        internationalFollowers = data.international_followers || 0;
         window.internationalFollowers = internationalFollowers;
         window.playerUnlockedInternational = data.unlocked_international || 0;
         window.electionState = data.election_state || 'idle';
         window.roundsInState = data.rounds_in_state || 0;
         window.travelDestination = data.travel_destination && data.travel_destination.toLowerCase() !== 'filthadelphia' ? data.travel_destination : null;
+        
+        window.playerUnlockedCult = data.unlocked_cult || 0;
+        window.playerUnlockedBuilder = data.unlocked_builder || 0;
+        window.playerUnlockedFantasy = data.unlocked_fantasy || 0;
+        window.playerHappiness = data.happiness !== undefined ? data.happiness : 100.0;
+        window.cultLeavesCumulative = data.cult_leaves_cumulative || 0;
+        try {
+            const bldgData = await apiCall('/api/game/buildings');
+            window._serverOwnedBuildings = bldgData.buildings || [];
+        } catch (e) {
+            console.error("Failed to load buildings", e);
+            window._serverOwnedBuildings = [];
+        }
         
         // Notify player when reaching requirements
         if (oldFollowers > 0) {
@@ -664,6 +781,12 @@ async function refreshGameState() {
             }
             if (oldFollowers < 25 && playerMovementSize >= 25) {
                 alert("🔓 Level Unlocked: Fast Food Mode is now available for purchase! (Needs 25 followers + $20,000)");
+            }
+            if (oldFollowers < 40 && playerMovementSize >= 40) {
+                alert("🔓 Level Unlocked: Cult Mode is now available for purchase! (Needs 40 followers + $15,000)");
+            }
+            if (oldFollowers < 60 && playerMovementSize >= 60) {
+                alert("🔓 Level Unlocked: Builder Mode is now available for purchase! (Needs 60 followers + $25,000)");
             }
         }
 
@@ -727,7 +850,8 @@ const STORE_ITEMS = [
     { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' },
     { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'mushrooms.png' },
     { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'employee.png' },
-    { name: 'Price Fixing', price: 2000, desc: 'Trash worth 1.25x value, but 4 police chase you! Press B to bribe.', sprite: 'protection.png' }
+    { name: 'Price Fixing', price: 2000, desc: 'Trash worth 1.25x value, but 4 police chase you! Press B to bribe.', sprite: 'protection.png' },
+    { name: 'Burninator', price: 1000000, desc: 'Summon the dragon! Requires 5 followers sacrificed every round. Boosts trash value as if 5 followers joined.', sprite: 'dragon.png' }
 ];
 
 function updateStoreUI() {
@@ -853,6 +977,9 @@ function renderStore() {
         if (item.name === 'Price Fixing' && window.madeManStatus !== 'accepted') {
             return;
         }
+        if (item.name === 'Burninator' && !window.playerUnlockedCult) {
+            return;
+        }
         const div = document.createElement('div');
         div.className = 'store-item-card';
         
@@ -908,6 +1035,14 @@ function renderStore() {
             }
         }
 
+        if (item.name === 'Burninator') {
+            const count = playerInventory['Burninator'] || 0;
+            if (count >= 1) {
+                btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
+                btnText = 'Owned';
+            }
+        }
+
         let sellBtnHtml = '';
         if (item.name === 'Bruno The Trash Truck' && playerHasTruck > 0) {
             sellBtnHtml = `<button class="btn sell-truck-btn" style="background: #ff4444; border-color: #cc2222; margin-top: 5px; width: 100%;">Sell for $5,000</button>`;
@@ -927,6 +1062,11 @@ function renderStore() {
     document.querySelectorAll('.buy-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const itemName = e.target.getAttribute('data-name');
+            if (itemName === 'Burninator') {
+                if (!confirm("Are you sure you want to purchase 'Burninator' for $1,000,000?\n\nNote: 'Burninator' requires a 5 follower sacrifice after every round it is used. If you fail to sacrifice or lack enough followers, it will leave your inventory.")) {
+                    return;
+                }
+            }
             try {
                 await apiCall('/api/game/buy', 'POST', { item_name: itemName });
                 await refreshGameState();
@@ -1102,6 +1242,210 @@ function updateModeToggles() {
             };
             label.innerText = officeLabels[office] || 'Politics Mode';
             label.style.color = '#00ffcc';
+        }
+    }
+
+    // 5. Cult Mode
+    const cultContainer = document.getElementById('cult-toggle-container');
+    if (cultContainer) {
+        const cultToggle = document.getElementById('cult-toggle');
+        const label = cultContainer.querySelector('.toggle-label');
+        
+        const oldBtn = cultContainer.querySelector('.unlock-mode-btn');
+        if (oldBtn) oldBtn.remove();
+        
+        if (window.playerUnlockedCult === 0) {
+            cultContainer.querySelector('.switch').style.display = 'none';
+            label.style.display = 'none';
+            cultToggle.checked = false;
+            
+            const btn = document.createElement('button');
+            btn.className = 'btn unlock-mode-btn';
+            btn.innerText = `Unlock Cult Mode ($15k + 40 Followers)`;
+            btn.style.fontFamily = "'Press Start 2P', monospace";
+            btn.style.fontSize = "6px";
+            btn.style.padding = "6px 8px";
+            btn.style.marginTop = "4px";
+            btn.style.width = "100%";
+            btn.style.cursor = "pointer";
+            
+            if (playerMovementSize >= 40 && playerBalance >= 15000) {
+                btn.style.background = '#00cc66';
+                btn.style.border = '2px solid #008844';
+                btn.disabled = false;
+                btn.addEventListener('click', async () => {
+                    try {
+                        await apiCall('/api/game/unlock-mode', 'POST', { mode: 'cult' });
+                        await refreshGameState();
+                        alert("🔓 Level Unlocked: Cult Mode!\n\nThe Church of Grimetology\n\nThe Church of Grimetology is a charismatic-led cult with a growing number of followers dedicated to cleaning up trash in their cities.\n\nAs a cult leader, you deeply believe that if they can only raise $1,000,000 you will be able to summon a dragon that will do your bidding and the bidding of the cult (picking up trash). The members of the Church of Grimetology are required to make many sacrifices.");
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                });
+            } else {
+                btn.style.background = '#333';
+                btn.style.border = '2px solid #222';
+                btn.style.color = '#888';
+                btn.disabled = true;
+                btn.style.cursor = "not-allowed";
+            }
+            cultContainer.appendChild(btn);
+        } else {
+            cultContainer.querySelector('.switch').style.display = 'inline-block';
+            label.style.display = 'inline-block';
+            cultToggle.disabled = false;
+            label.innerText = `Cult Mode`;
+            label.style.color = '#fff';
+        }
+    }
+
+    // 5.5. Dragon Mode (Burninator)
+    const dragonContainer = document.getElementById('dragon-toggle-container');
+    if (dragonContainer) {
+        const dragonToggle = document.getElementById('dragon-toggle');
+        const cultToggle = document.getElementById('cult-toggle');
+
+        if (playerInventory['Burninator'] > 0) {
+            dragonContainer.style.display = 'block';
+            dragonToggle.disabled = false;
+            
+            // Set up change handler
+            if (!dragonToggle.dataset.handlerWired) {
+                dragonToggle.dataset.handlerWired = "true";
+                dragonToggle.addEventListener('change', () => {
+                    window.dragonMode = dragonToggle.checked;
+                    if (window.dragonMode) {
+                        cultToggle.checked = true;
+                        cultToggle.disabled = true;
+                        window.cultMode = true;
+                    } else {
+                        if (window.playerUnlockedCult > 0) {
+                            cultToggle.disabled = false;
+                        }
+                        window.cultMode = cultToggle.checked;
+                    }
+                });
+            }
+            
+            // Set default value based on window.dragonMode
+            dragonToggle.checked = !!window.dragonMode;
+            
+            // If checked, ensure cultToggle is checked and disabled
+            if (dragonToggle.checked) {
+                cultToggle.checked = true;
+                cultToggle.disabled = true;
+                window.cultMode = true;
+            }
+        } else {
+            dragonContainer.style.display = 'none';
+            dragonToggle.checked = false;
+            window.dragonMode = false;
+        }
+    }
+
+    // 6. Builder Mode
+    const builderContainer = document.getElementById('builder-toggle-container');
+    if (builderContainer) {
+        const builderToggle = document.getElementById('builder-toggle');
+        const label = builderContainer.querySelector('.toggle-label');
+        
+        const oldBtn = builderContainer.querySelector('.unlock-mode-btn');
+        if (oldBtn) oldBtn.remove();
+        
+        if (window.playerUnlockedBuilder === 0) {
+            builderContainer.querySelector('.switch').style.display = 'none';
+            label.style.display = 'none';
+            builderToggle.checked = false;
+            
+            const btn = document.createElement('button');
+            btn.className = 'btn unlock-mode-btn';
+            btn.innerText = `Unlock Builder Mode ($25k + 60 Followers)`;
+            btn.style.fontFamily = "'Press Start 2P', monospace";
+            btn.style.fontSize = "6px";
+            btn.style.padding = "6px 8px";
+            btn.style.marginTop = "4px";
+            btn.style.width = "100%";
+            btn.style.cursor = "pointer";
+            
+            if (playerMovementSize >= 60 && playerBalance >= 25000) {
+                btn.style.background = '#00cc66';
+                btn.style.border = '2px solid #008844';
+                btn.disabled = false;
+                btn.addEventListener('click', async () => {
+                    try {
+                        await apiCall('/api/game/unlock-mode', 'POST', { mode: 'builder' });
+                        await refreshGameState();
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                });
+            } else {
+                btn.style.background = '#333';
+                btn.style.border = '2px solid #222';
+                btn.style.color = '#888';
+                btn.disabled = true;
+                btn.style.cursor = "not-allowed";
+            }
+            builderContainer.appendChild(btn);
+        } else {
+            builderContainer.querySelector('.switch').style.display = 'inline-block';
+            label.style.display = 'inline-block';
+            builderToggle.disabled = false;
+            label.innerText = `Builder Mode`;
+            label.style.color = '#fff';
+        }
+    }
+
+    // 7. Fantasy Mode
+    const fantasyContainer = document.getElementById('fantasy-toggle-container');
+    if (fantasyContainer) {
+        const fantasyToggle = document.getElementById('fantasy-toggle');
+        const label = fantasyContainer.querySelector('.toggle-label');
+        
+        const oldBtn = fantasyContainer.querySelector('.unlock-mode-btn');
+        if (oldBtn) oldBtn.remove();
+        
+        if (window.playerUnlockedFantasy === 0) {
+            fantasyContainer.querySelector('.switch').style.display = 'none';
+            label.style.display = 'none';
+            fantasyToggle.checked = false;
+            
+            const btn = document.createElement('button');
+            btn.className = 'btn unlock-mode-btn';
+            btn.innerText = `Unlock Fantasy Mode ($30k + 75 Followers)`;
+            btn.style.fontFamily = "'Press Start 2P', monospace";
+            btn.style.fontSize = "6px";
+            btn.style.padding = "6px 8px";
+            btn.style.marginTop = "4px";
+            btn.style.width = "100%";
+            btn.style.cursor = "pointer";
+            
+            if (playerMovementSize >= 75 && playerBalance >= 30000) {
+                btn.style.background = '#00cc66';
+                btn.style.border = '2px solid #008844';
+                btn.disabled = false;
+                btn.addEventListener('click', async () => {
+                    try {
+                        await apiCall('/api/game/unlock-mode', 'POST', { mode: 'fantasy' });
+                        await refreshGameState();
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                });
+            } else {
+                btn.style.background = '#333';
+                btn.style.border = '2px solid #222';
+                btn.style.color = '#888';
+                btn.disabled = true;
+                btn.style.cursor = "not-allowed";
+            }
+            fantasyContainer.appendChild(btn);
+        } else {
+            fantasyContainer.querySelector('.switch').style.display = 'inline-block';
+            label.style.display = 'inline-block';
+            fantasyToggle.disabled = false;
+            label.innerText = `Fantasy Mode`;
+            label.style.color = '#fff';
         }
     }
 }
@@ -1374,6 +1718,8 @@ window.apiCall = apiCall;
 window.refreshGameState = refreshGameState;
 window.showScreen = showScreen;
 window.renderStore = renderStore;
+window.buyBuilding = (buildingIdx, address, cost) => apiCall('/api/game/buy-building', 'POST', { building_idx: buildingIdx, address: address, cost: cost });
+window.addTenant = (buildingIdx) => apiCall('/api/game/add-tenant', 'POST', { building_idx: buildingIdx });
 
 // ── Performance Stats Graph Custom Renderer ──
 function drawStatsGraph(category) {

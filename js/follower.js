@@ -142,7 +142,8 @@ class Follower {
         const screen = camera.worldToScreen(this.x, this.y);
         const drawSize = this.size + 4;
 
-        const img = spriteManager.getCharacterImage(this.spriteId);
+        const activeSpriteId = window.cultMode ? 'cult_white_robe' : this.spriteId;
+        const img = spriteManager.getCharacterImage(activeSpriteId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
             let bobY = 0;

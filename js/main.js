@@ -96,6 +96,17 @@ class Game {
         // Do nothing/allow setter to prevent errors
     }
 
+    resetKeys() {
+        if (this.player && this.player.keys) {
+            this.player.keys.up = false;
+            this.player.keys.down = false;
+            this.player.keys.left = false;
+            this.player.keys.right = false;
+            this.player.keys.k = false;
+            this.player.moving = false;
+        }
+    }
+
     constructor(canvas) {
         if (window.gameLog) window.gameLog("Game class instantiation starting");
         this.canvas = canvas;
@@ -179,7 +190,8 @@ class Game {
                         const py = ((this.player.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
                         let nearDon = null;
                         for (const don of this.crimeManager.dons) {
-                            const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                            const wrappedDon = typeof nearestWrap === 'function' ? nearestWrap(don.x, don.y, this.player.x, this.player.y) : {x: don.x, y: don.y};
+                            const dist = Math.sqrt((this.player.x - wrappedDon.x)**2 + (this.player.y - wrappedDon.y)**2);
                             if (dist < TILE_SIZE * 1.5) {
                                 nearDon = don;
                                 break;
@@ -188,7 +200,10 @@ class Game {
                         if (nearDon) {
                             if (!this.crimeManager.madeMan) {
                                 this.crimeManager.triggerMadeManOffer(nearDon.id);
-                            } else if (!this.crimeManager.activeTask && this.crimeManager.activeFamily === nearDon.id) {
+                            } else if (!this.crimeManager.activeTask && (this.crimeManager.activeFamily === nearDon.id || this.crimeManager.activeFamily === -1)) {
+                                if (this.crimeManager.activeFamily === -1) {
+                                    this.crimeManager.activeFamily = nearDon.id;
+                                }
                                 this.crimeManager.assignNextTask(this.gameMap);
                             } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'talk_don' && nearDon.id === this.crimeManager.activeTask.targetDonId) {
                                 this.crimeManager.completeTask(this);
@@ -212,7 +227,7 @@ class Game {
                         }
                     }
 
-                    if (window.frenzyMode || window.flowersMode || window.crimeMode) {
+                    if (window.frenzyMode || window.flowersMode || window.crimeMode || window.cultMode || window.builderMode) {
                         const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
                         if (result) {
                             if (window.crimeMode && this.crimeManager && !this.crimeManager.madeMan) {
@@ -256,12 +271,12 @@ class Game {
 
 
                     // Fast Food, Hospital, & Airport interaction
-                    if (window.fastFoodMode || window.playerUnlockedInternational) {
+                    if (window.fastFoodMode || window.playerUnlockedInternational || window.cultMode) {
                         const px = wrapWorldX(this.player.x);
                         const py = wrapWorldY(this.player.y);
                         
                         // Check Hospital
-                        if ((window.fastFoodMode || window.playerUnlockedInternational) && !this.hasHealthInsurance) {
+                        if ((window.fastFoodMode || window.playerUnlockedInternational || window.cultMode) && !this.hasHealthInsurance) {
                             const hospitals = this.gameMap.buildings.filter(b => b.type === 'hospital');
                             for (const hospital of hospitals) {
                                 if (hospital.doorTiles.length > 0) {
@@ -276,13 +291,17 @@ class Game {
                         }
 
                         // Check Fast Food
-                        if (window.fastFoodMode) {
+                        if (window.fastFoodMode || window.cultMode) {
                             const ffBuildings = this.gameMap.buildings.filter(b => b.type === 'fast_food');
                             for (const ffBldg of ffBuildings) {
                                 if (ffBldg && ffBldg.doorTiles.length > 0) {
                                     const door = ffBldg.doorTiles[0];
                                     const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
                                     if (dist < TILE_SIZE * 1.5) {
+                                        if (window.cultMode) {
+                                            this.lastVisitedFastFoodId = ffBldg.id;
+                                        }
+                                        this.pendingFastFoodId = ffBldg.id;
                                         window.triggerFastFoodOffer(this.getRoundTotalFollowers());
                                         return;
                                     }
@@ -335,6 +354,103 @@ class Game {
                                     this.hud.showFollowerNotification("Garbage truck is already empty.", true);
                                 }
                                 return;
+                            }
+                        }
+                    }
+                }
+
+                // ── Phase 3 E-key interactions (always run if E pressed) ──
+                if (e.key === 'e' || e.key === 'E') {
+
+
+                    // Lost Child Quest: check parent delivery first, then child pickup
+                    if (this.npcManager && this.npcManager.childNPC && !this.npcManager.childDelivered) {
+                        const parentNear = this.npcManager.checkParentInteraction(this.player.x, this.player.y);
+                        if (parentNear) {
+                            this.npcManager.childDelivered = true;
+                            this.npcManager.childFollowing = false;
+                            for (let i = 0; i < 10; i++) this.followerManager.addFollower(this.player.x, this.player.y);
+                            this.hud.followerCount = this.getRoundTotalFollowers();
+                            this.npcManager.activeDialogue = { lines: ["Our child is home! Thank you so much!", "+10 Followers!"], lineIndex: 0, timer: 240 };
+                            this.hud.showFollowerNotification('\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc66 Child delivered! +10 Followers!', true);
+                        } else {
+                            const childNear = this.npcManager.checkChildInteraction(this.player.x, this.player.y);
+                            if (childNear && !this.npcManager.childFollowing) {
+                                this.npcManager.childFollowing = true;
+                                this.npcManager.activeDialogue = { lines: ["I am looking for my parents."], lineIndex: 0, timer: 180 };
+                                this.hud.showFollowerNotification('\ud83d\udc66 The child is following you! Find their parents!', true);
+                                if (this.npcManager.childQuestBuilding) {
+                                    this._childQuestHighlightBuilding = this.npcManager.childQuestBuilding.id;
+                                }
+                            }
+                        }
+                    }
+
+                    // Builder Mode: buy building at door
+                    if (window.builderMode) {
+                        const bpx = wrapWorldX(this.player.x);
+                        const bpy = wrapWorldY(this.player.y);
+                        for (let idx = 0; idx < this.gameMap.buildings.length; idx++) {
+                            const bldg = this.gameMap.buildings[idx];
+                            if (!bldg || bldg.doorTiles.length === 0) continue;
+                            if (['bank','police','airport','hospital','dump'].includes(bldg.type)) continue;
+                            const door = bldg.doorTiles[0];
+                            const dist = Math.sqrt((bpx - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (bpy - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
+                            if (dist < TILE_SIZE * 1.5) {
+                                const alreadyOwned = this.ownedBuildings.find(b => b.building_idx === idx);
+                                if (alreadyOwned) {
+                                    this.hud.showFollowerNotification(`\ud83c\udfe2 Owned: ${bldg.address || 'Building'} (${alreadyOwned.tenants || 0} tenants)`, true);
+                                } else {
+                                    if (!this.buildingPriceCache.has(idx)) {
+                                        this.buildingPriceCache.set(idx, 2000 + Math.floor(Math.random() * 1501));
+                                    }
+                                    const price = this.buildingPriceCache.get(idx);
+                                    const addr = bldg.address || `Bldg #${idx}`;
+                                    const canAfford = (window.playerBalance || 0) >= price;
+                                    if (!canAfford) {
+                                        this.hud.showFollowerNotification(`\ud83c\udfe2 ${addr}: $${price.toLocaleString()} (Need $${(price - (window.playerBalance||0)).toLocaleString()} more)`, false);
+                                    } else {
+                                        this.resetKeys();
+                                        if (confirm(`Buy ${addr} for $${price.toLocaleString()}?\nEarns $1,000/tenant/round. Max 5 tenants.`)) {
+                                            window.apiCall('/api/game/buy-building', 'POST', { building_idx: idx, address: addr, cost: price })
+                                                .then(res => {
+                                                    if (res.success) {
+                                                        window.playerBalance = res.balance;
+                                                        this.ownedBuildings.push({ building_idx: idx, address: addr, tenants: 0 });
+                                                        this.totalVacancies = (this.totalVacancies || 0) + 5;
+                                                        this.buildingPriceCache.delete(idx);
+                                                        this.hud.showFollowerNotification(`\ud83c\udfe2 Bought ${addr}! 5 vacancies open.`, true);
+                                                    }
+                                                }).catch(err => this.hud.showFollowerNotification(`\u274c Buy failed`, false));
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // A or a key: Builder mode — offer apartment to nearby NPC
+                if (e.key === 'a' || e.key === 'A') {
+                    if (window.builderMode && this.totalVacancies > 0) {
+                        const nearNPC = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                        if (nearNPC && nearNPC.npcType !== 'child' && nearNPC.npcType !== 'parent' && nearNPC.npcType !== 'cult_family') {
+                            const roll = Math.random();
+                            if (roll < 0.5) {
+                                // NPC accepts tenancy — find building with vacancy
+                                const bldgWithVacancy = this.ownedBuildings.find(b => (b.tenants || 0) < 5);
+                                if (bldgWithVacancy) {
+                                    bldgWithVacancy.tenants = (bldgWithVacancy.tenants || 0) + 1;
+                                    this.totalVacancies = Math.max(0, this.totalVacancies - 1);
+                                    this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== nearNPC);
+                                    this.npcManager.spawnSingleNPC(this.gameMap);
+                                    window.apiCall('/api/game/add-tenant', 'POST', { building_idx: bldgWithVacancy.building_idx })
+                                        .catch(e => console.error('add-tenant error:', e));
+                                    this.hud.showFollowerNotification(`\ud83d\udeaa ${nearNPC.name} moved into ${bldgWithVacancy.address}!`, true);
+                                }
+                            } else {
+                                this.hud.showFollowerNotification(`${nearNPC.name} declined your offer.`, false);
                             }
                         }
                     }
@@ -453,30 +569,51 @@ class Game {
                 // I or i to intimidate NPC or Don
                 if (e.key === 'i' || e.key === 'I') {
                     if (window.crimeMode) {
-                        // Check Don intimidate first
-                        if (this.crimeManager && this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate_don') {
-                            const px = wrapWorldX(this.player.x);
-                            const py = wrapWorldY(this.player.y);
-                            const don = this.crimeManager.dons.find(d => d.id === this.crimeManager.activeTask.targetDonId);
-                            if (don && don.alive) {
-                                const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
-                                if (dist < TILE_SIZE * 1.5) {
-                                    this.crimeManager.completeTask(this);
-                                    return;
+                        if (window.elPresidenteElection) {
+                            const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                            if (npc && !npc.shaken) {
+                                if (npc.isRedRivalOnly) {
+                                    this.hud.showFollowerNotification("This supporter only votes for your rival!", false);
+                                } else {
+                                    npc.shaken = true;
+                                    this.handshakesShaken = (this.handshakesShaken || 0) + 1;
+                                    this.hud.showFollowerNotification(`Intimidated ${npc.name}! (+1 Intimidation)`, true);
+                                    
+                                    this.npcManager.activeDialogue = {
+                                        lines: ["Please don't hurt me!", "I'll support you, boss!"],
+                                        lineIndex: 0,
+                                        timer: 120
+                                    };
+
+                                    this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== npc);
+                                    this.npcManager.spawnSingleNPC(this.gameMap);
                                 }
                             }
-                        }
+                        } else {
+                            if (this.crimeManager && this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate_don') {
+                                const px = wrapWorldX(this.player.x);
+                                const py = wrapWorldY(this.player.y);
+                                const don = this.crimeManager.dons.find(d => d.id === this.crimeManager.activeTask.targetDonId);
+                                if (don && don.alive) {
+                                    const dist = Math.sqrt((px - don.x)**2 + (py - don.y)**2);
+                                    if (dist < TILE_SIZE * 1.5) {
+                                        this.crimeManager.completeTask(this);
+                                        return;
+                                    }
+                                }
+                            }
 
-                        const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
-                        if (npc) {
-                            this.npcManager.activeDialogue = {
-                                lines: ["Please don't hurt me!", "I'll do whatever you say!"],
-                                lineIndex: 0,
-                                timer: 120
-                            };
-                            this.hud.showFollowerNotification('NPC Intimidated!', true);
-                            if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate') {
-                                this.crimeManager.completeTask(this);
+                            const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
+                            if (npc) {
+                                this.npcManager.activeDialogue = {
+                                    lines: ["Please don't hurt me!", "I'll do whatever you say!"],
+                                    lineIndex: 0,
+                                    timer: 120
+                                };
+                                this.hud.showFollowerNotification('NPC Intimidated!', true);
+                                if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'intimidate') {
+                                    this.crimeManager.completeTask(this);
+                                }
                             }
                         }
                     }
@@ -692,6 +829,82 @@ class Game {
         requestAnimationFrame(loop);
     }
 
+    triggerCultLeavingEvent() {
+        const dialog = document.getElementById('cult-leaving-dialog');
+        const textEl = document.getElementById('cult-leaving-text');
+        if (!dialog || !textEl) return;
+
+        // Stop time / game update loop
+        const oldState = this.state;
+        this.state = GameState.UI_OVERLAY;
+        this.player.keys = { up: false, down: false, left: false, right: false };
+
+        const loss = Math.pow(2, this.cultLeavesCumulative || 0);
+        
+        const narratives = [
+            "A member of the Church has been talking to others about leaving, what do you do?",
+            "An elder of the temple is questioning our sacred purification mission and sharing doubts. What do you do?",
+            "A group of followers was overheard whispering about escaping back to their families. What do you do?",
+            "A loyal disciple reports that a member is secretly hoarding personal belongings and planning to flee. What do you do?",
+            "A member of the flock claims they received a vision calling them away from the Church. What do you do?"
+        ];
+        const randomNarrative = narratives[Math.floor(Math.random() * narratives.length)];
+
+        textEl.innerHTML = `${randomNarrative}<br><br><span style="color:#ff3333; font-size: 7px; line-height: 1.4;">Allowing them to leave will cause ${loss} follower(s) to leave with them.</span>`;
+
+        dialog.classList.remove('hidden');
+
+        // Setup button / key listeners
+        const cleanup = () => {
+            dialog.classList.add('hidden');
+            window.removeEventListener('keydown', keyHandler);
+            this.state = oldState;
+            const canvas = document.getElementById('gameCanvas');
+            if (canvas) canvas.focus();
+        };
+
+        const stayAction = () => {
+            cleanup();
+            this.happiness = Math.max(0, (this.happiness || 100) - 15);
+            this.hud.showFollowerNotification('😈 You convinced them. -15% Happiness.', false);
+        };
+
+        const leaveAction = () => {
+            cleanup();
+            const lossVal = Math.pow(2, this.cultLeavesCumulative || 0);
+            const actualLoss = Math.min(this.getRoundTotalFollowers(), lossVal);
+            for (let i = 0; i < actualLoss; i++) {
+                this._removeSequentialFollower();
+            }
+            this.hud.followerCount = this.getRoundTotalFollowers();
+            this.cultLeavesCumulative = (this.cultLeavesCumulative || 0) + actualLoss;
+            this.hud.showFollowerNotification(`🚶 Allowed to leave. -${actualLoss} Followers.`, false);
+        };
+
+        const keyHandler = (e) => {
+            if (e.key === 'c' || e.key === 'C') {
+                stayAction();
+            } else if (e.key === 'l' || e.key === 'L') {
+                leaveAction();
+            }
+        };
+
+        window.addEventListener('keydown', keyHandler);
+
+        // Bind buttons
+        const btnStay = document.getElementById('btn-cult-stay');
+        const btnLeave = document.getElementById('btn-cult-leave');
+        
+        // Remove previous event listeners by cloning
+        const newBtnStay = btnStay.cloneNode(true);
+        btnStay.parentNode.replaceChild(newBtnStay, btnStay);
+        const newBtnLeave = btnLeave.cloneNode(true);
+        btnLeave.parentNode.replaceChild(newBtnLeave, btnLeave);
+
+        newBtnStay.addEventListener('click', stayAction);
+        newBtnLeave.addEventListener('click', leaveAction);
+    }
+
     pickupTrash() {
         if (this.state !== GameState.PLAYING || !this.player) return;
 
@@ -713,7 +926,7 @@ class Game {
         // Trashpickers: double the effective pickup radius for the player
         const baseRadius = TILE_SIZE * 0.8;
         const pickupRadius = this.doubleTrashPickup ? baseRadius * 2 : baseRadius;
-        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.getRoundTotalFollowers(), maxToPick);
+        const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.getRoundTotalFollowersForValue(), maxToPick);
 
         if (picked.length > 0) {
             if (window.playerHasTruck > 0) {
@@ -882,6 +1095,14 @@ class Game {
     }
 
     _update(dt) {
+        if (this.dragonSplashTimer > 0) {
+            this.dragonSplashTimer -= dt;
+            if (this.dragonSplashTimer <= 0) {
+                this.dragonSplashTimer = 0;
+            }
+            return;
+        }
+
         if (this.state !== GameState.PLAYING) return;
 
         // Price fixing bribe timer
@@ -942,6 +1163,51 @@ class Game {
             }
         }
 
+        // ── Phase 3: Lost Child — move child toward player ──
+        if (this.npcManager && this.npcManager.childFollowing && !this.npcManager.childDelivered) {
+            this.npcManager.updateChildFollow(this.player.x, this.player.y, this.gameMap);
+        }
+
+        // ── Phase 3: Cult Mode — happiness decay + family miss timer ──
+        if (window.cultMode) {
+            // Gradual happiness decay (2 points per 3s)
+            this.happinessDecayTimer = (this.happinessDecayTimer || 0) + dt;
+            if (this.happinessDecayTimer >= 3) {
+                this.happinessDecayTimer -= 3;
+                this.happiness = Math.max(0, (this.happiness || 100) - 2);
+            }
+
+            // Happiness hits 0: halve the posse
+            if ((this.happiness || 0) <= 0 && !this._happinessPenaltyTriggered) {
+                this._happinessPenaltyTriggered = true;
+                const totalF = this.getRoundTotalFollowers();
+                const toLose = Math.floor(totalF / 2);
+                for (let i = 0; i < toLose; i++) this._removeSequentialFollower();
+                this.hud.followerCount = this.getRoundTotalFollowers();
+                this.happiness = 50; // reset to 50
+                this._happinessPenaltyTriggered = false;
+                this.hud.showFollowerNotification('💔 Mass exodus! Unhappy followers left! (-50% Posse)', false);
+            }
+
+            if (this.cultHappinessBufferTimer > 0) {
+                this.cultHappinessBufferTimer -= dt;
+                if (this.cultHappinessBufferTimer <= 0) {
+                    this.cultHappinessBufferTimer = 0;
+                    const boost = this.pendingHappinessBoost || 20;
+                    this.happiness = Math.min(100, (this.happiness || 100) + boost);
+                    this.hud.showFollowerNotification(`😇 Posse digested fast food! +${boost}% Happiness!`, true);
+                }
+            }
+
+            // Leaving event timer — show dialog periodically
+            this.cultLeavingTimer = (this.cultLeavingTimer || (20.0 + Math.random() * 15.0)) - dt;
+            if (this.cultLeavingTimer <= 0 && this.getRoundTotalFollowers() > 0) {
+                this.cultLeavingTimer = 20.0 + Math.random() * 15.0;
+                this.resetKeys();
+                this.triggerCultLeavingEvent();
+            }
+        }
+
         // Update timer
         this.hud.update(dt);
         
@@ -962,14 +1228,16 @@ class Game {
 
         if (this.hud.isTimeUp()) {
             this.state = GameState.UI_OVERLAY;
-            if (window.politicsMode) {
+            if (window.politicsMode || window.elPresidenteElection) {
                 const playerVotes = this.handshakesShaken || 0;
                 const rivalVotes = this.rivalCandidate ? this.rivalCandidate.votes : 0;
                 const isWin = playerVotes > rivalVotes;
                 const title = isWin ? "CONGRATULATIONS!" : "BETTER LUCK NEXT TIME!";
+                const actionVerb = window.elPresidenteElection ? "intimidations" : "votes";
+                const campaignTitle = window.elPresidenteElection ? "El Presidente campaign" : "campaign";
                 const message = isWin 
-                    ? `You won the campaign! You got ${playerVotes} votes against the rival's ${rivalVotes}!` 
-                    : `Campaign failed! The rival won with ${rivalVotes} votes against your ${playerVotes}.`;
+                    ? `You won the ${campaignTitle}! You got ${playerVotes} ${actionVerb} against the rival's ${rivalVotes}!` 
+                    : `Campaign failed! The rival won with ${rivalVotes} ${actionVerb} against your ${playerVotes}.`;
                 this._showSplashGameOver(title, message, false);
             } else {
                 this._showSplashGameOver("TIME'S UP!", `Your shift is over! You earned $${this.trashManager.totalPoints}.`, false);
@@ -977,13 +1245,13 @@ class Game {
             return;
         }
 
-        // Frenzy/Politics/Flowers Mode updates
-        if (window.frenzyMode || window.flowersMode || window.politicsMode) {
+        // Frenzy/Politics/Flowers/Crime/Cult/Builder Mode updates
+        if (window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
             this.npcManager.update();
         }
 
         // Rival Candidate update logic
-        if (window.politicsMode && this.rivalCandidates && this.rivalCandidates.length > 0) {
+        if ((window.politicsMode || window.elPresidenteElection) && this.rivalCandidates && this.rivalCandidates.length > 0) {
             for (const rival of this.rivalCandidates) {
                 if (!rival.targetNPC || !this.npcManager.npcs.includes(rival.targetNPC) || rival.targetNPC.shaken) {
                     let nearest = null;
@@ -1039,7 +1307,11 @@ class Game {
                         }
                     } else {
                         rival.votes++;
-                        this.hud.showFollowerNotification(`Rival shook hands with ${target.name}! (+1 Rival Vote)`, false);
+                        if (window.elPresidenteElection) {
+                            this.hud.showFollowerNotification(`Rival intimidated ${target.name}! (+1 Rival Intimidation)`, false);
+                        } else {
+                            this.hud.showFollowerNotification(`Rival shook hands with ${target.name}! (+1 Rival Vote)`, false);
+                        }
                         this.npcManager.npcs = this.npcManager.npcs.filter(n => n !== target);
                         this.npcManager.spawnSingleNPC(this.gameMap);
                         rival.targetNPC = null;
@@ -1279,7 +1551,7 @@ class Game {
                 }
                 break; // Stop loop since truck is completely full
             }
-            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowers(), maxToPick);
+            const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowersForValue(), maxToPick);
             followerPicked = followerPicked.concat(picked);
         }
 
@@ -1313,7 +1585,7 @@ class Game {
                     if (maxToPick <= 0) {
                         break;
                     }
-                    const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowers(), maxToPick);
+                    const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowersForValue(), maxToPick);
                     orgFollowerPicked = orgFollowerPicked.concat(picked);
                     if (window.playerHasTruck > 0) {
                         maxToPick = Math.max(0, maxToPick - picked.length);
@@ -1331,6 +1603,42 @@ class Game {
                     this.trashCollectedInWindow += orgFollowerPicked.length;
                     this.trashCollectedInRound = (this.trashCollectedInRound || 0) + orgFollowerPicked.length;
                     this.trashManager.spawnMore(this.gameMap, orgFollowerPicked.length);
+                }
+            }
+        }
+
+        // Update Dragons and their followers' autonomous trash pickup
+        if (this.dragons) {
+            for (const drag of this.dragons) {
+                drag.update(dt);
+                
+                let dragFollowerPicked = [];
+                for (const follower of drag.followerManager.followers) {
+                    const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowersForValue(), Infinity);
+                    dragFollowerPicked = dragFollowerPicked.concat(picked);
+                }
+                
+                if (dragFollowerPicked.length > 0) {
+                    const totalFollowers = this.getRoundTotalFollowersForValue();
+                    const pointValue = Math.max(1, Math.round(Math.sqrt(16 * totalFollowers))) * dragFollowerPicked.length;
+                    this.trashManager.totalPoints += pointValue;
+                    
+                    dragFollowerPicked.forEach(item => {
+                        const wrapped = nearestWrap(item.x, item.y, this.camera.getCenterX(), this.camera.getCenterY());
+                        this.trashManager.pickupEffects.push({
+                            x: wrapped.x,
+                            y: wrapped.y,
+                            text: `🔥 +$${Math.max(1, Math.round(Math.sqrt(16 * totalFollowers)))}`,
+                            timer: 0,
+                            alpha: 1,
+                            color: '#ff6600',
+                        });
+                    });
+                    
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                    this.trashCollectedInWindow += dragFollowerPicked.length;
+                    this.trashCollectedInRound = (this.trashCollectedInRound || 0) + dragFollowerPicked.length;
+                    this.trashManager.spawnMore(this.gameMap, dragFollowerPicked.length);
                 }
             }
         }
@@ -1462,6 +1770,23 @@ class Game {
 
         // Update camera
         this.camera.follow(this.player.x, this.player.y);
+
+        // ── Phase 3: Builder Mode — building price cache viewport invalidation ──
+        if (window.builderMode && this.buildingPriceCache && this.buildingPriceCache.size > 0) {
+            for (const [idx, price] of this.buildingPriceCache.entries()) {
+                const bldg = this.gameMap.buildings[idx];
+                if (bldg && bldg.tiles.length > 0) {
+                    let cx = 0, cy = 0;
+                    for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
+                    cx = (cx / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
+                    cy = (cy / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
+                    const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                    if (!this.camera.isVisible(wrapped.x - 200, wrapped.y - 200, 400, 400)) {
+                        this.buildingPriceCache.delete(idx);
+                    }
+                }
+            }
+        }
     }
 
     _render() {
@@ -1774,10 +2099,35 @@ class Game {
         
         this.npcManager = new NPCManager();
         this.npcManager.spawnNPCs(this.gameMap, this.gameMap.buildings, window.frenzyMode);
+
+        // ── Phase 3: Lost Child Quest ──
+        this.npcManager.spawnChildQuest(this.gameMap, this.gameMap.buildings);
+
+        // ── Phase 3: Cult Mode ──
+        this.happiness = (window.playerHappiness !== undefined ? window.playerHappiness : 100.0);
+        this.cultLeavingTimer = 20.0 + Math.random() * 15.0; // first leaving dialog after 20-35s
+        this.cultHappinessBufferTimer = 0;
+        this.lastEatenFastFoodId = null;
+        this.lastVisitedFastFoodId = null;
+        this.cultLeavesCumulative = window.cultLeavesCumulative || 0;
+        if (window.cultMode) {
+            this.hud.showFollowerNotification('⛪ Cult Mode: Church of Grimetology is active!', true);
+        }
+
+        // ── Phase 3: Builder Mode ──
+        this.ownedBuildings = window._serverOwnedBuildings || [];
+        this.buildingPriceCache = new Map(); // bldgIdx -> price
+        this.totalVacancies = this.ownedBuildings.reduce((sum, b) => sum + Math.max(0, 5 - (b.tenants || 0)), 0);
+        if (window.builderMode) {
+            this.hud.showFollowerNotification('🏗️ Builder Mode: Press E at building doors to buy!', true);
+        }
         this.pirateManager = new PirateManager();
         this.carManager.spawnCars(this.gameMap);
         // Retrieve and spawn organizers
         this.organizers = [];
+        this.dragons = [];
+        this.dragonMasterFollower = null;
+        this.dragonSplashTimer = 0;
         let organizersCount = window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0;
         
         // Grant free organizers based on political rank
@@ -1816,12 +2166,16 @@ class Game {
         }
         this.nextFollowerGroupIndex = 0;
         this.rivalCandidates = [];
-        if (window.politicsMode) {
+        window.elPresidenteElection = window.politicalOffice && window.politicalOffice.startsWith('candidate_el_presidente_') && window.travelDestination && window.politicalOffice.endsWith(window.travelDestination.toLowerCase());
+        if (window.politicsMode || window.elPresidenteElection) {
             const office = window.politicalOffice || 'citizen';
             let numRivals = 1;
             let speed = 4.0; // Council (slow)
             
-            if (office === 'candidate_mayor' || office === 'mayor') {
+            if (window.elPresidenteElection) {
+                numRivals = 2;
+                speed = 7.0;
+            } else if (office === 'candidate_mayor' || office === 'mayor') {
                 numRivals = 2;
                 speed = 8.0;
             } else if (office === 'candidate_senator' || office === 'senator') {
@@ -1878,28 +2232,32 @@ class Game {
             this.hud.showFollowerNotification('🧹 Trashpickers active! Double pickup this round!', true);
         }
 
-        // ── Price Fixing check inventory ──
+        // ── Price Fixing check inventory (Crime Mode only) ──
         this.priceFixingActive = false;
         this.policeBribeCooldown = 0;
         if (window.playerInventory && (window.playerInventory['Price Fixing'] || 0) > 0) {
-            this.priceFixingActive = true;
-            window.apiCall('/api/game/consume', 'POST', { item_name: 'Price Fixing' }).then(() => {
-                window.playerInventory['Price Fixing'] -= 1;
-                console.log('Price Fixing consumed: active for this round.');
-            }).catch(e => console.error(e));
-            this.hud.showFollowerNotification('🕶️ Price Fixing active! 1.25x trash value, but police are chasing!', true);
-            
-            if (this.crimeManager) {
-                this.crimeManager.police = [];
-                this.crimeManager.policeActive = true;
-                const station = this.gameMap.buildings[1];
-                let spawnX = 0, spawnY = 0;
-                if (station && station.doorTiles.length > 0) {
-                    spawnX = station.doorTiles[0].x;
-                    spawnY = station.doorTiles[0].y;
-                }
-                for (let i = 0; i < 4; i++) {
-                    this.crimeManager.police.push(new PoliceOfficer(spawnX, spawnY, false));
+            if (!window.crimeMode) {
+                this.hud.showFollowerNotification('🚫 Price Fixing only works in Crime Mode!', false);
+            } else {
+                this.priceFixingActive = true;
+                window.apiCall('/api/game/consume', 'POST', { item_name: 'Price Fixing' }).then(() => {
+                    window.playerInventory['Price Fixing'] -= 1;
+                    console.log('Price Fixing consumed: active for this round.');
+                }).catch(e => console.error(e));
+                this.hud.showFollowerNotification('🕶️ Price Fixing active! 1.25x trash value, but police are chasing!', true);
+                
+                if (this.crimeManager) {
+                    this.crimeManager.police = [];
+                    this.crimeManager.policeActive = true;
+                    const station = this.gameMap.buildings[1];
+                    let spawnX = 0, spawnY = 0;
+                    if (station && station.doorTiles.length > 0) {
+                        spawnX = station.doorTiles[0].x;
+                        spawnY = station.doorTiles[0].y;
+                    }
+                    for (let i = 0; i < 4; i++) {
+                        this.crimeManager.police.push(new PoliceOfficer(spawnX, spawnY, false));
+                    }
                 }
             }
         }
@@ -1924,6 +2282,15 @@ class Game {
         if (window.gameLog) window.gameLog(`_startGame: snapping camera to player x=${this.player.x}, y=${this.player.y}`);
         this.camera.snapTo(this.player.x, this.player.y);
         if (window.gameLog) window.gameLog(`_startGame: camera snapped to x=${this.camera.x}, y=${this.camera.y}, size: w=${this.camera.width}, h=${this.camera.height}`);
+
+        if (window.dragonHoCheat || window.dragonMode) {
+            const isCheat = window.dragonHoCheat;
+            window.dragonHoCheat = false;
+            if (!this.dragons) this.dragons = [];
+            const dragon = new GameDragon(this, this.player.x + 32, this.player.y + 32);
+            this.dragons.push(dragon);
+            this.hud.showFollowerNotification(isCheat ? '🐲 Cheat active: Dragon spawned!' : '🐲 Burninator is active!', true);
+        }
 
         if (window.politicsMode) {
             this.state = GameState.UI_OVERLAY;
@@ -2072,6 +2439,7 @@ class Game {
             }
             earned += flowerPayout;
         }
+        const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
         try {
             const result = await window.apiCall('/api/game/end-round', 'POST', { 
                 earned, 
@@ -2081,8 +2449,16 @@ class Game {
                 trash_collected: this.trashCollectedInRound || 0,
                 handshakes: this.handshakesShaken || 0,
                 rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
-                international_followers_collected: this.internationalFollowersCollected || 0
+                international_followers_collected: this.internationalFollowersCollected || 0,
+                cult_mode_active: !!window.cultMode,
+                dragon_mode_active: !!window.dragonMode,
+                sacrifice_dragon: sacrifice_dragon,
+                happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                cult_leaves_cumulative: this.cultLeavesCumulative || 0
             });
+            if (result && result.dragon_lost) {
+                alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
+            }
             window.employeesHired = 0;
             // Reset Trashpickers at round end
             this.doubleTrashPickup = false;
@@ -2099,6 +2475,98 @@ class Game {
         this.state = GameState.UI_OVERLAY;
     }
 
+    triggerDragonTransformation(masterFollower) {
+        // Remove the dragon master follower from follower list
+        this.followerManager.followers = this.followerManager.followers.filter(f => f !== masterFollower);
+        this.dragonMasterFollower = null;
+        
+        // Re-index remaining followers
+        for (let i = 0; i < this.followerManager.followers.length; i++) {
+            this.followerManager.followers[i].index = i;
+        }
+        this.hud.followerCount = this.getRoundTotalFollowers();
+        
+        // Spawn a GameDragon at the location of the master follower
+        if (!this.dragons) this.dragons = [];
+        const dragon = new GameDragon(this, masterFollower.x, masterFollower.y);
+        this.dragons.push(dragon);
+        
+        // Play the splash screen for 3.5 seconds
+        this.dragonSplashTimer = 3.5;
+        this.hud.showFollowerNotification('🐲 A Dragon has joined your posse!', true);
+    }
+
+    _renderDragonSplash(ctx, w, h) {
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.95)';
+        ctx.fillRect(0, 0, w, h);
+
+        // Draw a double retro border
+        ctx.strokeStyle = '#ca8a04';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(10, 10, w - 20, h - 20);
+        ctx.strokeStyle = '#1e1b4b';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(16, 16, w - 32, h - 32);
+
+        // Center position
+        const cx = w / 2;
+        const cy = h / 2 - 20;
+
+        // Draw retro pixel-art dragon in the center holding a trash bag in its talons!
+        // Body (Green)
+        ctx.fillStyle = '#16a34a';
+        ctx.fillRect(cx - 30, cy - 30, 60, 60);
+        // Belly (Yellow)
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(cx - 10, cy - 10, 20, 40);
+        // Head
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(cx - 20, cy - 65, 40, 35);
+        // Snout
+        ctx.fillRect(cx - 10, cy - 38, 35, 12);
+        // Horns
+        ctx.fillStyle = '#ca8a04';
+        ctx.fillRect(cx - 25, cy - 75, 10, 10);
+        ctx.fillRect(cx + 15, cy - 75, 10, 10);
+        // Glowing Yellow Eyes
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(cx - 10, cy - 55, 6, 6);
+        ctx.fillRect(cx + 4, cy - 55, 6, 6);
+        // Wings (Red/orange)
+        ctx.fillStyle = '#ea580c';
+        ctx.fillRect(cx - 65, cy - 20, 35, 25);
+        ctx.fillRect(cx + 30, cy - 20, 35, 25);
+        ctx.fillStyle = '#ca8a04';
+        ctx.fillRect(cx - 55, cy - 10, 25, 15);
+        ctx.fillRect(cx + 30, cy - 10, 25, 15);
+
+        // Talons holding a trash bag
+        ctx.fillStyle = '#4b5563';
+        ctx.fillRect(cx - 20, cy + 30, 12, 12);
+        ctx.fillRect(cx + 8, cy + 30, 12, 12);
+
+        // Trash bag in talons
+        ctx.fillStyle = '#374151';
+        ctx.beginPath();
+        ctx.arc(cx, cy + 45, 16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(cx - 4, cy + 32, 8, 4); // bag tie
+
+        // Text
+        ctx.fillStyle = '#ffaa00';
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText("A DRAGON HAS JOINED", cx, cy + 90);
+        ctx.fillText("YOUR POSSE!", cx, cy + 115);
+
+        ctx.fillStyle = '#a855f7';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillText("Incinerates trash with hot fire!", cx, cy + 145);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText("Posse members will follow it!", cx, cy + 160);
+    }
+
     _restartGame() {
         this.gameMap = new GameMap();
         this.miniMap.buildStatic(this.gameMap);
@@ -2107,6 +2575,11 @@ class Game {
     }
 
     _renderGame(ctx, w, h) {
+        if (this.dragonSplashTimer > 0) {
+            this._renderDragonSplash(ctx, w, h);
+            return;
+        }
+
         if (!this.hasLoggedRender) {
             this.hasLoggedRender = true;
             if (window.gameLog) {
@@ -2117,7 +2590,7 @@ class Game {
         this.gameMap.render(ctx, this.camera, this.player);
 
         // Draw Fast Food & Hospital markers
-        if (window.fastFoodMode && this.spriteManager) {
+        if ((window.fastFoodMode || window.cultMode) && this.spriteManager) {
             const ffImg = this.spriteManager.getImage('fast_food_sign');
             for (const bldg of this.gameMap.buildings) {
                 if (!bldg || bldg.tiles.length === 0) continue;
@@ -2229,12 +2702,71 @@ class Game {
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
         }
         
-        if (window.frenzyMode || window.flowersMode || window.politicsMode) {
+        if (window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
             this.npcManager.render(ctx, this.camera, this.spriteManager);
         }
 
-        // Render rival Candidates in politics mode
-        if (window.politicsMode && this.rivalCandidates && this.rivalCandidates.length > 0) {
+        // ── Phase 3: Lost Child Quest building highlight ──
+        if (this.npcManager && this.npcManager.childQuestBuilding && this.npcManager.childFollowing && !this.npcManager.childDelivered) {
+            const qBldg = this.npcManager.childQuestBuilding;
+            if (qBldg.tiles.length > 0) {
+                let minTX = Infinity, minTY = Infinity, maxTX = -Infinity, maxTY = -Infinity;
+                for (const t of qBldg.tiles) {
+                    if (t.x < minTX) minTX = t.x;
+                    if (t.y < minTY) minTY = t.y;
+                    if (t.x > maxTX) maxTX = t.x;
+                    if (t.y > maxTY) maxTY = t.y;
+                }
+                const wx = minTX * TILE_SIZE;
+                const wy = minTY * TILE_SIZE;
+                const ww = (maxTX - minTX + 1) * TILE_SIZE;
+                const wh = (maxTY - minTY + 1) * TILE_SIZE;
+                const wrapped = nearestWrap(wx + ww/2, wy + wh/2, this.camera.getCenterX(), this.camera.getCenterY());
+                const screen = this.camera.worldToScreen(wrapped.x - ww/2, wrapped.y - wh/2);
+                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+                ctx.strokeStyle = `rgba(255, 220, 50, ${pulse})`;
+                ctx.lineWidth = 4;
+                ctx.strokeRect(screen.x, screen.y, ww, wh);
+                ctx.fillStyle = `rgba(255, 220, 50, ${pulse * 0.15})`;
+                ctx.fillRect(screen.x, screen.y, ww, wh);
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('👨‍👩 PARENTS HERE', screen.x + ww/2, screen.y - 8);
+            }
+        }
+
+        // ── Phase 3: Cult Mode search-for-family building highlight ──
+
+        // ── Phase 3: Render Child + Parent NPCs ──
+        if (this.npcManager) {
+            this.npcManager.renderChildAndParents(ctx, this.camera, this.spriteManager);
+        }
+
+        // ── Phase 3: Builder Mode — owned building badges ──
+        if (window.builderMode && this.ownedBuildings && this.ownedBuildings.length > 0) {
+            for (const owned of this.ownedBuildings) {
+                const bldg = this.gameMap.buildings[owned.building_idx];
+                if (!bldg || bldg.tiles.length === 0) continue;
+                let cx = 0, cy = 0;
+                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
+                cx = (cx / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
+                cy = (cy / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (!this.camera.isVisible(wrapped.x - 60, wrapped.y - 60, 120, 120)) continue;
+                const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                ctx.fillStyle = 'rgba(0,180,80,0.85)';
+                ctx.font = 'bold 7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`🏢 OWNED`, screen.x, screen.y - 30);
+                ctx.fillStyle = '#fff';
+                ctx.font = '6px "Press Start 2P", monospace';
+                ctx.fillText(`${owned.tenants || 0}/5 tenants`, screen.x, screen.y - 18);
+            }
+        }
+
+        // Render rival Candidates in politics/el presidente mode
+        if ((window.politicsMode || window.elPresidenteElection) && this.rivalCandidates && this.rivalCandidates.length > 0) {
             for (const rival of this.rivalCandidates) {
                 const screen = this.camera.worldToScreen(rival.x, rival.y);
                 if (this.camera.isVisible(rival.x - 20, rival.y - 20, 40, 40)) {
@@ -2382,10 +2914,15 @@ class Game {
             this.organizers.forEach(org => org.render(ctx, this.camera));
         }
 
+        // Render Dragons
+        if (this.dragons) {
+            this.dragons.forEach(drag => drag.render(ctx, this.camera));
+        }
+
         // Render HUD
         this.hud.render(ctx, w, h);
 
-        if (window.frenzyMode || window.politicsMode) {
+        if (window.frenzyMode || window.politicsMode || window.elPresidenteElection) {
             this.npcManager.renderDialogue(ctx, w, h);
             if (window.frenzyMode) {
                 this.pirateManager.renderCombatResults(ctx, w, h);
@@ -2393,7 +2930,9 @@ class Game {
         }
 
         if (window.crimeMode) {
-            this.npcManager.renderDialogue(ctx, w, h);
+            if (!window.elPresidenteElection) {
+                this.npcManager.renderDialogue(ctx, w, h);
+            }
         }
 
         // Render pickup hint if near trash
@@ -2574,7 +3113,7 @@ class Game {
                         ctx.drawImage(pirateImg, 130, 50, 32, 32);
                     }
                 }
-            } else if (window.politicsMode) {
+            } else if (window.politicsMode || window.elPresidenteElection) {
                 // Politics campaign result pixel art
                 const playerVotes = this.handshakesShaken || 0;
                 const rivalVotes = this.rivalCandidate ? this.rivalCandidate.votes : 0;
@@ -2741,14 +3280,22 @@ class Game {
                 if (isPirateDefeat) {
                     if (window.apiCall) {
                         try {
-                            await window.apiCall('/api/game/end-round', 'POST', {
+                            const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
+                            const result = await window.apiCall('/api/game/end-round', 'POST', {
                                 earned: 0,
                                 employee_cost: this.totalEmployeeCost,
                                 employees_killed: this.employeesKilledThisRound,
                                 lose_truck: hadTruck,
                                 followers: this.getRoundTotalFollowers(),
-                                handshakes: this.handshakesShaken || 0
+                                handshakes: this.handshakesShaken || 0,
+                                dragon_mode_active: !!window.dragonMode,
+                                sacrifice_dragon: sacrifice_dragon,
+                                happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                                cult_leaves_cumulative: this.cultLeavesCumulative || 0
                             });
+                            if (result && result.dragon_lost) {
+                                alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
+                            }
                             window.employeesHired = 0;
                             await window.refreshGameState();
                             window.renderStore();
@@ -2829,14 +3376,22 @@ class Game {
             newBtn.addEventListener('click', async () => {
                 if (window.apiCall) {
                     try {
-                        await window.apiCall('/api/game/end-round', 'POST', {
+                        const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
+                        const result = await window.apiCall('/api/game/end-round', 'POST', {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
                             lose_truck: false, 
                             followers: this.getRoundTotalFollowers(),
-                            handshakes: this.handshakesShaken || 0
+                            handshakes: this.handshakesShaken || 0,
+                            dragon_mode_active: !!window.dragonMode,
+                            sacrifice_dragon: sacrifice_dragon,
+                            happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                            cult_leaves_cumulative: this.cultLeavesCumulative || 0
                         });
+                        if (result && result.dragon_lost) {
+                            alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
+                        }
                         window.employeesHired = 0;
                         await window.refreshGameState();
                         window.renderStore();
@@ -2953,7 +3508,8 @@ class Game {
             newBtn.addEventListener('click', async () => {
                 if (window.apiCall) {
                     try {
-                        await window.apiCall('/api/game/end-round', 'POST', {
+                        const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
+                        const result = await window.apiCall('/api/game/end-round', 'POST', {
                             earned: 0,
                             employee_cost: this.totalEmployeeCost,
                             employees_killed: this.employeesKilledThisRound,
@@ -2962,8 +3518,15 @@ class Game {
                             handshakes: this.handshakesShaken || 0,
                             rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
                             mafia_arrest: isMafiaArrest,
-                            politics_arrest: isPoliticsArrest
+                            politics_arrest: isPoliticsArrest,
+                            dragon_mode_active: !!window.dragonMode,
+                            sacrifice_dragon: sacrifice_dragon,
+                            happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                            cult_leaves_cumulative: this.cultLeavesCumulative || 0
                         });
+                        if (result && result.dragon_lost) {
+                            alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
+                        }
                         window.employeesHired = 0;
                         await window.refreshGameState();
                         window.renderStore();
@@ -3045,23 +3608,69 @@ class Game {
                 total += org.followerManager.getFollowerCount();
             });
         }
+        if (this.dragons) {
+            this.dragons.forEach(drag => {
+                total += drag.followerManager.getFollowerCount();
+            });
+        }
         return total;
+    }
+
+    getRoundTotalFollowersForValue() {
+        return this.getRoundTotalFollowers() + (window.dragonMode ? 5 : 0);
     }
 
     _addSequentialFollower() {
         const organizersCount = this.organizers ? this.organizers.length : 0;
-        const totalGroups = organizersCount + 1;
+        const dragonsCount = this.dragons ? this.dragons.length : 0;
+        const totalGroups = organizersCount + dragonsCount + 1;
         
         let newFollower;
         if (this.nextFollowerGroupIndex === 0) {
             newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
+            
+            // Fantasy Mode: Dragon Master rolls
+            if (window.fantasyMode && !this.dragonMasterFollower && (!this.dragons || this.dragons.length === 0)) {
+                if (Math.random() < 0.10) {
+                    newFollower.spriteId = 'char_dragon_master';
+                    newFollower.isDragonMaster = true;
+                    this.dragonMasterFollower = newFollower;
+                    this.hud.showFollowerNotification('🧙‍♂️ A Dragon Master has joined your posse!', true);
+                }
+            } else if (window.fantasyMode && this.dragonMasterFollower) {
+                if (Math.random() < 0.10) {
+                    this.triggerDragonTransformation(this.dragonMasterFollower);
+                }
+            }
+            
             const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
             this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);
-        } else {
+        } else if (this.nextFollowerGroupIndex <= organizersCount) {
             const org = this.organizers[this.nextFollowerGroupIndex - 1];
             newFollower = org.followerManager.addFollower(org.x, org.y);
+            
+            // Fantasy Mode: Dragon Master rolls for organizer recruits
+            if (window.fantasyMode && !this.dragonMasterFollower && (!this.dragons || this.dragons.length === 0)) {
+                if (Math.random() < 0.10) {
+                    newFollower.spriteId = 'char_dragon_master';
+                    newFollower.isDragonMaster = true;
+                    this.dragonMasterFollower = newFollower;
+                    this.hud.showFollowerNotification('🧙‍♂️ A Dragon Master has joined your posse!', true);
+                }
+            } else if (window.fantasyMode && this.dragonMasterFollower) {
+                if (Math.random() < 0.10) {
+                    this.triggerDragonTransformation(this.dragonMasterFollower);
+                }
+            }
+            
             const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
             this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined Organizer ${this.nextFollowerGroupIndex}'s posse!` : `New member joined Organizer ${this.nextFollowerGroupIndex}'s posse!`, true);
+        } else {
+            const drag = this.dragons[this.nextFollowerGroupIndex - organizersCount - 1];
+            newFollower = drag.followerManager.addFollower(drag.x, drag.y);
+            
+            const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+            this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined Dragon's posse!` : `New member joined Dragon's posse!`, true);
         }
         this.nextFollowerGroupIndex = (this.nextFollowerGroupIndex + 1) % totalGroups;
 
@@ -3076,7 +3685,6 @@ class Game {
         if (this.doubleTrashPickup) {
             this.trashManager.totalPoints = Math.max(0, this.trashManager.totalPoints - 20);
             this.hud.updateScore(this.trashManager.totalPoints);
-            // Show brief deduction notice at low frequency to avoid spam
             if (!this._lastTrashpickersNotify || Date.now() - this._lastTrashpickersNotify > 3000) {
                 this.hud.showFollowerNotification('-$20 to equip new recruit (Trashpickers)', false);
                 this._lastTrashpickersNotify = Date.now();
@@ -3086,7 +3694,12 @@ class Game {
 
     _removeSequentialFollower() {
         const organizersCount = this.organizers ? this.organizers.length : 0;
+        const dragonsCount = this.dragons ? this.dragons.length : 0;
         if (this.followerManager.followers.length > 0) {
+            const removed = this.followerManager.followers[this.followerManager.followers.length - 1];
+            if (removed === this.dragonMasterFollower) {
+                this.dragonMasterFollower = null;
+            }
             this.followerManager.removeFollower();
             this.hud.showFollowerNotification('A posse member left you!', false);
         } else if (organizersCount > 0) {
@@ -3095,7 +3708,16 @@ class Game {
                 if (org.followerManager.followers.length > 0) {
                     org.followerManager.removeFollower();
                     this.hud.showFollowerNotification(`A posse member left Organizer ${i + 1}!`, false);
-                    break;
+                    return;
+                }
+            }
+        } else if (dragonsCount > 0) {
+            for (let i = 0; i < dragonsCount; i++) {
+                const drag = this.dragons[i];
+                if (drag.followerManager.followers.length > 0) {
+                    drag.followerManager.removeFollower();
+                    this.hud.showFollowerNotification(`A posse member left the Dragon!`, false);
+                    return;
                 }
             }
         }
@@ -3167,7 +3789,7 @@ class GameOrganizer {
                     nearest.collected = true;
                     this.game.trashManager.totalCollected++;
                     
-                    const totalFollowers = this.game.getRoundTotalFollowers();
+                    const totalFollowers = this.game.getRoundTotalFollowersForValue();
                     const isPriceFixing = this.game.priceFixingActive;
                     const basePointValue = Math.max(1, Math.round(Math.sqrt(16 * totalFollowers)));
                     let pointValue = isPriceFixing ? Math.round(basePointValue * 1.25) : basePointValue;
@@ -3299,6 +3921,36 @@ class GameOrganizer {
         const screen = camera.worldToScreen(this.x, this.y);
         if (!camera.isVisible(this.x - 32, this.y - 32, 64, 64)) return;
 
+        if (window.cultMode) {
+            const img = this.game.spriteManager.getCharacterImage('cult_white_robe');
+            if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+                let bobY = 0;
+                if (this.moving) {
+                    bobY = Math.sin(this.animTimer * 0.8) * 1.5;
+                }
+                ctx.save();
+                const drawSize = 24;
+                if (this.direction === 'left') {
+                    ctx.translate(screen.x, screen.y + bobY);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2 + bobY, drawSize, drawSize);
+                }
+                ctx.restore();
+                
+                ctx.save();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '6px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 26);
+                ctx.restore();
+                
+                this.followerManager.render(ctx, camera, this.game.spriteManager);
+                return;
+            }
+        }
+
         ctx.save();
         // Body (Blue shirt)
         ctx.fillStyle = '#3b82f6';
@@ -3350,11 +4002,43 @@ window.triggerFastFoodOffer = function(posseCount) {
     }
     const dialog = document.getElementById('fast-food-dialog');
     const costText = document.getElementById('fast-food-cost-text');
-    if (dialog && costText) {
-        const trashWorth = Math.max(1, Math.round(Math.sqrt(16 * posseCount)));
-        const cost = posseCount * trashWorth;
-        costText.innerText = `Cost: $${cost.toLocaleString()}`;
-        window.currentFastFoodCost = cost;
+    const warnText = document.getElementById('fast-food-warning-text');
+    const btnYes = document.getElementById('btn-fast-food-yes');
+    const btnNo = document.getElementById('btn-fast-food-no');
+    
+    if (dialog) {
+        let isBlocked = false;
+        if (window.cultMode && window.game) {
+            const lastEaten = window.game.lastEatenFastFoodId;
+            const pending = window.game.pendingFastFoodId;
+            const lastVisited = window.game.lastVisitedFastFoodId;
+            if (lastEaten !== undefined && lastEaten !== null && lastEaten === pending && lastVisited === lastEaten) {
+                isBlocked = true;
+            }
+        }
+
+        if (isBlocked) {
+            if (btnYes) btnYes.style.display = 'none';
+            if (btnNo) btnNo.innerText = 'Close';
+            if (costText) costText.style.display = 'none';
+            if (warnText) {
+                warnText.innerText = 'You cannot eat here two times in a row without going to a different restaurant first!';
+                warnText.style.display = 'block';
+            }
+        } else {
+            if (btnYes) btnYes.style.display = 'inline-block';
+            if (btnNo) btnNo.innerText = 'No';
+            if (costText) {
+                const trashWorth = Math.max(1, Math.round(Math.sqrt(16 * posseCount)));
+                const cost = posseCount * trashWorth;
+                costText.innerText = `Cost: $${cost.toLocaleString()}`;
+                window.currentFastFoodCost = cost;
+                costText.style.display = 'block';
+            }
+            if (warnText) {
+                warnText.style.display = 'none';
+            }
+        }
         dialog.classList.remove('hidden');
     }
 };
@@ -3415,7 +4099,14 @@ window.addEventListener('DOMContentLoaded', () => {
                     window.game.hud.showFollowerNotification('Food poisoning! Entire posse died without insurance!', false);
                 }
             } else {
-                window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 15s.`, true);
+                if (window.cultMode) {
+                    window.game.lastEatenFastFoodId = window.game.pendingFastFoodId;
+                    window.game.cultHappinessBufferTimer = 10.0;
+                    window.game.pendingHappinessBoost = 15 + Math.floor(Math.random() * 11);
+                    window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Happiness will increase in 10s!`, true);
+                } else {
+                    window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 15s.`, true);
+                }
             }
         }
         canvas.focus();
@@ -3506,4 +4197,165 @@ window.addEventListener('DOMContentLoaded', () => {
             canvas.focus();
         });
     }
+
+    window.addEventListener('blur', () => {
+        if (window.game) {
+            window.game.resetKeys();
+        }
+    });
 });
+
+class GameDragon {
+    constructor(game, x, y) {
+        this.game = game;
+        this.x = x;
+        this.y = y;
+        this.speed = 5.5;
+        this.followerManager = new FollowerManager();
+        this.followerManager.initialize('char_dragon');
+        
+        this.targetTrash = null;
+        this.direction = 'down';
+        this.animFrame = 0;
+        this.animTimer = 0;
+        this.moving = false;
+        this.positionHistory = [{ x: this.x, y: this.y }];
+        this.fireTimer = 0;
+        this.fireX = 0;
+        this.fireY = 0;
+    }
+
+    getTileX() { return Math.floor(this.x / TILE_SIZE); }
+    getTileY() { return Math.floor(this.y / TILE_SIZE); }
+
+    update(dt) {
+        if (this.collectTimer === undefined) this.collectTimer = 0;
+        this.collectTimer += dt;
+        if (this.collectTimer >= 0.5) {
+            this.collectTimer -= 0.5;
+            let nearest = null;
+            let minDist = TILE_SIZE * 10;
+            for (const item of this.game.trashManager.items) {
+                if (!item.collected) {
+                    const dx = item.x - this.x;
+                    const dy = item.y - this.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = item;
+                    }
+                }
+            }
+            if (nearest) {
+                nearest.collected = true;
+                this.game.trashManager.totalCollected++;
+                this.fireTimer = 0.25;
+                this.fireX = nearest.x;
+                this.fireY = nearest.y;
+                const totalFollowers = this.game.getRoundTotalFollowersForValue();
+                const pointValue = Math.max(1, Math.round(Math.sqrt(16 * totalFollowers)));
+                this.game.trashManager.totalPoints += pointValue;
+                
+                const wrapped = nearestWrap(nearest.x, nearest.y, this.game.camera.getCenterX(), this.game.camera.getCenterY());
+                this.game.trashManager.pickupEffects.push({
+                    x: wrapped.x,
+                    y: wrapped.y,
+                    text: `🔥 +$${pointValue}`,
+                    timer: 0,
+                    alpha: 1,
+                    color: '#ff6600',
+                });
+                
+                this.game.trashCollectedInWindow++;
+                this.game.trashCollectedInRound = (this.game.trashCollectedInRound || 0) + 1;
+                this.game.hud.updateScore(this.game.trashManager.totalPoints);
+                this.game.trashManager.spawnMore(this.game.gameMap, 1);
+                this.targetTrash = null;
+            }
+        }
+
+        if (!this.targetTrash || this.targetTrash.collected) {
+            let nearest = null;
+            let minDist = Infinity;
+            for (const item of this.game.trashManager.items) {
+                if (!item.collected) {
+                    const dx = item.x - this.x;
+                    const dy = item.y - this.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearest = item;
+                    }
+                }
+            }
+            this.targetTrash = nearest;
+        }
+
+        if (this.targetTrash) {
+            const target = this.targetTrash;
+            const dx = target.x - this.x;
+            const dy = target.y - this.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > 5) {
+                this.moving = true;
+                const vx = (dx / dist) * this.speed;
+                const vy = (dy / dist) * this.speed;
+                this.x += vx * 60 * dt;
+                this.y += vy * 60 * dt;
+                if (Math.abs(vx) > Math.abs(vy)) {
+                    this.direction = vx > 0 ? 'right' : 'left';
+                } else {
+                    this.direction = vy > 0 ? 'down' : 'up';
+                }
+            } else {
+                this.moving = false;
+            }
+        } else {
+            this.moving = false;
+        }
+
+        if (this.fireTimer > 0) {
+            this.fireTimer -= dt;
+        }
+
+        this.positionHistory.push({ x: this.x, y: this.y });
+        if (this.positionHistory.length > 1000) {
+            this.positionHistory.shift();
+        }
+        this.followerManager.update(this, this.game.gameMap);
+    }
+
+    render(ctx, camera) {
+        const wrapped = nearestWrap(this.x, this.y, camera.getCenterX(), camera.getCenterY());
+        const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+        
+        if (this.fireTimer > 0 && this.game.spriteManager) {
+            const fireImg = this.game.spriteManager.getImage('dragon_fire');
+            if (fireImg) {
+                const wFire = nearestWrap(this.fireX, this.fireY, camera.getCenterX(), camera.getCenterY());
+                const screenFire = camera.worldToScreen(wFire.x, wFire.y);
+                ctx.drawImage(fireImg, screenFire.x - 16, screenFire.y - 16, 32, 32);
+                
+                ctx.strokeStyle = 'rgba(255, 100, 0, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(screen.x, screen.y);
+                ctx.lineTo(screenFire.x, screenFire.y);
+                ctx.stroke();
+            }
+        }
+
+        if (this.game.spriteManager) {
+            const dragImg = this.game.spriteManager.getCharacterImage('char_dragon');
+            if (dragImg) {
+                ctx.drawImage(dragImg, screen.x - 72, screen.y - 72, 144, 144);
+            }
+        }
+        
+        ctx.fillStyle = '#16a34a';
+        ctx.font = 'bold 6px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText("🐲 DRAGON", screen.x, screen.y - 78);
+        this.followerManager.render(ctx, camera, this.game.spriteManager);
+    }
+}

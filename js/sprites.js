@@ -18,9 +18,13 @@ const SPRITE_CONFIG = {
         { id: 'trash4', name: 'Banana Peel', src: 'assets/sprites/trash4.png' },
     ],
     other: [
+        { id: 'cult_white_robe', name: 'Cult Robe', src: 'assets/sprites/cult_white_robe.png', color: '#ffffff' },
         { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' },
         { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },
         { id: 'char_pirate', name: 'Pirate', src: 'assets/sprites/pirate.png', color: '#aa3333' },
+        { id: 'char_dragon_master', name: 'Dragon Master', src: 'assets/sprites/dragon_master.png', color: '#6d28d9' },
+        { id: 'char_dragon', name: 'Dragon', src: 'assets/sprites/dragon.png', color: '#16a34a' },
+        { id: 'dragon_fire', name: 'Dragon Fire', src: 'assets/sprites/dragon_fire.png', color: '#ea580c' },
         { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' },
         { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ffaa00' },
         { id: 'flower', name: 'Flower', src: 'assets/sprites/flower.png' },
@@ -162,13 +166,92 @@ class SpriteManager {
     }
 
     _createFallbackSprite(sprite) {
-        const size = sprite.id.startsWith('char') ? 64 : 32;
+        const size = (sprite.id.startsWith('char') || sprite.id === 'dragon_fire') ? 64 : 32;
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
 
-        if (sprite.id.startsWith('char')) {
+        if (sprite.id === 'char_dragon_master') {
+            // Draw a 16-bit retro style Dragon Master
+            ctx.fillStyle = '#4a2c00'; // brown boots/pants
+            ctx.fillRect(24, 48, 16, 12);
+            
+            ctx.fillStyle = '#6d28d9'; // purple/violet robe
+            ctx.fillRect(20, 24, 24, 24);
+            
+            ctx.fillStyle = '#fbcfe8'; // pale skin face
+            ctx.fillRect(24, 12, 16, 12);
+            
+            ctx.fillStyle = '#1e1b4b'; // dark blue wizard hat
+            ctx.beginPath();
+            ctx.moveTo(16, 12);
+            ctx.lineTo(48, 12);
+            ctx.lineTo(32, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#ff0055'; // red glowing dragon-master eyes
+            ctx.fillRect(26, 16, 4, 4);
+            ctx.fillRect(34, 16, 4, 4);
+
+            // Staff
+            ctx.fillStyle = '#b45309'; // wooden staff
+            ctx.fillRect(44, 12, 4, 36);
+            ctx.fillStyle = '#22c55e'; // green glowing dragon orb on staff
+            ctx.fillRect(42, 6, 8, 8);
+            
+        } else if (sprite.id === 'char_dragon') {
+            // Draw a 16-bit retro green flying dragon
+            // Tail
+            ctx.fillStyle = '#15803d'; // green tail
+            ctx.fillRect(4, 32, 16, 8);
+            ctx.fillStyle = '#16a34a'; 
+            ctx.fillRect(8, 28, 8, 4);
+
+            // Wings (Red/orange)
+            ctx.fillStyle = '#dc2626'; // dark red wing back
+            ctx.fillRect(16, 8, 12, 16);
+            ctx.fillStyle = '#ea580c'; // orange highlights
+            ctx.fillRect(20, 4, 8, 8);
+
+            // Body
+            ctx.fillStyle = '#16a34a'; // green dragon body
+            ctx.fillRect(20, 16, 28, 24);
+            ctx.fillStyle = '#facc15'; // yellow belly scales
+            ctx.fillRect(28, 28, 12, 12);
+
+            // Head
+            ctx.fillStyle = '#15803d'; // dark green head
+            ctx.fillRect(36, 8, 20, 16);
+            ctx.fillStyle = '#ca8a04'; // horns
+            ctx.fillRect(32, 0, 8, 8);
+            ctx.fillRect(44, 0, 8, 8);
+
+            // Glowing Yellow Eyes
+            ctx.fillStyle = '#facc15'; 
+            ctx.fillRect(48, 10, 4, 4);
+
+            // Mouth
+            ctx.fillStyle = '#111'; // mouth line
+            ctx.fillRect(52, 18, 4, 2);
+
+        } else if (sprite.id === 'dragon_fire') {
+            // Draw a retro 16-bit fire blast
+            ctx.fillStyle = '#ea580c'; // outer orange flame
+            ctx.fillRect(12, 12, 40, 40);
+            
+            ctx.fillStyle = '#ca8a04'; // mid yellow-orange
+            ctx.fillRect(18, 18, 28, 28);
+            
+            ctx.fillStyle = '#fef08a'; // light yellow core
+            ctx.fillRect(24, 24, 16, 16);
+            
+            ctx.fillStyle = '#ffffff'; // white hot center
+            ctx.fillRect(28, 28, 8, 8);
+            
+        } else if (sprite.id.startsWith('char')) {
             // Character fallback: colored circle with initial
             const color = sprite.color || '#888';
             ctx.fillStyle = color;

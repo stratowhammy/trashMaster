@@ -135,6 +135,34 @@
                         </label>
                         <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Politics Mode</span>
                     </div>
+                    <div id="cult-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="cult-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Cult Mode</span>
+                    </div>
+                    <div id="dragon-toggle-container" class="toggle-container" style="margin-bottom: 12px; display: none;">
+                        <label class="switch">
+                            <input type="checkbox" id="dragon-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ff3333; margin-left: 8px; vertical-align: middle;">Burninator Mode</span>
+                    </div>
+                    <div id="builder-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="builder-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Builder Mode</span>
+                    </div>
+                    <div id="fantasy-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
+                        <label class="switch">
+                            <input type="checkbox" id="fantasy-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Fantasy Mode</span>
+                    </div>
                     <div class="toggle-container" style="margin-bottom: 12px;">
                         <label class="switch">
                             <input type="checkbox" id="flowers-toggle">
@@ -146,6 +174,13 @@
                     <button id="btn-view-trophies" class="btn secondary" style="margin-bottom: 12px; background: #ffaa00; border: 2px solid #cc7700; color: #111; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Trophy Case</button>
                     <button id="btn-view-stats" class="btn secondary" style="margin-bottom: 12px; background: #00aa66; border: 2px solid #007744; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Performance Stats</button>
                     <button id="btn-store-logout" class="btn secondary">Logout</button>
+                    
+                    <!-- Retro Store Terminal -->
+                    <div id="store-terminal" style="margin-top: 15px; background: #000; border: 2px solid #333; padding: 8px; font-family: monospace; font-size: 10px; color: #00ff00; border-radius: 4px; box-shadow: inset 0 0 5px #00ff00; text-align: left;">
+                        <div style="font-family: 'Press Start 2P', monospace; font-size: 6px; color: #888; margin-bottom: 6px;">STORE TERMINAL:</div>
+                        <div id="terminal-history" style="height: 50px; overflow-y: auto; margin-bottom: 4px; line-height: 1.2; font-family: monospace; font-size: 9px; white-space: pre-wrap;">Ready.</div>
+                        <input type="text" id="terminal-input" placeholder="Type command..." style="width: 100%; background: #000; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 9px; padding: 4px; box-sizing: border-box; outline: none;">
+                    </div>
                 </div>
                 <div class="store-items">
                     <!-- Items populated dynamically -->
@@ -311,6 +346,7 @@
             <div style="font-size: 48px; margin-bottom: 15px;">🍔</div>
             <h2 style="color: #ffaa00; margin-bottom: 15px; font-size: 16px;">Feed Your Posse?</h2>
             <p id="fast-food-cost-text" style="color: #ddd; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">Cost: $0</p>
+            <p id="fast-food-warning-text" style="color: #ff3333; font-size: 10px; line-height: 1.6; margin-bottom: 25px; display: none; font-family: 'Press Start 2P', monospace;"></p>
             <div style="display: flex; gap: 15px; justify-content: center;">
                 <button id="btn-fast-food-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px;">Yes</button>
                 <button id="btn-fast-food-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px;">No</button>
@@ -400,6 +436,19 @@
                 Your party nominated you to run for Office!
             </p>
             <button id="btn-primary-win-continue" class="btn play-btn" style="background: #00aa66; border: 2px solid #007744; box-shadow: 0 4px #005522; padding: 15px 30px; font-family: 'Press Start 2P', monospace; font-size: 12px; color: #fff; cursor: pointer;">CONTINUE TO MAIN ELECTION</button>
+        </div>
+    </div>
+
+    <!-- Cult Leaving Dialog -->
+    <div id="cult-leaving-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #111; border: 4px solid #ccaa00; border-radius: 12px; padding: 25px; width: 420px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8); font-family: 'Press Start 2P', monospace; box-sizing: border-box;">
+            <div style="font-size: 48px; margin-bottom: 15px;">⛪</div>
+            <h2 style="color: #ccaa00; margin-bottom: 20px; font-size: 10px; line-height: 1.6;">Church of Grimetology</h2>
+            <p id="cult-leaving-text" style="color: #ffffff; font-size: 8px; line-height: 1.6; margin-bottom: 25px; text-align: left;"></p>
+            <div style="display: flex; flex-direction: column; gap: 15px; align-items: center; width: 100%;">
+                <button id="btn-cult-stay" class="btn" style="background: #cc4444; border-color: #aa2222; width: 100%; font-size: 8px; padding: 12px; font-family: 'Press Start 2P', monospace; color: #fff; cursor: pointer;">[C] Convince to Stay</button>
+                <button id="btn-cult-leave" class="btn" style="background: #44cc44; border-color: #22aa22; width: 100%; font-size: 8px; padding: 12px; font-family: 'Press Start 2P', monospace; color: #fff; cursor: pointer;">[L] Allow to Leave</button>
+            </div>
         </div>
     </div>
 

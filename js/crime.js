@@ -338,7 +338,7 @@ class CrimeManager {
             };
         }
 
-        this.madeMan = false;
+        this.madeMan = (window.madeManStatus === 'accepted');
         this.activeFamily = -1;
         this.activeTask = null;
         this.completedJobsCount = window.completedMafiaJobs || 0;
@@ -729,7 +729,33 @@ class CrimeManager {
             if (alliedDon && alliedDon.alive) {
                 const dist = Math.sqrt((alliedDon.x - wpx)**2 + (alliedDon.y - wpy)**2);
                 if (dist < TILE_SIZE * 1.5 && game.player.keys.k) {
-                    if (this.activeTask && this.activeTask.type === 'travel_job') {
+                    const currentOffice = window.politicalOffice || 'citizen';
+                    const hasRequiredPhilly = (window.playerMovementSize >= 200);
+                    const hasRequiredIntl = (window.internationalFollowers >= 50);
+
+                    if (!window.travelDestination && currentOffice !== 'el_presidente' && !currentOffice.startsWith('candidate_el_presidente_') && hasRequiredPhilly && hasRequiredIntl) {
+                        const targetDest = Math.random() < 0.5 ? 'cucaracha' : 'dahgbad';
+                        const displayDest = targetDest === 'cucaracha' ? 'Cucaracha' : 'Dahgbad';
+                        
+                        game.npcManager.activeDialogue = {
+                            lines: [
+                                "You've grown too big for Philly, kid.",
+                                `Go to ${displayDest} and establish yourself as El Presidente.`,
+                                "I've set up the campaign. The race starts when you land."
+                            ],
+                            lineIndex: 0,
+                            timer: 200
+                        };
+                        game.hud.showFollowerNotification(`Nominated for El Presidente in ${displayDest}!`, true);
+                        
+                        window.apiCall('/api/game/political-choice', 'POST', { 
+                            choice: 'accepted', 
+                            office: 'candidate_el_presidente_' + targetDest 
+                        }).then(() => {
+                            window.refreshGameState();
+                        }).catch(e => console.error("Nomination failed:", e));
+
+                    } else if (this.activeTask && this.activeTask.type === 'travel_job') {
                         if (this.activeTask.completed) {
                             this.completeTask(game);
                         } else {

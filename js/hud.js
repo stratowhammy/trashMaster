@@ -193,8 +193,8 @@ class HUD {
         ctx.textAlign = 'left';
         ctx.fillText(`Posse: ${this.followerCount}`, fX + 28, fY + 12);
 
-        // ── Politics Mode Votes Display (top-left, below Posse) ──
-        if (window.politicsMode && window.game) {
+        // ── Politics/El Presidente Mode Votes Display (top-left, below Posse) ──
+        if ((window.politicsMode || window.elPresidenteElection) && window.game) {
             const pvX = 20;
             const pvY = 70;
             ctx.fillStyle = 'rgba(10,15,25,0.75)';
@@ -210,7 +210,7 @@ class HUD {
             ctx.fillStyle = '#ff8844';
             ctx.font = '16px serif';
             ctx.textAlign = 'left';
-            ctx.fillText('🤝', pvX, pvY + 12);
+            ctx.fillText(window.elPresidenteElection ? '😡' : '🤝', pvX, pvY + 12);
             
             const playerVotes = window.game.handshakesShaken || 0;
             const rivalVotes = (window.game.rivalCandidate && window.game.rivalCandidate.votes) || 0;
@@ -218,7 +218,32 @@ class HUD {
             ctx.fillStyle = '#00ffcc';
             ctx.font = 'bold 8px "Press Start 2P", monospace';
             ctx.textAlign = 'left';
-            ctx.fillText(`You:${playerVotes} VS Rival:${rivalVotes}`, pvX + 28, pvY + 12);
+            ctx.fillText(window.elPresidenteElection ? `You:${playerVotes} VS Rival:${rivalVotes} (Intimidate)` : `You:${playerVotes} VS Rival:${rivalVotes}`, pvX + 28, pvY + 12);
+        }
+
+        // ── Builder Mode: Vacancies panel (top-left, below posse/politics) ──
+        if (window.builderMode && window.game) {
+            const vacX = 20;
+            const ownedCount = (window.game.ownedBuildings || []).length;
+            const vacancies = window.game.totalVacancies || 0;
+            const bvY = (window.politicsMode || window.elPresidenteElection) ? 120 : 70;
+            ctx.fillStyle = 'rgba(10,15,25,0.75)';
+            ctx.beginPath();
+            ctx.roundRect(vacX - 10, bvY - 10, 230, 40, 8);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(100,220,100,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(vacX - 10, bvY - 10, 230, 40, 8);
+            ctx.stroke();
+            ctx.fillStyle = '#88ff88';
+            ctx.font = '16px serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('🏢', vacX, bvY + 12);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 8px "Press Start 2P", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Buildings: ${ownedCount}  Vac: ${vacancies}`, vacX + 28, bvY + 12);
         }
 
         // ── Follower Notification ──
@@ -369,6 +394,38 @@ class HUD {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('HUNGER', canvasWidth / 2, barY + barH / 2 + 1);
+        }
+
+        // ── Happiness Bar (Bottom Center, Cult Mode) ──
+        if (window.cultMode && window.game) {
+            const happiness = Math.max(0, Math.min(100, window.game.happiness || 100));
+            const fillPct = happiness / 100;
+
+            const barW = Math.min(400, canvasWidth * 0.5);
+            const barH = 16;
+            const barX = canvasWidth / 2 - barW / 2;
+            const barY = nextBarY;
+            nextBarY -= 20;
+
+            ctx.fillStyle = 'rgba(20, 5, 40, 0.8)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            // Color: purple at full, red at low
+            let hapColor = '#cc44ff';
+            if (fillPct < 0.25) hapColor = '#ff2244';
+            else if (fillPct < 0.5) hapColor = '#ff66aa';
+            ctx.fillStyle = hapColor;
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+            ctx.strokeStyle = '#cc66ff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`HAPPINESS ${Math.round(happiness)}%`, canvasWidth / 2, barY + barH / 2 + 1);
         }
     }
 

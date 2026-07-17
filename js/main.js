@@ -3747,8 +3747,40 @@ class Game {
 
     renderWordGameDialog() {
         const uniqueLetters = ['A','B','C','D','E','F','G','I','L','M','N','O','P','R','S','T','U','W','Y'];
-        const invText = 'Available Letters: ' + uniqueLetters.map(l => `${l}(${this.collectedLetters[l] || 0})`).join(' | ');
-        document.getElementById('letter-inventory-display').innerText = invText;
+        const invDisplay = document.getElementById('letter-inventory-display');
+        invDisplay.innerHTML = '';
+
+        uniqueLetters.forEach(letter => {
+            const count = this.collectedLetters[letter] || 0;
+            
+            const tile = document.createElement('div');
+            tile.style.width = '36px';
+            tile.style.height = '36px';
+            tile.style.background = count > 0 ? '#1b102e' : '#222';
+            tile.style.border = count > 0 ? '2px solid #b55fe6' : '2px solid #444';
+            tile.style.borderRadius = '6px';
+            tile.style.display = 'flex';
+            tile.style.alignItems = 'center';
+            tile.style.justifyContent = 'center';
+            tile.style.position = 'relative';
+            tile.style.fontFamily = '"Press Start 2P", monospace';
+            tile.style.fontSize = '10px';
+            tile.style.color = count > 0 ? '#fff' : '#555';
+            tile.style.boxSizing = 'border-box';
+            tile.innerText = letter;
+
+            const badge = document.createElement('span');
+            badge.style.position = 'absolute';
+            badge.style.right = '2px';
+            badge.style.bottom = '2px';
+            badge.style.fontSize = '6px';
+            badge.style.fontFamily = '"Press Start 2P", monospace';
+            badge.style.color = count > 0 ? '#ccff00' : '#444';
+            badge.innerText = `x${count}`;
+            tile.appendChild(badge);
+
+            invDisplay.appendChild(tile);
+        });
 
         const PRIZES = {
             'WASTE': { name: '$15,000 Cash', type: 'cash', val: 15000 },

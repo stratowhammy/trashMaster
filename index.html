@@ -452,17 +452,17 @@
         </div>
     </div>
 
-    <!-- Word Game Button -->
-    <button id="btn-open-word-game" class="btn" style="position: absolute; left: 20px; top: 120px; z-index: 999; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; background: #b55fe6; border: 2px solid #9240c5; color: #fff; cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px rgba(181, 95, 230, 0.4); display: none;">🔠 Word Game</button>
+    <!-- Letter Inventory Button -->
+    <button id="btn-open-word-game" class="btn" style="position: absolute; left: 20px; top: 120px; z-index: 999; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; background: #b55fe6; border: 2px solid #9240c5; color: #fff; cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px rgba(181, 95, 230, 0.4); display: none;">Letter Inventory 🎒</button>
 
     <!-- Word Game Dialog Modal -->
     <div id="trash-word-game-dialog" class="hidden" style="position: fixed; z-index: 1004; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
         <div style="background: #111; border: 4px solid #b55fe6; border-radius: 12px; padding: 25px; width: 720px; max-height: 90vh; overflow-y: auto; text-align: center; box-shadow: 0 8px 30px rgba(181, 95, 230, 0.4); font-family: 'Press Start 2P', monospace; box-sizing: border-box; position: relative;">
             <button id="btn-word-game-close" class="btn" style="position: absolute; right: 15px; top: 15px; padding: 5px 10px; background: #cc4444; border: 2px solid #aa2222; font-size: 8px; font-family: 'Press Start 2P', monospace; color: #fff; cursor: pointer;">X</button>
-            <h2 style="color: #b55fe6; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">Trash Word Completer</h2>
+            <h2 style="color: #b55fe6; margin-bottom: 15px; font-size: 14px; line-height: 1.6;">Letter Inventory</h2>
             
-            <div id="letter-inventory-display" style="margin-bottom: 20px; font-size: 8px; line-height: 1.8; color: #ccff00; border-bottom: 2px dashed #555; padding-bottom: 15px; text-align: left;">
-                Available Letters: ...
+            <div id="letter-inventory-display" style="margin-bottom: 20px; border-bottom: 2px dashed #555; padding-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+                <!-- Dynamically populated tiles -->
             </div>
 
             <div id="word-game-slots-container" style="display: flex; flex-direction: column; gap: 15px; text-align: left;">

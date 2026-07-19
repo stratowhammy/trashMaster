@@ -2307,6 +2307,23 @@ class Game {
             }
         }
 
+        // ── Chaos Mode Police Spawn ──
+        if (window.chaosMode && window.chaosLevel >= 2) {
+            if (this.crimeManager) {
+                this.crimeManager.police = [];
+                this.crimeManager.policeActive = true;
+                const station = this.gameMap.buildings[1];
+                let spawnX = 0, spawnY = 0;
+                if (station && station.doorTiles.length > 0) {
+                    spawnX = station.doorTiles[0].x;
+                    spawnY = station.doorTiles[0].y;
+                }
+                for (let i = 0; i < 8; i++) {
+                    this.crimeManager.police.push(new PoliceOfficer(spawnX, spawnY, false));
+                }
+            }
+        }
+
         // Fast Food Mode State
         this.hungerTimer = 45.0;
         this.hungerWarned25 = false;
@@ -2505,8 +2522,12 @@ class Game {
                 alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
             }
             window.employeesHired = 0;
-            // Reset Trashpickers at round end
+            // Reset Trashpickers & Chaos Mode at round end
             this.doubleTrashPickup = false;
+            window.chaosCheatActive = false;
+            window.chaosMode = false;
+            const chaosToggle = document.getElementById('chaos-toggle');
+            if (chaosToggle) chaosToggle.checked = false;
             await window.refreshGameState();
             window.renderStore();
 
@@ -2631,6 +2652,22 @@ class Game {
                 window.gameLog(`_renderGame FIRST call: w=${w}, h=${h}, player.x=${this.player ? this.player.x : 'null'}, camera.x=${this.camera ? this.camera.x : 'null'}, camera size: w=${this.camera ? this.camera.width : 'null'}, h=${this.camera ? this.camera.height : 'null'}`);
             }
         }
+
+        const rotateWorld = (window.chaosMode && window.chaosLevel >= 4);
+        const bwWorld = (window.chaosMode && window.chaosLevel === 3);
+
+        if (rotateWorld || bwWorld) {
+            ctx.save();
+        }
+        if (rotateWorld) {
+            ctx.translate(w / 2, h / 2);
+            ctx.rotate(Math.PI / 2);
+            ctx.translate(-w / 2, -h / 2);
+        }
+        if (bwWorld) {
+            ctx.filter = 'grayscale(100%)';
+        }
+
         // Render map
         this.gameMap.render(ctx, this.camera, this.player);
 
@@ -2965,6 +3002,9 @@ class Game {
         }
 
         // Render HUD
+        if (window.chaosMode && (window.chaosLevel === 3 || window.chaosLevel >= 4)) {
+            ctx.restore();
+        }
         this.hud.render(ctx, w, h);
 
         if (window.frenzyMode || window.politicsMode || window.elPresidenteElection) {

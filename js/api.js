@@ -51,6 +51,13 @@ function showScreen(screenId) {
     }
 }
 
+function showChaosConfigDialog() {
+    const dialog = document.getElementById('chaos-dialog');
+    if (dialog) {
+        dialog.classList.remove('hidden');
+    }
+}
+
 function initUI() {
     const btnLogin = document.getElementById('btn-login');
     const btnGenerate = document.getElementById('btn-generate');
@@ -122,9 +129,14 @@ function initUI() {
                 if (cmd) {
                     if (terminalHistory) {
                         terminalHistory.innerHTML += `\n> ${cmd}`;
-                        if (cmd.toLowerCase() === 'dragon ho!') {
+                        const cmdLower = cmd.toLowerCase();
+                        if (cmdLower === 'dragon ho!') {
                             window.dragonHoCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #ffff00;">Dragon Ho! Activated!</span>`;
+                        } else if (cmdLower === 'chaos' || cmdLower === 'chaos mode' || cmdLower === 'chaos ho!') {
+                            window.chaosCheatActive = true;
+                            updateModeToggles();
+                            terminalHistory.innerHTML += `\n<span style="color: #ff0055; text-shadow: 0 0 3px #ff0055;">Chaos Mode Unlocked for this round! Check the toggle.</span>`;
                         } else {
                             terminalHistory.innerHTML += `\n<span style="color: #ff0055;">Unknown command.</span>`;
                         }
@@ -726,6 +738,71 @@ function initUI() {
     if (btnHireCancel) {
         btnHireCancel.addEventListener('click', () => {
             document.getElementById('hire-dialog').classList.add('hidden');
+        });
+    }
+
+    // Chaos Mode Dialog Wiring
+    const chaosLevelSlider = document.getElementById('chaos-level-slider');
+    const chaosLevelDesc = document.getElementById('chaos-level-desc');
+    const chaosTimeSlider = document.getElementById('chaos-time-slider');
+    const chaosTimeValue = document.getElementById('chaos-time-value');
+    const btnChaosStart = document.getElementById('btn-chaos-start');
+    const btnChaosCancel = document.getElementById('btn-chaos-cancel');
+    const chaosToggle = document.getElementById('chaos-toggle');
+
+    if (chaosLevelSlider && chaosLevelDesc) {
+        const descs = {
+            1: "Position 1: Captain Kirk Douglas. All modes enabled simultaneously!",
+            2: "Position 2: Twice as many NPCs, 8 police officers chase you. All modes enabled.",
+            3: "Position 3: Questlove. Map turns Black & White. Twice as many NPCs, 8 police chasing, all modes enabled.",
+            4: "Position 4: Map rotated 90 degrees. Twice as many NPCs, 8 police chasing, all modes enabled.",
+            5: "Position 5: Malik B. Rotated 90 degrees map, twice as many NPCs, 8 police chasing, inverted X/Y arrow keys, all modes enabled."
+        };
+        chaosLevelSlider.addEventListener('input', () => {
+            const val = chaosLevelSlider.value;
+            chaosLevelDesc.innerText = descs[val] || "";
+        });
+    }
+
+    if (chaosTimeSlider && chaosTimeValue) {
+        chaosTimeSlider.addEventListener('input', () => {
+            chaosTimeValue.innerText = `${chaosTimeSlider.value}s`;
+        });
+    }
+
+    if (btnChaosCancel) {
+        btnChaosCancel.addEventListener('click', () => {
+            const dialog = document.getElementById('chaos-dialog');
+            if (dialog) dialog.classList.add('hidden');
+            if (chaosToggle) chaosToggle.checked = false;
+            window.chaosMode = false;
+        });
+    }
+
+    if (btnChaosStart) {
+        btnChaosStart.addEventListener('click', () => {
+            const dialog = document.getElementById('chaos-dialog');
+            if (dialog) dialog.classList.add('hidden');
+            
+            window.chaosMode = true;
+            window.chaosLevel = parseInt(chaosLevelSlider.value);
+            window.chaosTimeLimit = parseInt(chaosTimeSlider.value);
+
+            // Force all other modes active when Chaos Mode starts
+            window.frenzyMode = true;
+            window.crimeMode = true;
+            window.fastFoodMode = true;
+            window.politicsMode = true;
+            window.flowersMode = true;
+            window.cultMode = true;
+            window.builderMode = true;
+            window.fantasyMode = true;
+            window.dragonMode = true;
+
+            showScreen('game-layer');
+            if (window.startGameFromStore) {
+                window.startGameFromStore();
+            }
         });
     }
 }
@@ -1451,6 +1528,41 @@ function updateModeToggles() {
             fantasyToggle.disabled = false;
             label.innerText = `Fantasy Mode`;
             label.style.color = '#fff';
+        }
+    }
+
+    // 8. Chaos Mode
+    const chaosContainer = document.getElementById('chaos-toggle-container');
+    if (chaosContainer) {
+        const chaosToggle = document.getElementById('chaos-toggle');
+        const allUnlocked = (
+            playerMovementSize >= 10 &&
+            playerUnlockedFastFood > 0 &&
+            window.madeManStatus === 'accepted' &&
+            (window.politicalOffice && window.politicalOffice !== 'citizen') &&
+            window.playerUnlockedCult > 0 &&
+            window.playerUnlockedBuilder > 0 &&
+            window.playerUnlockedFantasy > 0
+        );
+
+        if (allUnlocked || window.chaosCheatActive) {
+            chaosContainer.style.display = 'block';
+            chaosToggle.disabled = false;
+            
+            // Set up change handler
+            if (!chaosToggle.dataset.handlerWired) {
+                chaosToggle.dataset.handlerWired = "true";
+                chaosToggle.addEventListener('change', () => {
+                    window.chaosMode = chaosToggle.checked;
+                    if (window.chaosMode) {
+                        showChaosConfigDialog();
+                    }
+                });
+            }
+        } else {
+            chaosContainer.style.display = 'none';
+            chaosToggle.checked = false;
+            window.chaosMode = false;
         }
     }
 }

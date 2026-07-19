@@ -190,7 +190,9 @@ class NPCManager {
             [sidewalks[i], sidewalks[j]] = [sidewalks[j], sidewalks[i]];
         }
 
-        const maxPositions = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? 150 : 20;
+        const npcMultiplier = (window.chaosMode && window.chaosLevel >= 2) ? 2 : 1;
+        let maxPositions = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? 150 : 20;
+        maxPositions *= npcMultiplier;
         const positions = [];
         for (const pos of sidewalks) {
             let tooClose = false;
@@ -210,7 +212,8 @@ class NPCManager {
         const informantIndices = new Set();
         const flowerIndices = new Set();
 
-        const numNPCsToSpawn = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? Math.min(60, positions.length) : Math.min(10, positions.length);
+        let numNPCsToSpawn = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? Math.min(60, positions.length) : Math.min(10, positions.length);
+        numNPCsToSpawn = Math.min(numNPCsToSpawn * npcMultiplier, positions.length);
 
         if (frenzyMode && buildings && buildings.length >= 5) {
             // Pick 5 random NPCs to be informants

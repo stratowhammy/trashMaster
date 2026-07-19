@@ -31,7 +31,14 @@ class Player {
     }
 
     handleKeyDown(e) {
-        switch (e.key) {
+        let key = e.key;
+        if (window.chaosMode && window.chaosLevel >= 5) {
+            if (key === 'ArrowUp') key = 'ArrowDown';
+            else if (key === 'ArrowDown') key = 'ArrowUp';
+            else if (key === 'ArrowLeft') key = 'ArrowRight';
+            else if (key === 'ArrowRight') key = 'ArrowLeft';
+        }
+        switch (key) {
             case 'ArrowUp': this.keys.up = true; break;
             case 'ArrowDown': this.keys.down = true; break;
             case 'ArrowLeft': this.keys.left = true; break;
@@ -41,7 +48,14 @@ class Player {
     }
 
     handleKeyUp(e) {
-        switch (e.key) {
+        let key = e.key;
+        if (window.chaosMode && window.chaosLevel >= 5) {
+            if (key === 'ArrowUp') key = 'ArrowDown';
+            else if (key === 'ArrowDown') key = 'ArrowUp';
+            else if (key === 'ArrowLeft') key = 'ArrowRight';
+            else if (key === 'ArrowRight') key = 'ArrowLeft';
+        }
+        switch (key) {
             case 'ArrowUp': this.keys.up = false; break;
             case 'ArrowDown': this.keys.down = false; break;
             case 'ArrowLeft': this.keys.left = false; break;

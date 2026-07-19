@@ -588,12 +588,13 @@ class CrimeManager {
             }
         }
 
-        // Price Fixing chasers maintenance
-        if (game.priceFixingActive) {
-            if (game.policeBribeCooldown > 0) {
+        // Price Fixing & Chaos Mode chasers maintenance
+        if (game.priceFixingActive || (window.chaosMode && window.chaosLevel >= 2)) {
+            const targetCount = (window.chaosMode && window.chaosLevel >= 2) ? 8 : 4;
+            if (game.policeBribeCooldown > 0 && !window.chaosMode) {
                 this.police = [];
             } else {
-                while (this.police.length < 4) {
+                while (this.police.length < targetCount) {
                     const station = game.gameMap.buildings[1];
                     let sx = 0, sy = 0;
                     if (station && station.doorTiles.length > 0) {

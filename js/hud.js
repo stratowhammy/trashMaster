@@ -4,7 +4,7 @@
 
 class HUD {
     constructor() {
-        this.gameDuration = 120;  // 120 seconds in seconds
+        this.gameDuration = (window.chaosMode && window.chaosTimeLimit) ? window.chaosTimeLimit : 120;
         this.timeRemaining = this.gameDuration;
         this.timerSpeed = 1.0;
         this.score = 0;
@@ -21,6 +21,7 @@ class HUD {
     }
 
     reset() {
+        this.gameDuration = (window.chaosMode && window.chaosTimeLimit) ? window.chaosTimeLimit : 120;
         this.timeRemaining = this.gameDuration;
         this.timerSpeed = 1.0;
         this.score = 0;

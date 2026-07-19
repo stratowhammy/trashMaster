@@ -280,8 +280,20 @@ class CrimeManager {
                     const ty = wrapTileY(6 + dy);
                     const tile = gameMap.getTile(tx, ty);
                     if (tile === TileType.ROAD || tile === TileType.SIDEWALK || tile === TileType.CROSSWALK) {
-                        don1Tile = { x: tx, y: ty };
-                        found1 = true;
+                        let isNearDoor = false;
+                        for (let ny_offset = -1; ny_offset <= 1; ny_offset++) {
+                            for (let nx_offset = -1; nx_offset <= 1; nx_offset++) {
+                                const nx = wrapTileX(tx + nx_offset);
+                                const ny = wrapTileY(ty + ny_offset);
+                                if (gameMap.getTile(nx, ny) === TileType.BUILDING_DOOR) {
+                                    isNearDoor = true;
+                                }
+                            }
+                        }
+                        if (!isNearDoor) {
+                            don1Tile = { x: tx, y: ty };
+                            found1 = true;
+                        }
                     }
                 }
             }
@@ -297,8 +309,20 @@ class CrimeManager {
                     const ty = wrapTileY(58 + dy);
                     const tile = gameMap.getTile(tx, ty);
                     if (tile === TileType.ROAD || tile === TileType.SIDEWALK || tile === TileType.CROSSWALK) {
-                        don2Tile = { x: tx, y: ty };
-                        found2 = true;
+                        let isNearDoor = false;
+                        for (let ny_offset = -1; ny_offset <= 1; ny_offset++) {
+                            for (let nx_offset = -1; nx_offset <= 1; nx_offset++) {
+                                const nx = wrapTileX(tx + nx_offset);
+                                const ny = wrapTileY(ty + ny_offset);
+                                if (gameMap.getTile(nx, ny) === TileType.BUILDING_DOOR) {
+                                    isNearDoor = true;
+                                }
+                            }
+                        }
+                        if (!isNearDoor) {
+                            don2Tile = { x: tx, y: ty };
+                            found2 = true;
+                        }
                     }
                 }
             }

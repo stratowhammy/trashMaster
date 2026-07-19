@@ -174,12 +174,24 @@ class NPCManager {
         this.npcs = [];
         this.activeDialogue = null;
 
-        // Find all sidewalk tiles
+        // Find all sidewalk tiles (excluding those adjacent to any building door)
         const sidewalks = [];
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
                 if (gameMap.tiles[y][x] === TileType.SIDEWALK) {
-                    sidewalks.push({ x, y });
+                    let isNearDoor = false;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const nx = wrapTileX(x + dx);
+                            const ny = wrapTileY(y + dy);
+                            if (gameMap.tiles[ny][nx] === TileType.BUILDING_DOOR) {
+                                isNearDoor = true;
+                            }
+                        }
+                    }
+                    if (!isNearDoor) {
+                        sidewalks.push({ x, y });
+                    }
                 }
             }
         }
@@ -431,7 +443,19 @@ class NPCManager {
             tx = Math.floor(Math.random() * MAP_WIDTH);
             ty = Math.floor(Math.random() * MAP_HEIGHT);
             if (gameMap.getTile(tx, ty) === TileType.SIDEWALK) {
-                break;
+                let isNearDoor = false;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const nx = wrapTileX(tx + dx);
+                        const ny = wrapTileY(ty + dy);
+                        if (gameMap.tiles[ny][nx] === TileType.BUILDING_DOOR) {
+                            isNearDoor = true;
+                        }
+                    }
+                }
+                if (!isNearDoor) {
+                    break;
+                }
             }
         }
         const nameList = [
@@ -501,7 +525,21 @@ class NPCManager {
         const sidewalks = [];
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
-                if (gameMap.tiles[y][x] === TileType.SIDEWALK) sidewalks.push({ x, y });
+                if (gameMap.tiles[y][x] === TileType.SIDEWALK) {
+                    let isNearDoor = false;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const nx = wrapTileX(x + dx);
+                            const ny = wrapTileY(y + dy);
+                            if (gameMap.tiles[ny][nx] === TileType.BUILDING_DOOR) {
+                                isNearDoor = true;
+                            }
+                        }
+                    }
+                    if (!isNearDoor) {
+                        sidewalks.push({ x, y });
+                    }
+                }
             }
         }
 

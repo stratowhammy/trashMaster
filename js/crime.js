@@ -52,7 +52,7 @@ class PoliceOfficer {
         this.x = tx * TILE_SIZE + TILE_SIZE / 2;
         this.y = ty * TILE_SIZE + TILE_SIZE / 2;
         this.size = 32;
-        this.speed = TILE_SIZE * 2.025; // move 50% faster
+        this.speed = TILE_SIZE * 2.53125; // move 25% faster (was 2.025)
         this.alive = true;
         this.temporary = temporary;
         this.ttl = temporary ? 30.0 : Infinity;
@@ -590,7 +590,7 @@ class CrimeManager {
 
         // Price Fixing & Chaos Mode chasers maintenance
         if (game.priceFixingActive || (window.chaosMode && window.chaosLevel >= 2)) {
-            const targetCount = (window.chaosMode && window.chaosLevel >= 2) ? 8 : 4;
+            const targetCount = 12;
             if (game.policeBribeCooldown > 0 && !window.chaosMode) {
                 this.police = [];
             } else {

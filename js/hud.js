@@ -395,6 +395,7 @@ class HUD {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('HUNGER', canvasWidth / 2, barY + barH / 2 + 1);
+            nextBarY -= 20;
         }
 
         // ── Happiness Bar (Bottom Center, Cult Mode) ──

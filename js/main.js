@@ -699,8 +699,8 @@ class Game {
 
                 // S or s to steal car (Crime) or shake hands (Politics)
                 if (e.key === 's' || e.key === 'S') {
+                    let targetCar = null;
                     if (window.crimeMode) {
-                        let targetCar = null;
                         for (const car of this.carManager.cars) {
                             if (car.active) {
                                 const dx = this.player.x - car.x;
@@ -712,28 +712,28 @@ class Game {
                                 }
                             }
                         }
+                    }
 
-                        if (targetCar) {
-                            const curTX = this.player.getTileX();
-                            const curTY = this.player.getTileY();
-                            const tile = this.gameMap.getTile(curTX, curTY);
-                            
-                            if (tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.SIDEWALK) {
-                                if (this.followerManager.getFollowerCount() > 0) {
-                                    targetCar.active = false;
-                                    this.followerManager.removeFollower();
-                                    this.trashManager.totalPoints += 1000;
-                                    this.hud.showFollowerNotification('Car stolen! Posse member drove off. +$1,000', true);
+                    if (targetCar && window.crimeMode) {
+                        const curTX = this.player.getTileX();
+                        const curTY = this.player.getTileY();
+                        const tile = this.gameMap.getTile(curTX, curTY);
+                        
+                        if (tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.SIDEWALK) {
+                            if (this.followerManager.getFollowerCount() > 0) {
+                                targetCar.active = false;
+                                this.followerManager.removeFollower();
+                                this.trashManager.totalPoints += 1000;
+                                this.hud.showFollowerNotification('Car stolen! Posse member drove off. +$1,000', true);
 
-                                    if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'steal_car') {
-                                        this.crimeManager.completeTask(this);
-                                    }
-                                } else {
-                                    this.hud.showFollowerNotification('You need a posse member to drive off with the stolen car!', true);
+                                if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'steal_car') {
+                                    this.crimeManager.completeTask(this);
                                 }
                             } else {
-                                this.hud.showFollowerNotification('You can only steal cars on roads or intersections!', true);
+                                this.hud.showFollowerNotification('You need a posse member to drive off with the stolen car!', true);
                             }
+                        } else {
+                            this.hud.showFollowerNotification('You can only steal cars on roads or intersections!', true);
                         }
                     } else if (window.politicsMode) {
                         const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
@@ -2309,7 +2309,7 @@ class Game {
                         spawnX = station.doorTiles[0].x;
                         spawnY = station.doorTiles[0].y;
                     }
-                    for (let i = 0; i < 4; i++) {
+                    for (let i = 0; i < 12; i++) {
                         this.crimeManager.police.push(new PoliceOfficer(spawnX, spawnY, false));
                     }
                 }
@@ -2327,7 +2327,7 @@ class Game {
                     spawnX = station.doorTiles[0].x;
                     spawnY = station.doorTiles[0].y;
                 }
-                for (let i = 0; i < 8; i++) {
+                for (let i = 0; i < 12; i++) {
                     this.crimeManager.police.push(new PoliceOfficer(spawnX, spawnY, false));
                 }
             }

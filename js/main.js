@@ -1837,6 +1837,7 @@ class Game {
         }
 
         // Clear
+        ctx.filter = 'none';
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, w, h);
 
@@ -3004,6 +3005,7 @@ class Game {
         // Render HUD
         if (window.chaosMode && (window.chaosLevel === 3 || window.chaosLevel >= 4)) {
             ctx.restore();
+            ctx.filter = 'none';
         }
         this.hud.render(ctx, w, h);
 

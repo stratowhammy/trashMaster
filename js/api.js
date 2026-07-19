@@ -1625,8 +1625,8 @@ const TROPHY_CATEGORIES = [
         names: ['Pennies Count', 'Dollar Bill', 'Big Earner', 'Wealth Generator', 'Money Magnet']
     },
     {
-        key: 'cumulative_money',
-        name: 'Total Earnings',
+        key: 'current_balance',
+        name: 'Current Balance',
         color: '#ffc107',
         badge: '💰',
         thresholds: [2000, 10000, 50000, 250000, 1250000],
@@ -1664,7 +1664,10 @@ function renderTrophyRoom() {
         title.innerText = cat.name.toUpperCase();
         shelfRow.appendChild(title);
 
-        const currentVal = playerStats[cat.key] || 0;
+        let currentVal = playerStats[cat.key] || 0;
+        if (cat.key === 'current_balance') {
+            currentVal = playerBalance || 0;
+        }
 
         // Find the next locked achievement
         let nextIndex = -1;

@@ -3138,18 +3138,40 @@ class Game {
         }
         const screenEl = document.getElementById('pirate-defeat-screen');
 
-        // Always show the GIF on the splash screen as requested (except in Politics Mode)
         const gifEl = document.getElementById('defeat-gif');
-        if (gifEl) {
-            if (window.politicsMode) {
+        const trophyCanvas = document.getElementById('endRoundTrophyCanvas');
+        if (gifEl && trophyCanvas) {
+            if (window.politicsMode && !isPirateDefeat) {
                 gifEl.style.display = 'none';
+                trophyCanvas.style.display = 'none';
             } else {
-                if (!isPirateDefeat && title === "TIME'S UP!") {
-                    gifEl.src = "assets/sprites/defeat_animation.gif";
-                } else {
-                    gifEl.src = "assets/sprites/defeat_animation.gif";
+                gifEl.style.display = 'none';
+                trophyCanvas.style.display = 'block';
+                
+                // Draw trophy based on trash collected in round
+                const totalTrash = this.trashCollectedInRound || 0;
+                let trophyLevel = 0; // 0 means silhouette (no trophy)
+                let catColor = '#4caf50'; // Default green for trash
+                
+                if (totalTrash >= 300) {
+                    trophyLevel = 5; // Diamond
+                } else if (totalTrash >= 100) {
+                    trophyLevel = 3; // Gold
+                } else if (totalTrash >= 30) {
+                    trophyLevel = 2; // Silver
+                } else if (totalTrash >= 10) {
+                    trophyLevel = 1; // Bronze
                 }
-                gifEl.style.display = 'block';
+                
+                if (trophyLevel > 0) {
+                    if (typeof window.drawTrophy === 'function') {
+                        window.drawTrophy(trophyCanvas, trophyLevel, catColor);
+                    }
+                } else {
+                    if (typeof window.drawSilhouetteTrophy === 'function') {
+                        window.drawSilhouetteTrophy(trophyCanvas, 1);
+                    }
+                }
             }
         }
 
@@ -3487,7 +3509,11 @@ class Game {
         const msgEl = document.getElementById('defeat-message');
         const titleEl = document.getElementById('defeat-title');
         const gifEl = document.getElementById('defeat-gif');
+        const trophyCanvas = document.getElementById('endRoundTrophyCanvas');
         const artContainer = document.getElementById('defeat-art-container');
+
+        if (trophyCanvas) trophyCanvas.style.display = 'none';
+        if (gifEl) gifEl.style.display = 'block';
 
         const isPoliticsArrest = window.politicsMode;
 

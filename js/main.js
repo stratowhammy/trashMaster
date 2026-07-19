@@ -1838,6 +1838,14 @@ class Game {
 
         // Clear
         ctx.filter = 'none';
+        
+        // Apply grayscale CSS filter to the canvas element for Questlove mode (hardware-accelerated)
+        if (window.chaosMode && window.chaosLevel === 3) {
+            this.canvas.style.filter = 'grayscale(100%)';
+        } else {
+            this.canvas.style.filter = 'none';
+        }
+
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, w, h);
 
@@ -2655,18 +2663,12 @@ class Game {
         }
 
         const rotateWorld = (window.chaosMode && window.chaosLevel >= 4);
-        const bwWorld = (window.chaosMode && window.chaosLevel === 3);
 
-        if (rotateWorld || bwWorld) {
-            ctx.save();
-        }
         if (rotateWorld) {
+            ctx.save();
             ctx.translate(w / 2, h / 2);
             ctx.rotate(Math.PI / 2);
             ctx.translate(-w / 2, -h / 2);
-        }
-        if (bwWorld) {
-            ctx.filter = 'grayscale(100%)';
         }
 
         // Render map
@@ -3003,9 +3005,8 @@ class Game {
         }
 
         // Render HUD
-        if (window.chaosMode && (window.chaosLevel === 3 || window.chaosLevel >= 4)) {
+        if (window.chaosMode && window.chaosLevel >= 4) {
             ctx.restore();
-            ctx.filter = 'none';
         }
         this.hud.render(ctx, w, h);
 

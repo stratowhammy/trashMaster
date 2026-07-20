@@ -255,7 +255,7 @@ class Game {
                         }
                     }
 
-                    if (window.frenzyMode || window.flowersMode || window.crimeMode || window.cultMode || window.builderMode) {
+                    if (this.npcManager) {
                         const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
                         if (result) {
                             if (window.crimeMode && this.crimeManager && !this.crimeManager.madeMan) {
@@ -3831,6 +3831,8 @@ class Game {
         this.state = GameState.UI_OVERLAY;
         this.resetKeys();
 
+        this.loadWordGameState();
+
         this.wordSlotsState = this.wordSlotsState || {};
         this.wordList.forEach(w => {
             if (!this.wordSlotsState[w]) {
@@ -3849,12 +3851,14 @@ class Game {
 
         uniqueLetters.forEach(letter => {
             const count = this.collectedLetters[letter] || 0;
+            const isSelected = (window.selectedInventoryLetter === letter && count > 0);
             
             const tile = document.createElement('div');
             tile.style.width = '36px';
             tile.style.height = '36px';
-            tile.style.background = count > 0 ? '#1b102e' : '#222';
-            tile.style.border = count > 0 ? '2px solid #b55fe6' : '2px solid #444';
+            tile.style.background = count > 0 ? (isSelected ? '#4a1570' : '#1b102e') : '#222';
+            tile.style.border = count > 0 ? (isSelected ? '3px solid #ffea00' : '2px solid #b55fe6') : '2px solid #444';
+            tile.style.boxShadow = isSelected ? '0 0 12px #ffea00' : (count > 0 ? '0 0 6px rgba(181,95,230,0.3)' : 'none');
             tile.style.borderRadius = '6px';
             tile.style.display = 'flex';
             tile.style.alignItems = 'center';
@@ -3864,13 +3868,26 @@ class Game {
             tile.style.fontSize = '10px';
             tile.style.color = count > 0 ? '#fff' : '#555';
             tile.style.boxSizing = 'border-box';
+            tile.style.userSelect = 'none';
             tile.innerText = letter;
 
             if (count > 0) {
                 tile.draggable = true;
-                tile.style.cursor = 'grab';
+                tile.style.cursor = 'pointer';
+                tile.title = `Click or drag letter '${letter}' into a slot`;
+
                 tile.addEventListener('dragstart', (e) => {
                     e.dataTransfer.setData('text/plain', letter);
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+
+                tile.addEventListener('click', () => {
+                    if (window.selectedInventoryLetter === letter) {
+                        window.selectedInventoryLetter = null;
+                    } else {
+                        window.selectedInventoryLetter = letter;
+                    }
+                    this.renderWordGameDialog();
                 });
             }
 
@@ -3880,7 +3897,7 @@ class Game {
             badge.style.bottom = '2px';
             badge.style.fontSize = '6px';
             badge.style.fontFamily = '"Press Start 2P", monospace';
-            badge.style.color = count > 0 ? '#ccff00' : '#444';
+            badge.style.color = count > 0 ? (isSelected ? '#ffea00' : '#ccff00') : '#444';
             badge.innerText = `x${count}`;
             tile.appendChild(badge);
 
@@ -3949,11 +3966,11 @@ class Game {
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.maxLength = 1;
-                input.style.width = '22px';
-                input.style.height = '22px';
+                input.style.width = '24px';
+                input.style.height = '24px';
                 input.style.textAlign = 'center';
                 input.style.fontFamily = '"Press Start 2P", monospace';
-                input.style.fontSize = '9px';
+                input.style.fontSize = '10px';
                 input.style.marginRight = '4px';
                 input.style.boxSizing = 'border-box';
                 
@@ -3970,14 +3987,32 @@ class Game {
                     input.style.color = '#00ff55';
                 } else if (currentVal !== '') {
                     input.value = currentVal;
-                    input.disabled = true;
-                    input.style.background = '#2a2a2a';
-                    input.style.border = '2px solid #888';
-                    input.style.color = '#ccc';
+                    input.style.background = '#2a1b4e';
+                    input.style.border = '2px solid #b55fe6';
+                    input.style.color = '#00f0ff';
+                    input.style.cursor = 'pointer';
+                    input.title = "Click or press Backspace to remove letter";
+
+                    const removeLetter = () => {
+                        this.wordSlotsState[word][i] = '';
+                        this.collectedLetters[currentVal] = (this.collectedLetters[currentVal] || 0) + 1;
+                        this.saveWordGameState();
+                        this.renderWordGameDialog();
+                    };
+
+                    input.addEventListener('click', () => removeLetter());
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Backspace' || e.key === 'Delete') {
+                            e.preventDefault();
+                            removeLetter();
+                        }
+                    });
                 } else {
                     input.value = '';
+                    const isExpectingSelected = (window.selectedInventoryLetter && window.selectedInventoryLetter === word[i]);
                     input.style.background = '#222';
-                    input.style.border = '2px solid #555';
+                    input.style.border = isExpectingSelected ? '2px solid #ffea00' : '2px solid #555';
+                    input.style.boxShadow = isExpectingSelected ? '0 0 6px #ffea00' : 'none';
                     input.style.color = '#fff';
 
                     const submitLetter = (char) => {
@@ -3999,6 +4034,10 @@ class Game {
                         statusEl.innerText = '';
                         this.collectedLetters[char]--;
                         this.wordSlotsState[word][i] = char;
+
+                        if (window.selectedInventoryLetter === char && (this.collectedLetters[char] || 0) <= 0) {
+                            window.selectedInventoryLetter = null;
+                        }
 
                         if (this.wordSlotsState[word].join('') === word) {
                             this.completedWords.push(word);
@@ -4024,6 +4063,12 @@ class Game {
                         }, 50);
                     };
 
+                    input.addEventListener('click', () => {
+                        if (window.selectedInventoryLetter) {
+                            submitLetter(window.selectedInventoryLetter);
+                        }
+                    });
+
                     input.addEventListener('input', (e) => {
                         const char = e.target.value.toUpperCase();
                         e.target.value = '';
@@ -4032,12 +4077,38 @@ class Game {
 
                     input.addEventListener('dragover', (e) => {
                         e.preventDefault();
+                        e.dataTransfer.dropEffect = 'copy';
+                    });
+
+                    input.addEventListener('dragenter', (e) => {
+                        e.preventDefault();
+                        input.style.borderColor = '#00ffcc';
+                        input.style.background = '#333';
+                    });
+
+                    input.addEventListener('dragleave', () => {
+                        input.style.borderColor = isExpectingSelected ? '#ffea00' : '#555';
+                        input.style.background = '#222';
                     });
 
                     input.addEventListener('drop', (e) => {
                         e.preventDefault();
-                        const char = e.dataTransfer.getData('text/plain').toUpperCase();
-                        submitLetter(char);
+                        input.style.borderColor = isExpectingSelected ? '#ffea00' : '#555';
+                        input.style.background = '#222';
+                        const char = (e.dataTransfer.getData('text/plain') || '').toUpperCase().trim();
+                        if (char) submitLetter(char);
+                    });
+
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Backspace' || e.key === 'ArrowLeft') {
+                            const prevIndex = i - 1;
+                            const prevInput = document.querySelector(`input[data-word="${word}"][data-index="${prevIndex}"]`);
+                            if (prevInput) prevInput.focus();
+                        } else if (e.key === 'ArrowRight') {
+                            const nextIndex = i + 1;
+                            const nextInput = document.querySelector(`input[data-word="${word}"][data-index="${nextIndex}"]`);
+                            if (nextInput) nextInput.focus();
+                        }
                     });
                 }
 

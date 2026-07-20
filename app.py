@@ -651,12 +651,8 @@ def save_word_game():
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        INSERT INTO user_word_game (user_id, collected_letters, completed_words, word_slots_state)
+        INSERT OR REPLACE INTO user_word_game (user_id, collected_letters, completed_words, word_slots_state)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET
-            collected_letters = excluded.collected_letters,
-            completed_words = excluded.completed_words,
-            word_slots_state = excluded.word_slots_state
     """, (user_data['user_id'], collected_letters, completed_words, word_slots_state))
     db.commit()
     return jsonify({'success': True})

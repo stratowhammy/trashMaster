@@ -848,6 +848,9 @@ async function refreshGameState() {
             completed_words: [],
             word_slots_state: {}
         };
+        if (window.game && typeof window.game.loadWordGameState === 'function') {
+            window.game.loadWordGameState();
+        }
         try {
             const bldgData = await apiCall('/api/game/buildings');
             window._serverOwnedBuildings = bldgData.buildings || [];

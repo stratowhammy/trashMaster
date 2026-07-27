@@ -142,6 +142,58 @@ class Follower {
         const screen = camera.worldToScreen(this.x, this.y);
         const drawSize = 64;
 
+        // ── Pirate Mode: draw posse member as pixel pirate (black + BLUE bandana) ──
+        if (window.pirateMode) {
+            ctx.save();
+            const bob = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
+            const s = screen.x;
+            const t = screen.y + bob;
+
+            // Legs
+            ctx.fillStyle = '#111';
+            ctx.fillRect(s - 8, t + 10, 7, 12);
+            ctx.fillRect(s + 1, t + 10, 7, 12);
+
+            // Boots
+            ctx.fillStyle = '#4a3000';
+            ctx.fillRect(s - 9, t + 19, 8, 5);
+            ctx.fillRect(s + 1, t + 19, 8, 5);
+
+            // Body (black coat)
+            ctx.fillStyle = '#111';
+            ctx.fillRect(s - 12, t - 10, 24, 22);
+
+            // Blue coat trim (player's crew)
+            ctx.fillStyle = '#1d4ed8';
+            ctx.fillRect(s - 12, t - 10, 3, 22);
+            ctx.fillRect(s + 9, t - 10, 3, 22);
+
+            // Head
+            ctx.fillStyle = '#f4c47a';
+            ctx.beginPath();
+            ctx.arc(s, t - 18, 9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Blue bandana (player's crew colour)
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(s - 10, t - 26, 20, 7);
+            ctx.fillRect(s + 8, t - 21, 4, 4); // knot
+
+            // Eyes
+            ctx.fillStyle = '#111';
+            ctx.fillRect(s - 4, t - 20, 2, 2);
+            ctx.fillRect(s + 2, t - 20, 2, 2);
+
+            // Follower number label
+            ctx.fillStyle = '#93c5fd';
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`#${this.index + 1}`, s, t - 34);
+
+            ctx.restore();
+            return;
+        }
+
         const activeSpriteId = window.cultMode ? 'cult_white_robe' : this.spriteId;
         const img = spriteManager.getCharacterImage(activeSpriteId);
 

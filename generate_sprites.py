@@ -170,12 +170,82 @@ wings_palette = {
     'g': (200, 220, 250, 255)
 }
 
+ship_matrix = [
+    "       fff      ",
+    "       fff      ",
+    "        m       ",
+    "      wwmww     ",
+    "     wwwmwww    ",
+    "    wwwwmwwww   ",
+    "     wwwmwww    ",
+    "        m       ",
+    "   bbbbbmbbbbb  ",
+    "  bbbbbbbbbbbbb ",
+    " bbcbcbcbcbcbbb ",
+    " bbbbbbbbbbbbbb ",
+    "  bbbbbbbbbbbb  ",
+    "   dddddddddd   ",
+    "                ",
+    "                "
+]
+ship_palette = {
+    'f': (30, 30, 30, 255),
+    'w': (240, 240, 230, 255),
+    'm': (100, 60, 20, 255),
+    'b': (140, 80, 30, 255),
+    'd': (90, 50, 20, 255),
+    'c': (20, 20, 20, 255)
+}
+
+map_matrix = [
+    "                ",
+    "  pppppppppppp  ",
+    "  pddddddddddp  ",
+    "  pd  r  r  dp  ",
+    "  pd   r r  dp  ",
+    "  pd    r   dp  ",
+    "  pd   r r  dp  ",
+    "  pd  r  r  dp  ",
+    "  pd        dp  ",
+    "  pd   c    dp  ",
+    "  pd  ccc   dp  ",
+    "  pd   c    dp  ",
+    "  pddddddddddp  ",
+    "  pppppppppppp  ",
+    "                ",
+    "                "
+]
+map_palette = {
+    'p': (180, 140, 80, 255),
+    'd': (240, 210, 150, 255),
+    'r': (220, 30, 30, 255),
+    'c': (140, 90, 30, 255)
+}
+
+cannonball_matrix = [
+    "      kkkk      ",
+    "     kggggk     ",
+    "    kgwggggk    ",
+    "    kggggggk    ",
+    "    kggggggk    ",
+    "     kggggk     ",
+    "      kkkk      ",
+    "                "
+]
+cannonball_palette = {
+    'k': (20, 20, 20, 255),
+    'g': (60, 60, 65, 255),
+    'w': (200, 200, 200, 255)
+}
+
 os.makedirs('assets/sprites', exist_ok=True)
 create_sprite(emp_matrix, emp_palette, 'assets/sprites/employee.png')
-create_sprite(truck_matrix, truck_palette, 'assets/sprites/trash_truck.png')
 create_sprite(filth_matrix, filth_palette, 'assets/sprites/filthadelphia.png')
 create_sprite(watch_matrix, watch_palette, 'assets/sprites/borrowed_time.png')
 create_sprite(mush_matrix, mush_palette, 'assets/sprites/mushrooms.png')
-create_sprite(wings_matrix, wings_palette, 'assets/sprites/wings.png')
+create_sprite(ship_matrix, ship_palette, 'assets/sprites/pirate_ship.png')
+create_sprite(map_matrix, map_palette, 'assets/sprites/treasure_map.png')
+create_sprite(cannonball_matrix, cannonball_palette, 'assets/sprites/cannonball.png', size=32)
 
 print("All png pixel art generated successfully.")
+

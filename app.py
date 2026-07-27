@@ -140,24 +140,31 @@ def init_db():
         except sqlite3.OperationalError:
             pass
             
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS user_word_game (
-                user_id INTEGER PRIMARY KEY,
-                collected_letters TEXT DEFAULT '{}',
-                completed_words TEXT DEFAULT '[]',
-                word_slots_state TEXT DEFAULT '{}',
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
+        try:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS user_word_game (
+                    user_id INTEGER PRIMARY KEY,
+                    collected_letters TEXT DEFAULT '{}',
+                    completed_words TEXT DEFAULT '[]',
+                    word_slots_state TEXT DEFAULT '{}',
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            ''')
+            db.commit()
+        except sqlite3.OperationalError as e:
+            print("Error creating user_word_game:", e)
+            
         try:
             db.execute("ALTER TABLE users ADD COLUMN politics_banned INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS user_round_stats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                round_number INTEGER NOT NULL,
+        
+        try:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS user_round_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    round_number INTEGER NOT NULL,
                 trash_collected INTEGER DEFAULT 0,
                 money_earned INTEGER DEFAULT 0,
                 followers_gained INTEGER DEFAULT 0,
@@ -168,6 +175,8 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
+        except sqlite3.OperationalError:
+            pass
         try:
             db.execute("ALTER TABLE user_round_stats ADD COLUMN bank_balance INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
@@ -361,26 +370,49 @@ def buy_item():
     user_data = verify_token(request)
     if not user_data: return jsonify({'error': 'Unauthorized'}), 401
     
-    item_name = request.json.get('item_name')
+    raw_item_name = request.json.get('item_name', '').strip()
     prices = {
-        'Filthadelphia': 2500,
-        'Borrowed Time': 2000,
-        'Mushrooms': 2500,
-        'Wings': 1500,
-        'Protection': 1000,
-        'Magic 8-Ball': 1500,
-        'Bruno The Trash Truck': 10000,
-        'Fertilizer': 100,
-        'Parade': 3000,
-        'Organizer': 250,
-        'Quinine': 750,
-        'Trashpickers': 1000,
-        'Price Fixing': 2000,
-        'Burninator': 1000000
+        'filthadelphia': 2500,
+        'borrowed time': 2000,
+        'mushrooms': 2500,
+        'wings': 1500,
+        'protection': 1000,
+        'magic 8-ball': 1500,
+        'bruno the trash truck': 10000,
+        'fertilizer': 100,
+        'parade': 3000,
+        'organizer': 250,
+        'quinine': 750,
+        'trashpickers': 1000,
+        'price fixing': 2000,
+        'burninator': 1000000,
+        'flashlight': 1500
     }
     
-    if item_name not in prices: return jsonify({'error': 'Invalid item'}), 400
-    price = prices[item_name]
+    canonical_names = {
+        'filthadelphia': 'Filthadelphia',
+        'borrowed time': 'Borrowed Time',
+        'mushrooms': 'Mushrooms',
+        'wings': 'Wings',
+        'protection': 'Protection',
+        'magic 8-ball': 'Magic 8-Ball',
+        'bruno the trash truck': 'Bruno The Trash Truck',
+        'fertilizer': 'Fertilizer',
+        'parade': 'Parade',
+        'organizer': 'Organizer',
+        'quinine': 'Quinine',
+        'trashpickers': 'Trashpickers',
+        'price fixing': 'Price Fixing',
+        'burninator': 'Burninator',
+        'flashlight': 'Flashlight'
+    }
+
+    key = raw_item_name.lower()
+    if key not in prices:
+        return jsonify({'error': f'Invalid item: {raw_item_name}'}), 400
+        
+    item_name = canonical_names[key]
+    price = prices[key]
     
     db = get_db()
     cursor = db.cursor()
@@ -390,6 +422,7 @@ def buy_item():
     if user['balance'] < price:
         return jsonify({'error': 'Insufficient funds'}), 400
         
+    allowed_items = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade', 'Flashlight']        
     if item_name == 'Burninator':
         cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Burninator'))
         row = cursor.fetchone()
@@ -397,7 +430,7 @@ def buy_item():
         if qty >= 1:
             return jsonify({'error': 'You already own Burninator!'}), 400
         
-    limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
+    limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection', 'Flashlight']
     if item_name in limited_items:
         cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
         row = cursor.fetchone()
@@ -442,7 +475,7 @@ def buy_item():
         db.execute("UPDATE users SET has_truck = has_truck + ? WHERE id=?", (added_trucks, user_data['user_id']))
     else:
         added_qty = 1
-        limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
+        limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection', 'Flashlight']
         if item_name in limited_items:
             cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
             row = cursor.fetchone()
@@ -517,7 +550,7 @@ def spend_credit():
     if not user_data: return jsonify({'error': 'Unauthorized'}), 401
 
     item_name = request.json.get('item_name')
-    allowed_items = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade']
+    allowed_items = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade', 'Flashlight']
     if item_name not in allowed_items:
         return jsonify({'error': 'Item cannot be unlocked with credits'}), 400
 
@@ -532,7 +565,7 @@ def spend_credit():
     db.execute("UPDATE users SET credits = credits - 1 WHERE id=?", (user_data['user_id'],))
     
     added_qty = 1
-    limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection']
+    limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection', 'Flashlight']
     if item_name in limited_items:
         cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
         row = cursor.fetchone()
@@ -634,6 +667,13 @@ def award_prize():
             db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], 'Protection'))
     elif prize_type == 'truck':
         db.execute("UPDATE users SET has_truck = MIN(4, has_truck + 1) WHERE id=?", (user_data['user_id'],))
+    elif prize_type == 'flashlight':
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Flashlight'))
+        row = cursor.fetchone()
+        if row:
+            db.execute("UPDATE inventory SET quantity = quantity + 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Flashlight'))
+        else:
+            db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)", (user_data['user_id'], 'Flashlight'))
         
     db.commit()
     return jsonify({'success': True})
@@ -703,11 +743,13 @@ def end_round():
     if row and row['quantity'] > 0:
         db.execute("UPDATE inventory SET quantity = quantity - 1 WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Magic 8-Ball'))
         multiplier = random.choices([1, 2, 3, 4, 5], weights=[40, 30, 15, 10, 5], k=1)[0]
-        earned = earned * multiplier
 
-    # Role Perks (Made Man 5x multiplier)
+    # Calculate total effective multiplier (capped at 5x max to prevent exponential compounding)
+    effective_multiplier = multiplier
     if user['made_man_status'] == 'accepted':
-        earned = earned * 5
+        effective_multiplier = min(5, effective_multiplier + 1)
+
+    earned = int(earned * effective_multiplier)
 
     adjusted_employee_cost = int(employee_cost * penalty)
     

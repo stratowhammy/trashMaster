@@ -49,29 +49,16 @@ class MiniMap {
                     }
                 }
 
-                if (window.fastFoodMode) {
-                    const bldg = gameMap.getBuildingAtTile(x, y);
-                    if (bldg) {
-                        if (bldg.type === 'fast_food') {
-                            color = '#ffaa00'; // Fast Food: Orange
-                        } else if (bldg.type === 'hospital') {
-                            color = '#ffffff'; // Hospital: White
-                        }
-                    }
-                }
-                
                 const bldg = gameMap.getBuildingAtTile(x, y);
                 if (bldg) {
-                    if (bldg.type === 'dump') {
+                    if (bldg.type === 'fast_food') {
+                        color = '#ffaa00'; // Fast Food: Orange
+                    } else if (bldg.type === 'hospital') {
+                        color = '#ffffff'; // Hospital: White
+                    } else if (bldg.type === 'dump') {
                         color = '#8b5a2b'; // Dump: Brown
                     } else if (bldg.type === 'city_hall' || bldg.type === 'cityhall') {
                         color = '#00ffff'; // City Hall: Cyan
-                    } else if ([
-                        'art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute', 'station',
-                        'burj_khalifa', 'petra', 'dome_of_rock', 'pyramids', 'burj_al_arab', 'kingdom_centre',
-                        'christ_redeemer', 'machu_picchu', 'obelisco_ba', 'torre_entel', 'palacio_salvo', 'congresso_nacional'
-                    ].includes(bldg.type)) {
-                        color = '#ff88ff'; // Landmarks: Pink/Purple
                     }
                 }
                 
@@ -80,17 +67,18 @@ class MiniMap {
             }
         }
 
-        if (window.fastFoodMode) {
-            const hospital = gameMap.buildings.find(b => b.type === 'hospital');
-            if (hospital && hospital.tiles.length > 0) {
-                let hx = 0, hy = 0;
-                for (const t of hospital.tiles) { hx += t.x; hy += t.y; }
-                hx /= hospital.tiles.length;
-                hy /= hospital.tiles.length;
-                ctx.fillStyle = '#ff0000';
-                ctx.fillRect(hx * s - s, hy * s - 3 * s, 2 * s, 6 * s);
-                ctx.fillRect(hx * s - 3 * s, hy * s - s, 6 * s, 2 * s);
-            }
+        // Draw prominent red cross for Hospital anytime it exists in the map
+        const hospital = gameMap.buildings.find(b => b.type === 'hospital');
+        if (hospital && hospital.tiles.length > 0) {
+            let hx = 0, hy = 0;
+            for (const t of hospital.tiles) { hx += t.x; hy += t.y; }
+            hx /= hospital.tiles.length;
+            hy /= hospital.tiles.length;
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(hx * s - s, hy * s - 3 * s, 2 * s, 6 * s);
+            ctx.fillRect(hx * s - 3 * s, hy * s - s, 6 * s, 2 * s);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(hx * s - 0.5 * s, hy * s - 0.5 * s, s, s);
         }
 
         this.staticDirty = false;
@@ -205,6 +193,121 @@ class MiniMap {
             }
         }
 
+        // Draw Pirate Mode Treasure Map Target Highlight (Flashing sequentially)
+        if (window.pirateMode && window.game && window.game.pirateModeManager) {
+            const pm = window.game.pirateModeManager;
+            if (pm.playerStep < 8 && pm.playerLocations[pm.playerStep]) {
+                const target = pm.playerLocations[pm.playerStep];
+                // Rapid flashing pulse (200ms cycle)
+                const pulse = Math.sin(performance.now() / 80) * 0.4 + 0.6;
+                ctx.fillStyle = `rgba(255, 235, 0, ${pulse})`;
+
+                // Highlight building tiles if target is a building
+                let bldg = target.buildingObj;
+                if (!bldg && gameMap && gameMap.buildings) {
+                    bldg = gameMap.buildings.find(b => b.id === target.id) || gameMap.getBuildingAtTile(Math.floor(target.x / TILE_SIZE), Math.floor(target.y / TILE_SIZE));
+                }
+
+                if (bldg && bldg.tiles) {
+                    for (const tile of bldg.tiles) {
+                        ctx.fillRect(mapX + tile.x * s, mapY + tile.y * s, s, s);
+                    }
+                }
+
+                // Draw pulsing location marker & ring
+                const tx = mapX + (target.x / MAP_PIXEL_W) * this.width;
+                const ty = mapY + (target.y / MAP_PIXEL_H) * this.height;
+
+                ctx.strokeStyle = `rgba(255, 255, 0, ${pulse})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(tx, ty, 8 + Math.sin(performance.now() / 100) * 3, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+                ctx.beginPath();
+                ctx.arc(tx, ty, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Step label badge on minimap
+                ctx.fillStyle = '#ffea00';
+                ctx.font = 'bold 8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`LOC ${pm.playerStep + 1}`, tx, ty - 10);
+            } else if (pm.treasureBuilding && !pm.treasureClaimed) {
+                const target = pm.treasureBuilding;
+                const pulse = Math.sin(performance.now() / 60) * 0.5 + 0.5;
+                ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+
+                let bldg = target.buildingObj;
+                if (!bldg && gameMap && gameMap.buildings) {
+                    bldg = gameMap.buildings.find(b => b.id === target.id);
+                }
+                if (bldg && bldg.tiles) {
+                    for (const tile of bldg.tiles) {
+                        ctx.fillRect(mapX + tile.x * s, mapY + tile.y * s, s, s);
+                    }
+                }
+                const tx = mapX + (target.x / MAP_PIXEL_W) * this.width;
+                const ty = mapY + (target.y / MAP_PIXEL_H) * this.height;
+                ctx.fillRect(tx - 5, ty - 5, 10, 10);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🪙', tx, ty - 8);
+            }
+
+            // Draw Rival Pirate Ship position (Prominent skull & glowing marker)
+            if (pm.rivalShip && pm.rivalShip.alive) {
+                const rx = mapX + (pm.rivalShip.x / MAP_PIXEL_W) * this.width;
+                const ry = mapY + (pm.rivalShip.y / MAP_PIXEL_H) * this.height;
+
+                const rPulse = Math.sin(performance.now() / 90) * 0.4 + 0.6;
+
+                // Glowing red outer ring
+                ctx.strokeStyle = `rgba(255, 30, 30, ${rPulse})`;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(rx, ry, 9, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Solid red center dot
+                ctx.fillStyle = '#ff1111';
+                ctx.beginPath();
+                ctx.arc(rx, ry, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Skull flag badge on minimap
+                ctx.fillStyle = '#ff3333';
+                ctx.font = 'bold 8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🏴‍☠️ RIVALS', rx, ry - 11);
+            }
+
+            // Draw individual NPC Pirate Crew members on minimap
+            if (pm.npcCrew && pm.npcCrew.members) {
+                for (const member of pm.npcCrew.members) {
+                    if (!member.alive) continue;
+                    const mx = mapX + (member.x / MAP_PIXEL_W) * this.width;
+                    const my = mapY + (member.y / MAP_PIXEL_H) * this.height;
+
+                    const mPulse = member.stunTimer > 0 ? 0.4 : (Math.sin(performance.now() / 120 + member.index) * 0.3 + 0.7);
+
+                    // Small red dot per crew member
+                    ctx.fillStyle = member.stunTimer > 0 ? `rgba(255, 120, 0, ${mPulse})` : `rgba(220, 38, 38, ${mPulse})`;
+                    ctx.beginPath();
+                    ctx.arc(mx, my, 4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tiny pirate hat marker
+                    ctx.fillStyle = '#ff2222';
+                    ctx.font = '7px serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('☠', mx, my - 6);
+                }
+            }
+        }
+
         // Draw trash as tiny dots
         if (trashItems) {
             ctx.fillStyle = '#ff6';
@@ -227,6 +330,23 @@ class MiniMap {
                 if (airplaneImg) {
                     ctx.drawImage(airplaneImg, cx - 8, cy - 8, 16, 16);
                 }
+            }
+        }
+        
+        // Draw Hospital label anytime hospital exists in map
+        if (gameMap && gameMap.buildings) {
+            const hosp = gameMap.buildings.find(b => b.type === 'hospital');
+            if (hosp && hosp.tiles.length > 0) {
+                let hx = 0, hy = 0;
+                for (const t of hosp.tiles) { hx += t.x; hy += t.y; }
+                hx /= hosp.tiles.length;
+                hy /= hosp.tiles.length;
+                const cx = mapX + hx * s;
+                const cy = mapY + hy * s;
+                ctx.fillStyle = '#ff3355';
+                ctx.font = 'bold 9px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('HOSPITAL', cx, cy - 6);
             }
         }
 

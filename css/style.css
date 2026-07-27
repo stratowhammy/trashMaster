@@ -88,6 +88,13 @@ input {
 }
 input:focus { outline: none; border-color: #00ff88; }
 
+#trash-word-game-dialog input {
+    padding: 0 !important;
+    line-height: 22px !important;
+    user-select: auto !important;
+    pointer-events: auto !important;
+}
+
 .btn {
     font-family: 'Press Start 2P', monospace;
     padding: 1rem;

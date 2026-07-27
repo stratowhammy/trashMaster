@@ -40,14 +40,26 @@ async function apiCall(endpoint, method = 'GET', body = null) {
 function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
     const screen = document.getElementById(screenId);
-    if (screen) screen.classList.remove('hidden');
+    if (screen) {
+        screen.classList.remove('hidden');
+        if (window.soundManager && screenId !== 'game-layer') {
+            window.soundManager.playDialogAppearSFX();
+        }
+    }
     
     if (screenId === 'game-layer') {
         document.getElementById('ui-layer').classList.add('hidden');
         document.getElementById('gameCanvas').classList.remove('hidden');
+        if (window.soundManager) {
+            const track = window.chaosMode ? 'chaos' : (window.selectedMusicTrack || 'game');
+            window.soundManager.playTrack(track);
+        }
     } else {
         document.getElementById('ui-layer').classList.remove('hidden');
         document.getElementById('gameCanvas').classList.add('hidden');
+        if (window.soundManager && (screenId === 'store-screen' || screenId === 'login-screen')) {
+            window.soundManager.playTrack('store');
+        }
     }
 }
 
@@ -55,6 +67,7 @@ function showChaosConfigDialog() {
     const dialog = document.getElementById('chaos-dialog');
     if (dialog) {
         dialog.classList.remove('hidden');
+        if (window.soundManager) window.soundManager.playDialogAppearSFX();
     }
 }
 
@@ -188,9 +201,12 @@ function initUI() {
     };
 
     const showInstructionsDialog = () => {
+        const pirateToggle = document.getElementById('pirate-toggle');
+        window.pirateMode = pirateToggle ? pirateToggle.checked : false;
+
         const frenzyToggle = document.getElementById('frenzy-toggle');
         window.frenzyMode = frenzyToggle ? frenzyToggle.checked : false;
-        
+
         const crimeToggle = document.getElementById('crime-toggle');
         window.crimeMode = crimeToggle ? crimeToggle.checked : false;
         
@@ -240,12 +256,14 @@ function initUI() {
         }
 
         // Mode explanations
-        if (window.frenzyMode) {
+        if (window.pirateMode) {
             activeSlides.push({
-                title: "FRENZY MODE",
-                desc: "The city has gone into a cleaning frenzy! Trash generates at a double rate, and Informants are scattered around the streets.",
+                title: "PIRATE MODE",
+                desc: "Sail in a Pirate Ship! Follow the 8-location Treasure Map, race against rival pirates, and claim the ultimate treasure!",
                 controls: [
-                    "Informants: Speak with them to receive random bonus rewards!"
+                    "Pirate Ship: Travel in a high-seas pirate ship.",
+                    "Cannons ('C' key): Press 'C' to fire cannons ahead. Stun rival pirates for 5s!",
+                    "Warning: Firing cannons at civilians turns them into Jolly Roger flags & alerts police!"
                 ]
             });
         }
@@ -843,13 +861,16 @@ async function refreshGameState() {
         window.playerUnlockedFantasy = data.unlocked_fantasy || 0;
         window.playerHappiness = data.happiness !== undefined ? data.happiness : 100.0;
         window.cultLeavesCumulative = data.cult_leaves_cumulative || 0;
-        window.wordGameState = data.word_game_state || {
-            collected_letters: {},
-            completed_words: [],
-            word_slots_state: {}
-        };
+        if (data.word_game_state) {
+            window.wordGameState = data.word_game_state || {
+                collected_letters: {},
+                completed_words: [],
+                word_slots_state: {}
+            };
+            // Do not call loadWordGameState on every sync to prevent overwriting local state
+        }
         if (window.game && typeof window.game.loadWordGameState === 'function') {
-            window.game.loadWordGameState();
+            // window.game.loadWordGameState();
         }
         try {
             const bldgData = await apiCall('/api/game/buildings');
@@ -924,17 +945,18 @@ async function refreshGameState() {
 
 const STORE_ITEMS = [
     { name: 'Filthadelphia', price: 2500, desc: 'Doubles trash spawn', sprite: 'filthadelphia.png' },
-    { name: 'Borrowed Time', price: 2000, desc: '+20s to timer (Key T)', sprite: 'borrowed_time.png' },
-    { name: 'Mushrooms', price: 2500, desc: 'Slow timer for 20s (Key M)', sprite: 'mushrooms.png' },
+    { name: 'Borrowed Time', price: 2000, desc: '+20s to timer (Key T). Warning: Using multiple times in a round may cause you to work into the night!', sprite: 'borrowed_time.png' },
+    { name: 'Flashlight', price: 1500, desc: 'Equip with F key during Night Time to illuminate a 10-square radius around you.', sprite: 'flashlight.png' },
+    { name: 'Mushrooms', price: 2500, desc: 'Slow timer for 20s (Key U)', sprite: 'mushrooms.png' },
     { name: 'Wings', price: 1500, desc: '1.5x speed for 15s (Key W)', sprite: 'wings.png' },
     { name: 'Protection', price: 1000, desc: '+5% posse win chance for 30s (Key P)', sprite: 'protection.png' },
     { name: 'Magic 8-Ball', price: 1500, desc: 'Score multiplied randomly at end of round', sprite: 'magic_8_ball.png' },
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
-    { name: 'Organizer', price: 250, desc: 'Splits followers to collect trash simultaneously across the map. Costs $250/round.', sprite: 'employee.png' },
+    { name: 'Organizer', price: 250, desc: 'Splits followers to collect trash simultaneously across the map. Costs $250/round.', sprite: 'organizer.png' },
     { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' },
-    { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'mushrooms.png' },
-    { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'employee.png' },
+    { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'quinine.png' },
+    { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'trashpickers.png' },
     { name: 'Price Fixing', price: 2000, desc: 'Trash worth 1.25x value, but 4 police chase you! Press B to bribe.', sprite: 'protection.png' },
     { name: 'Burninator', price: 1000000, desc: 'Summon the dragon! Requires 5 followers sacrificed every round. Boosts trash value as if 5 followers joined.', sprite: 'dragon.png' }
 ];
@@ -951,7 +973,13 @@ function updateStoreUI() {
         invEl.innerHTML = '<h3>Inventory:</h3>';
         if (playerHasTruck > 0) invEl.innerHTML += `<div>Bruno The Trash Truck (x${playerHasTruck})</div>`;
         for (const [item, count] of Object.entries(playerInventory)) {
-            if (count > 0) invEl.innerHTML += `<div>${item} (x${count})</div>`;
+            if (count > 0) {
+                if (item === 'Goose Rewards Card') {
+                    invEl.innerHTML += `<div style="display:flex;align-items:center;gap:6px;"><img src="assets/sprites/goose_card.png" style="width:20px;height:20px;image-rendering:pixelated;"/> ${item} (x${count})</div>`;
+                } else {
+                    invEl.innerHTML += `<div>${item} (x${count})</div>`;
+                }
+            }
         }
     }
 }
@@ -1094,7 +1122,7 @@ function renderStore() {
             }
         }
 
-        const limitedItems = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection'];
+        const limitedItems = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection', 'Flashlight'];
         if (limitedItems.includes(item.name)) {
             const count = playerInventory[item.name] || 0;
             descOverride = `${item.desc} (Owned: ${count}/10)`;
@@ -1211,23 +1239,21 @@ function updateHireDialogUI() {
 }
 
 function updateModeToggles() {
-    const frenzyContainer = document.getElementById('frenzy-toggle-container');
+    const pirateContainer = document.getElementById('pirate-toggle-container');
+    const frenzyContainer = document.getElementById('frenzy-toggle-container') || pirateContainer;
     const crimeContainer = document.getElementById('crime-toggle-container');
     const fastfoodContainer = document.getElementById('fastfood-toggle-container');
 
-    // 1. Frenzy Mode
-    if (frenzyContainer) {
-        const frenzyToggle = document.getElementById('frenzy-toggle');
-        const label = frenzyContainer.querySelector('.toggle-label');
+    // 1. Pirate Mode
+    if (pirateContainer) {
+        const pirateToggle = document.getElementById('pirate-toggle');
+        const label = pirateContainer.querySelector('.toggle-label');
         if (playerMovementSize < 10) {
-            frenzyToggle.disabled = true;
-            frenzyToggle.checked = false;
-            label.innerText = `Frenzy (Locked: 10 Followers)`;
-            label.style.color = '#888';
+            if (pirateToggle) { pirateToggle.disabled = true; pirateToggle.checked = false; }
+            if (label) { label.innerText = `Pirate Mode (Locked: 10 Followers)`; label.style.color = '#888'; }
         } else {
-            frenzyToggle.disabled = false;
-            label.innerText = `Frenzy Mode`;
-            label.style.color = '#fff';
+            if (pirateToggle) pirateToggle.disabled = false;
+            if (label) { label.innerText = `Pirate Mode`; label.style.color = '#ffcc00'; }
         }
     }
 
@@ -1608,7 +1634,7 @@ const TROPHY_CATEGORIES = [
         name: 'Single Game Trash',
         color: '#4caf50',
         badge: '🗑️',
-        thresholds: [10, 30, 100, 300, 1000],
+        thresholds: [300, 500, 1000, 1750, 2500],
         names: ['Trash Collector', 'Garbage Patrol', 'Sanitation Officer', 'City Cleaner', 'Trash Overlord']
     },
     {
@@ -1726,6 +1752,15 @@ function renderTrophyRoom() {
 
             slot.appendChild(canvas);
 
+            const slotLabel = document.createElement('div');
+            slotLabel.style.fontSize = '6px';
+            slotLabel.style.fontFamily = '"Press Start 2P", monospace';
+            slotLabel.style.color = unlocked ? '#ffaa00' : '#555';
+            slotLabel.style.marginTop = '4px';
+            slotLabel.style.textAlign = 'center';
+            slotLabel.innerText = levelsList[index] || '';
+            slot.appendChild(slotLabel);
+
             const tooltip = document.createElement('div');
             tooltip.className = 'trophy-tooltip';
             
@@ -1762,54 +1797,75 @@ function drawTrophy(canvas, level, categoryColor) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const w = canvas.width;
+    const h = canvas.height;
     ctx.imageRendering = 'pixelated';
     
     let metalColor = '#8c5a3c';
     let strokeColor = '#3e2417';
     let lightColor = '#b88663';
+    let labelName = 'BRONZE';
+    let labelColor = '#cd7f32';
     
     if (level === 2) {
         metalColor = '#a0a0a8';
         strokeColor = '#484850';
         lightColor = '#e0e0e8';
+        labelName = 'SILVER';
+        labelColor = '#d0d0d8';
     } else if (level === 3) {
         metalColor = '#e0a000';
         strokeColor = '#604000';
         lightColor = '#ffe060';
+        labelName = 'GOLD';
+        labelColor = '#ffd700';
     } else if (level === 4) {
         metalColor = '#00b8b8';
         strokeColor = '#004c4c';
         lightColor = '#80ffff';
+        labelName = 'PLATINUM';
+        labelColor = '#e5e4e2';
     } else if (level === 5) {
         metalColor = '#60a0ff';
         strokeColor = '#103080';
         lightColor = '#e0f0ff';
+        labelName = 'DIAMOND';
+        labelColor = '#b9f2ff';
     }
     
     const scale = w / 16;
     
     ctx.fillStyle = strokeColor;
-    ctx.fillRect(4 * scale, 13 * scale, 8 * scale, 2 * scale);
-    ctx.fillRect(7 * scale, 9 * scale, 2 * scale, 4 * scale);
-    ctx.fillRect(3 * scale, 2 * scale, 10 * scale, 7 * scale);
-    ctx.fillRect(1 * scale, 3 * scale, 2 * scale, 4 * scale);
-    ctx.fillRect(13 * scale, 3 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(4 * scale, 11 * scale, 8 * scale, 2 * scale);
+    ctx.fillRect(7 * scale, 7 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(3 * scale, 1 * scale, 10 * scale, 6 * scale);
+    ctx.fillRect(1 * scale, 2 * scale, 2 * scale, 4 * scale);
+    ctx.fillRect(13 * scale, 2 * scale, 2 * scale, 4 * scale);
     
     ctx.fillStyle = metalColor;
-    ctx.fillRect(5 * scale, 13 * scale, 6 * scale, 1 * scale);
-    ctx.fillRect(7.5 * scale, 9 * scale, 1 * scale, 4 * scale);
-    ctx.fillRect(4 * scale, 3 * scale, 8 * scale, 5 * scale);
+    ctx.fillRect(5 * scale, 11 * scale, 6 * scale, 1 * scale);
+    ctx.fillRect(7.5 * scale, 7 * scale, 1 * scale, 4 * scale);
+    ctx.fillRect(4 * scale, 2 * scale, 8 * scale, 4.5 * scale);
     
     ctx.fillStyle = lightColor;
-    ctx.fillRect(5 * scale, 3 * scale, 1 * scale, 4 * scale);
-    ctx.fillRect(8 * scale, 13 * scale, 1 * scale, 1 * scale);
+    ctx.fillRect(5 * scale, 2 * scale, 1 * scale, 3.5 * scale);
+    ctx.fillRect(8 * scale, 11 * scale, 1 * scale, 1 * scale);
     
     ctx.fillStyle = '#0c0804';
-    ctx.fillRect(2 * scale, 4 * scale, 1 * scale, 2 * scale);
-    ctx.fillRect(13 * scale, 4 * scale, 1 * scale, 2 * scale);
+    ctx.fillRect(2 * scale, 3 * scale, 1 * scale, 2 * scale);
+    ctx.fillRect(13 * scale, 3 * scale, 1 * scale, 2 * scale);
     
-    ctx.fillStyle = categoryColor;
-    ctx.fillRect(7 * scale, 5 * scale, 2 * scale, 2 * scale);
+    ctx.fillStyle = categoryColor || '#4caf50';
+    ctx.fillRect(7 * scale, 3.5 * scale, 2 * scale, 2 * scale);
+
+    // Draw Trophy Tier Label
+    ctx.fillStyle = labelColor;
+    ctx.font = `bold ${Math.max(7, Math.floor(scale * 1.2))}px "Press Start 2P", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 3;
+    ctx.fillText(labelName, w / 2, h - 2);
+    ctx.shadowBlur = 0;
 }
 
 function drawSilhouetteTrophy(canvas, level) {

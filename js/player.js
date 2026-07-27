@@ -65,6 +65,11 @@ class Player {
     }
 
     update(gameMap, dt) {
+        if (window.game && window.game.pirateModeManager && window.game.pirateModeManager.playerStunTimer > 0) {
+            this.moving = false;
+            return; // Immobilized by cannonball!
+        }
+
         let dx = 0, dy = 0;
         if (this.keys.up) dy -= 1;
         if (this.keys.down) dy += 1;
@@ -78,24 +83,16 @@ class Player {
             if (Math.abs(dx) > Math.abs(dy)) this.direction = dx > 0 ? 'right' : 'left';
             else this.direction = dy > 0 ? 'down' : 'up';
 
-            // Athlete (+10% speed) applies only when NOT driving a truck.
-            // All other multipliers (Wings, etc.) apply regardless of mode.
             let effectiveMultiplier = this.speedMultiplier || 1.0;
             if (this.characterClass === 'char4' && window.playerHasTruck) {
-                // Strip out only the Athlete base +10% bonus (factor 1.1); keep item bonuses.
-                // We do this by dividing out 1.1 from effectiveMultiplier if it was set to 1.1
-                // by the class init (no item bonuses active).
-                // Safe approach: Athlete base speed is stored separately.
                 effectiveMultiplier = effectiveMultiplier / (this.athleteBaseMultiplier || 1.0);
             }
-            const currentSpeed = this.speed * effectiveMultiplier;
+            const currentSpeed = (window.pirateMode ? 8.5 : this.speed) * effectiveMultiplier;
             const newX = this.x + dx * currentSpeed * 60 * dt;
             const newY = this.y + dy * currentSpeed * 60 * dt;
 
-            // Collision uses wrapping tile lookups — works for infinite world
             if (this._canMoveTo(newX, this.y, gameMap)) this.x = newX;
             if (this._canMoveTo(this.x, newY, gameMap)) this.y = newY;
-            // NO edge clamping — player walks forever
         }
 
         this.animTimer++;
@@ -161,7 +158,9 @@ class Player {
         let drawSize = 64;
         
         let imgId = this.spriteId;
-        if (window.crimeMode) {
+        if (window.pirateMode) {
+            imgId = 'pirate_ship';
+        } else if (window.crimeMode) {
             imgId = 'black_cadillac';
         } else if (window.politicsMode) {
             imgId = 'black_suv';
@@ -174,7 +173,11 @@ class Player {
             ctx.save();
             ctx.translate(screen.x, screen.y + bobY);
             
-            if (window.crimeMode || window.politicsMode) {
+            if (window.pirateMode) {
+                if (this.direction === 'left') {
+                    ctx.scale(-1, 1);
+                }
+            } else if (window.crimeMode || window.politicsMode) {
                 let angle = 0;
                 if (this.direction === 'down') angle = Math.PI;
                 else if (this.direction === 'left') angle = -Math.PI / 2;

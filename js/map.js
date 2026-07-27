@@ -216,9 +216,12 @@ class BaseMap {
     }
 
     isWalkable(tileX, tileY, curTX, curTY, lenient = false) {
+        if (tileX === undefined || tileY === undefined || isNaN(tileX) || isNaN(tileY)) return false;
         const wx = wrapTileX(tileX);
         const wy = wrapTileY(tileY);
+        if (!this.tiles || !this.tiles[wy]) return false;
         const t = this.tiles[wy][wx];
+        if (t === undefined) return false;
         
         if (curTX === undefined || curTY === undefined) {
             if (t === TileType.BUILDING) return false;
@@ -440,12 +443,28 @@ class BaseMap {
 
                     this.tiles[doorTile.y][doorTile.x] = TileType.BUILDING_DOOR;
 
+                    let minTileX = Infinity, minTileY = Infinity, maxTileX = -Infinity, maxTileY = -Infinity;
+                    for (const t of tiles) {
+                        if (t.x < minTileX) minTileX = t.x;
+                        if (t.x > maxTileX) maxTileX = t.x;
+                        if (t.y < minTileY) minTileY = t.y;
+                        if (t.y > maxTileY) maxTileY = t.y;
+                    }
+                    const bx = minTileX * TILE_SIZE;
+                    const by = minTileY * TILE_SIZE;
+                    const bw = (maxTileX - minTileX + 1) * TILE_SIZE;
+                    const bh = (maxTileY - minTileY + 1) * TILE_SIZE;
+
                     this.buildings.push({
                         id: this.buildings.length,
                         address,
                         tiles,
                         doorTiles: [doorTile],
-                        type: 'default'
+                        type: 'default',
+                        x: bx,
+                        y: by,
+                        width: bw,
+                        height: bh
                     });
                     numCounter += Math.floor(Math.random() * 20) + 10;
                     if (numCounter > 999) { numCounter = 100; letterIdx++; }

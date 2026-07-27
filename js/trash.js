@@ -178,6 +178,8 @@ class TrashManager {
                 this.totalPoints += actualPoints;
                 picked.push(item);
 
+                if (window.soundManager) window.soundManager.playTrashPickupSFX();
+
                 // Create pickup effect
                 this.pickupEffects.push({
                     x: wrapped.x,

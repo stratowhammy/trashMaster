@@ -72,6 +72,26 @@ class NPC {
         const screen = camera.worldToScreen(this.x, this.y);
         const drawSize = 64;
 
+        if (this.isDeadFlag) {
+            ctx.save();
+            // Wooden Flagpole
+            ctx.fillStyle = '#8b4513';
+            ctx.fillRect(screen.x - 2, screen.y - 20, 4, 30);
+            // Black Jolly Roger Flag
+            ctx.fillStyle = '#111111';
+            ctx.fillRect(screen.x + 2, screen.y - 20, 24, 16);
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(screen.x + 2, screen.y - 20, 24, 16);
+            // Skull & Crossbones icon
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '10px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('☠️', screen.x + 14, screen.y - 8);
+            ctx.restore();
+            return;
+        }
+
         const img = spriteManager.getCharacterImage(this.spriteId);
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
             if (this.isRedRivalOnly) {

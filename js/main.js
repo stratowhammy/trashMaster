@@ -210,8 +210,19 @@ class Game {
                     this.pickupTrash();
                 }
 
+                // C or c key to fire cannons in Pirate Mode
+                if ((e.key === 'c' || e.key === 'C') && window.pirateMode && this.pirateModeManager) {
+                    this.pirateModeManager.firePlayerCannon(this);
+                }
+
                 // E or e key to interact with NPC or green cars, Dons or Chief
                 if (e.key === 'e' || e.key === 'E') {
+                    if (window.soundManager) window.soundManager.playEngageSFX();
+
+                    // Pirate Mode engage check
+                    if (window.pirateMode && this.pirateModeManager) {
+                        this.pirateModeManager.handlePlayerEngage(this);
+                    }
                     // Crime Mode checks
                     if (window.crimeMode && this.crimeManager) {
                         const px = ((this.player.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
@@ -391,6 +402,9 @@ class Game {
 
                 // ── Phase 3 E-key interactions (always run if E pressed) ──
                 if (e.key === 'e' || e.key === 'E') {
+                    if (this.player && this.player.characterClass === 'char1') {
+                        this._rangerTryCaptureAnimal();
+                    }
 
 
                     // Lost Child Quest: check parent delivery first, then child pickup
@@ -486,8 +500,17 @@ class Game {
                     }
                 }
 
-                // F or f to plant fertilizer
+                // F or f key: Flashlight toggle or plant fertilizer
                 if (e.key === 'f' || e.key === 'F') {
+                    const hasFlashlight = (window.playerInventory && window.playerInventory['Flashlight'] > 0);
+                    if (this.nightTimeTimer > 0 || hasFlashlight) {
+                        if (hasFlashlight) {
+                            this.flashlightEquipped = !this.flashlightEquipped;
+                            this.hud.showFollowerNotification(this.flashlightEquipped ? "🔦 Flashlight ON!" : "🔦 Flashlight OFF!", true);
+                        } else {
+                            this.hud.showFollowerNotification("❌ Flashlight required! Buy one from the Store for $1,500.", false);
+                        }
+                    }
                     if (window.flowersMode) {
                         const px = wrapWorldX(this.player.x);
                         const py = wrapWorldY(this.player.y);
@@ -534,6 +557,7 @@ class Game {
 
                 // K or k to kill NPC
                 if (e.key === 'k' || e.key === 'K') {
+                    if (window.soundManager) window.soundManager.playKillSFX();
                     if (window.crimeMode) {
                         // Check if near a Don first
                         if (window.crimeMode && this.crimeManager) {
@@ -651,6 +675,7 @@ class Game {
 
                 // R or r to rob NPC
                 if (e.key === 'r' || e.key === 'R') {
+                    if (window.soundManager) window.soundManager.playRobSFX();
                     if (window.crimeMode) {
                         // Check Don rob first
                         if (window.crimeMode && this.crimeManager) {
@@ -699,6 +724,7 @@ class Game {
 
                 // S or s to steal car (Crime) or shake hands (Politics)
                 if (e.key === 's' || e.key === 'S') {
+                    if (window.soundManager) window.soundManager.playHandshakeSFX();
                     let targetCar = null;
                     if (window.crimeMode) {
                         for (const car of this.carManager.cars) {
@@ -735,7 +761,7 @@ class Game {
                         } else {
                             this.hud.showFollowerNotification('You can only steal cars on roads or intersections!', true);
                         }
-                    } else if (window.politicsMode) {
+                    } else if (window.politicsMode || window.chaosMode) {
                         const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
                         if (npc && !npc.shaken) {
                             if (npc.isRedRivalOnly) {
@@ -753,11 +779,23 @@ class Game {
                     }
                 }
 
-                // Hotkeys for Consumables
+                // Hotkeys for Consumables & Audio Controls
                 if (e.key === 't' || e.key === 'T') this.useConsumable('Borrowed Time');
-                if (e.key === 'm' || e.key === 'M') this.useConsumable('Mushrooms');
+                if (e.key === 'u' || e.key === 'U') this.useConsumable('Mushrooms');
                 if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
                 if (e.key === 'p' || e.key === 'P') this.useConsumable('Protection');
+                if (e.key === 'm' || e.key === 'M') {
+                    if (window.soundManager) {
+                        const isMuted = window.soundManager.toggleMute();
+                        this.hud.showFollowerNotification(isMuted ? "🎵 Music: OFF" : "🎵 Music: ON", true);
+                    }
+                }
+                if (e.key === 'n' || e.key === 'N') {
+                    if (window.soundManager) {
+                        const sfxMuted = window.soundManager.toggleSFX();
+                        this.hud.showFollowerNotification(sfxMuted ? "🔊 SFX: OFF" : "🔊 SFX: ON", true);
+                    }
+                }
                 if (e.key === 'b' || e.key === 'B') {
                     if (this.priceFixingActive) {
                         this.triggerPriceFixingBribe();
@@ -986,7 +1024,13 @@ class Game {
             
             if (itemName === 'Borrowed Time') {
                 this.hud.timeRemaining += 20;
-                this.hud.showFollowerNotification('+20s Timer Added!', true);
+                this.borrowedTimeCount = (this.borrowedTimeCount || 0) + 1;
+                if (this.borrowedTimeCount >= 3 && !this.nightTimeTriggered && (this.nightTimePendingTimer || 0) <= 0) {
+                    this.nightTimePendingTimer = 10.0;
+                    this.hud.showFollowerNotification('⚠️ Working into the night! Night falls in 10 seconds...', true);
+                } else {
+                    this.hud.showFollowerNotification('+20s Timer Added!', true);
+                }
             } else if (itemName === 'Mushrooms') {
                 this.hud.timerSpeed = 0.5;
                 this.mushroomTimer = 20;
@@ -1015,6 +1059,7 @@ class Game {
         this.state = GameState.UI_OVERLAY;
         
         dialog.classList.remove('hidden');
+        if (window.soundManager) window.soundManager.playDialogAppearSFX();
         
         const titleEl = document.querySelector('#bribe-dialog h2');
         const oldTitle = titleEl ? titleEl.innerText : "BRIBE POLICE CHIEF";
@@ -1277,8 +1322,8 @@ class Game {
             return;
         }
 
-        // Frenzy/Politics/Flowers/Crime/Cult/Builder Mode updates
-        if (window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
+        // Pirate/Frenzy/Politics/Flowers/Crime/Cult/Builder Mode updates
+        if (window.pirateMode || window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
             this.npcManager.update();
         }
 
@@ -1350,6 +1395,10 @@ class Game {
                     }
                 }
             }
+        }
+        
+        if (window.pirateMode && this.pirateModeManager) {
+            this.pirateModeManager.update(dt, this);
         }
         
         if (window.frenzyMode) {
@@ -1484,8 +1533,8 @@ class Game {
         }
         this._playerInsideBuildingLastFrame = isCurrentlyInside;
 
-        // Interior trash spawning
-        if (isCurrentlyInside) {
+        // Interior trash spawning (Disabled in Pirate Mode)
+        if (isCurrentlyInside && !window.pirateMode) {
             this.buildingTrashTimer = (this.buildingTrashTimer || 0) + dt;
             if (this.buildingTrashTimer >= 1.0) {
                 this.buildingTrashTimer -= 1.0;
@@ -1652,8 +1701,6 @@ class Game {
                 
                 if (dragFollowerPicked.length > 0) {
                     const totalFollowers = this.getRoundTotalFollowersForValue();
-                    const pointValue = Math.max(1, Math.round(Math.sqrt(16 * totalFollowers))) * dragFollowerPicked.length;
-                    this.trashManager.totalPoints += pointValue;
                     
                     dragFollowerPicked.forEach(item => {
                         const wrapped = nearestWrap(item.x, item.y, this.camera.getCenterX(), this.camera.getCenterY());
@@ -1755,12 +1802,30 @@ class Game {
                     }
                 }
             }
-            
+
             // Check stranded condition
             if (window.playerBalance < 0) {
                 document.getElementById('stranded-screen').classList.remove('hidden');
                 this.state = GameState.UI_OVERLAY;
                 return;
+            }
+        }
+
+        // ── Night Time Mode Timers (runs in ALL game modes) ──
+        if (this.nightTimePendingTimer > 0) {
+            this.nightTimePendingTimer -= dt;
+            if (this.nightTimePendingTimer <= 0) {
+                this.nightTimePendingTimer = 0;
+                this.nightTimeTriggered = true;
+                this.nightTimeTimer = 25.0; // 25 seconds of Night Time
+                this.hud.showFollowerNotification("🌙 NIGHT TIME! It's pitch black! Press [F] to use your Flashlight.", true);
+            }
+        }
+        if (this.nightTimeTimer > 0) {
+            this.nightTimeTimer -= dt;
+            if (this.nightTimeTimer <= 0) {
+                this.nightTimeTimer = 0;
+                this.hud.showFollowerNotification("🌅 Dawn breaks! Night time has ended.", true);
             }
         }
 
@@ -1824,7 +1889,7 @@ class Game {
     _render() {
         const btnWordGame = document.getElementById('btn-open-word-game');
         if (btnWordGame) {
-            btnWordGame.style.display = (this.state === GameState.PLAYING) ? 'block' : 'none';
+            btnWordGame.style.display = 'none';
         }
 
         const ctx = this.ctx;
@@ -2176,6 +2241,7 @@ class Game {
             this.hud.showFollowerNotification('🏗️ Builder Mode: Press E at building doors to buy!', true);
         }
         this.pirateManager = new PirateManager();
+        this.pirateModeManager = new PirateModeManager();
         this.carManager.spawnCars(this.gameMap);
         // Retrieve and spawn organizers
         this.organizers = [];
@@ -2345,6 +2411,13 @@ class Game {
         this.sick = false;
         this.sicknessTimer = 30.0;
 
+        // Night Time Mode variables
+        this.borrowedTimeCount = 0;
+        this.nightTimePendingTimer = 0;
+        this.nightTimeTimer = 0;
+        this.nightTimeTriggered = false;
+        this.flashlightEquipped = false;
+
         // ── Character Class Initialization Rules ──
         const charClass = this.player ? this.player.characterClass : spriteId;
         this._applyCharacterClassInit(charClass);
@@ -2372,6 +2445,9 @@ class Game {
         } else {
             this.state = GameState.PLAYING;
             if (window.gameLog) window.gameLog(`_startGame: state set to ${this.state}. Canvas size: w=${this.canvas.width}, h=${this.canvas.height}`);
+        }
+        if (window.soundManager) {
+            window.soundManager.playTrack(window.chaosMode ? 'chaos' : (window.selectedMusicTrack || 'game'));
         }
         console.log('Game state set. Player:', this.player);
     }
@@ -2457,6 +2533,15 @@ class Game {
                 });
             }
         }
+
+        // Pick a random building to be the Zoo, ensure it's not hospital or police
+        if (this.gameMap && this.gameMap.buildings && this.gameMap.buildings.length > 0) {
+            const validZoos = this.gameMap.buildings.filter(b => b.type === 'normal' || b.type === 'cult' || b.type === 'shop' || b.type === 'zoo');
+            if (validZoos.length > 0) {
+                this.zooBuilding = validZoos[Math.floor(Math.random() * validZoos.length)];
+                this.zooBuilding.type = 'zoo'; // ensure it's marked as zoo
+            }
+        }
     }
 
     // ── RANGER: Try to capture a nearby animal ──
@@ -2466,8 +2551,26 @@ class Game {
         const py = this.player.y;
         const maxAnimals = window.playerHasTruck ? 99 : 1;
 
-        for (const node of this.animalNodes) {
-            if (node.captured) continue;
+        // Check if near Zoo building
+        if (this.zooBuilding && this.player.capturedAnimals && this.player.capturedAnimals.length > 0) {
+            const door = this.zooBuilding.doorTiles[0];
+            if (door) {
+                const dx = px - (door.x * TILE_SIZE + TILE_SIZE/2);
+                const dy = py - (door.y * TILE_SIZE + TILE_SIZE/2);
+                if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE * 2) {
+                    const count = this.player.capturedAnimals.length;
+                    const reward = 500 + (100 * count);
+                    this.trashManager.totalPoints += reward;
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                    this.player.capturedAnimals = [];
+                    this.hud.showFollowerNotification(`Delivered ${count} animals to the Zoo! Earned $${reward}.`, true);
+                    return;
+                }
+            }
+        }
+
+        for (let i = 0; i < this.animalNodes.length; i++) {
+            const node = this.animalNodes[i];
             const dx = px - node.x;
             const dy = py - node.y;
             if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 1.2) {
@@ -2480,7 +2583,7 @@ class Game {
                     );
                     return;
                 }
-                node.captured = true;
+                this.animalNodes.splice(i, 1);
                 this.player.capturedAnimals.push({ type: node.type });
                 const cargoReduction = this.player.capturedAnimals.length * 10;
                 this.hud.showFollowerNotification(
@@ -2489,7 +2592,12 @@ class Game {
                 return;
             }
         }
-        this.hud.showFollowerNotification('No animal nearby to capture.', false);
+        
+        if (this.zooBuilding) {
+            this.hud.showFollowerNotification('No animal nearby. Deliver captured animals to the ZOO.', false);
+        } else {
+            this.hud.showFollowerNotification('No animal nearby to capture.', false);
+        }
     }
 
     async _endRoundAndReturnToStore() {
@@ -2782,12 +2890,16 @@ class Game {
             }
         }
 
+        if (window.pirateMode && this.pirateModeManager) {
+            this.pirateModeManager.render(ctx, this.camera, this.spriteManager, this.canvas.width, this.canvas.height);
+        }
+
         if (window.frenzyMode) {
             this.gameMap.renderAddresses(ctx, this.camera);
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
         }
         
-        if (window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
+        if (window.pirateMode || window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
             this.npcManager.render(ctx, this.camera, this.spriteManager);
         }
 
@@ -2948,33 +3060,30 @@ class Game {
                 if (!this.camera.isVisible(wrapped.x - 32, wrapped.y - 32, 64, 64)) continue;
                 const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
 
-                // Pulsing circle background
-                const pulse = 1 + Math.sin(time * 3 + node.x * 0.01) * 0.08;
+                // Draw animal sprite as a normal sprite
+                const pulse = 1 + Math.sin(time * 4 + (node.id || 0)) * 0.05;
+                const size = 32 * pulse;
+                const animalImg = this.spriteManager ? this.spriteManager.getImage('animal') : null;
+                
                 ctx.save();
-                ctx.globalAlpha = 0.85;
-                ctx.fillStyle = '#2d6b2d';
-                ctx.beginPath();
-                ctx.arc(screen.x, screen.y, 14 * pulse, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#88ff88';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(screen.x, screen.y, 14 * pulse, 0, Math.PI * 2);
-                ctx.stroke();
+                if (animalImg) {
+                    ctx.drawImage(animalImg, screen.x - size/2, screen.y - size/2, size, size);
+                } else {
+                    ctx.fillStyle = '#ff9900';
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
 
-                // Paw icon text
-                ctx.font = '14px serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.globalAlpha = 1.0;
-                ctx.fillText('🐾', screen.x, screen.y);
-
-                // Animal type label
+                // Animal type label below sprite
                 ctx.fillStyle = '#ffffff';
-                ctx.font = '6px "Press Start 2P", monospace';
+                ctx.font = '7px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
-                ctx.fillText(node.type.toUpperCase(), screen.x, screen.y + 16);
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 3;
+                ctx.fillText(node.type.toUpperCase(), screen.x, screen.y + size/2 + 2);
+                ctx.shadowBlur = 0;
                 ctx.restore();
             }
         }
@@ -3002,6 +3111,42 @@ class Game {
         // Render Dragons
         if (this.dragons) {
             this.dragons.forEach(drag => drag.render(ctx, this.camera));
+        }
+
+        // Render Night Time Darkness Overlay (Solid Pitch Black)
+        if (this.nightTimeTimer > 0) {
+            ctx.save();
+            const hasFlashlight = (window.playerInventory && window.playerInventory['Flashlight'] > 0);
+            
+            if (this.flashlightEquipped && hasFlashlight) {
+                const screenPos = this.camera.worldToScreen(this.player.x, this.player.y);
+                const radius = 5 * TILE_SIZE; // 5 squares = 160px
+                
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = w;
+                tempCanvas.height = h;
+                const tctx = tempCanvas.getContext('2d');
+                
+                tctx.fillStyle = '#000000';
+                tctx.fillRect(0, 0, w, h);
+                
+                tctx.globalCompositeOperation = 'destination-out';
+                const grad = tctx.createRadialGradient(screenPos.x, screenPos.y, radius * 0.3, screenPos.x, screenPos.y, radius);
+                grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+                grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.9)');
+                grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+                tctx.fillStyle = grad;
+                tctx.beginPath();
+                tctx.arc(screenPos.x, screenPos.y, radius, 0, Math.PI * 2);
+                tctx.fill();
+                
+                ctx.drawImage(tempCanvas, 0, 0);
+            } else {
+                // Entire map goes solid pitch black
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+            }
+            ctx.restore();
         }
 
         // Render HUD
@@ -3153,13 +3298,15 @@ class Game {
                 let trophyLevel = 0; // 0 means silhouette (no trophy)
                 let catColor = '#4caf50'; // Default green for trash
                 
-                if (totalTrash >= 300) {
+                if (totalTrash >= 2500) {
                     trophyLevel = 5; // Diamond
-                } else if (totalTrash >= 100) {
+                } else if (totalTrash >= 1750) {
+                    trophyLevel = 4; // Platinum
+                } else if (totalTrash >= 1000) {
                     trophyLevel = 3; // Gold
-                } else if (totalTrash >= 30) {
+                } else if (totalTrash >= 500) {
                     trophyLevel = 2; // Silver
-                } else if (totalTrash >= 10) {
+                } else if (totalTrash >= 300) {
                     trophyLevel = 1; // Bronze
                 }
                 
@@ -3541,10 +3688,34 @@ class Game {
             }
         } else {
             if (titleEl) titleEl.innerText = "WASTED BY POLICE";
-            if (gifEl) {
-                gifEl.src = "assets/sprites/defeat_animation.gif";
-                gifEl.style.width = "128px";
-                gifEl.style.height = "128px";
+            if (gifEl) gifEl.style.display = 'none';
+            if (trophyCanvas) {
+                trophyCanvas.style.display = 'block';
+                const totalTrash = this.trashCollectedInRound || 0;
+                let trophyLevel = 0;
+                let catColor = '#4caf50';
+                
+                if (totalTrash >= 2500) {
+                    trophyLevel = 5; // Diamond
+                } else if (totalTrash >= 1750) {
+                    trophyLevel = 4; // Platinum
+                } else if (totalTrash >= 1000) {
+                    trophyLevel = 3; // Gold
+                } else if (totalTrash >= 500) {
+                    trophyLevel = 2; // Silver
+                } else if (totalTrash >= 300) {
+                    trophyLevel = 1; // Bronze
+                }
+                
+                if (trophyLevel > 0) {
+                    if (typeof window.drawTrophy === 'function') {
+                        window.drawTrophy(trophyCanvas, trophyLevel, catColor);
+                    }
+                } else {
+                    if (typeof window.drawSilhouetteTrophy === 'function') {
+                        window.drawSilhouetteTrophy(trophyCanvas, 1);
+                    }
+                }
             }
             if (artContainer) artContainer.style.display = "block";
             if (msgEl) {
@@ -3842,6 +4013,7 @@ class Game {
 
         this.renderWordGameDialog();
         document.getElementById('trash-word-game-dialog').classList.remove('hidden');
+        if (window.soundManager) window.soundManager.playDialogAppearSFX();
     }
 
     renderWordGameDialog() {
@@ -3968,11 +4140,15 @@ class Game {
                 input.maxLength = 1;
                 input.style.width = '24px';
                 input.style.height = '24px';
+                input.style.padding = '0';
+                input.style.lineHeight = '22px';
                 input.style.textAlign = 'center';
                 input.style.fontFamily = '"Press Start 2P", monospace';
                 input.style.fontSize = '10px';
                 input.style.marginRight = '4px';
                 input.style.boxSizing = 'border-box';
+                input.style.userSelect = 'auto';
+                input.style.pointerEvents = 'auto';
                 
                 input.setAttribute('data-word', word);
                 input.setAttribute('data-index', i);
@@ -3989,7 +4165,8 @@ class Game {
                     input.value = currentVal;
                     input.style.background = '#2a1b4e';
                     input.style.border = '2px solid #b55fe6';
-                    input.style.color = '#00f0ff';
+                    input.style.color = '#ffea00';
+                    input.style.fontWeight = 'bold';
                     input.style.cursor = 'pointer';
                     input.title = "Click or press Backspace to remove letter";
 
@@ -4144,8 +4321,10 @@ class Game {
 
     async awardWordGamePrize(prize) {
         if (prize.val > 0) {
-            this.trashManager.totalPoints += prize.val;
-            this.hud.updateScore(this.trashManager.totalPoints);
+            await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'cash', cash_amount: prize.val });
+            this.hud.showFollowerNotification(`🎁 Word Game Prize: +$${prize.val.toLocaleString()} Cash added to balance!`, true);
+            await window.refreshGameState();
+            window.renderStore();
         }
 
         if (prize.type === 'quinine_cash') {
@@ -4156,10 +4335,14 @@ class Game {
             window.playerInventory = window.playerInventory || {};
             window.playerInventory['Flower'] = (window.playerInventory['Flower'] || 0) + 1;
             await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'flower' });
-        } else if (prize.type === 'protection_cash') {
+        } else if (prize.type === 'protection_cash' || prize.type === 'flashlight_protection_cash') {
             window.playerInventory = window.playerInventory || {};
             window.playerInventory['Protection'] = (window.playerInventory['Protection'] || 0) + 1;
             await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'protection' });
+            if (prize.type === 'flashlight_protection_cash') {
+                window.playerInventory['Flashlight'] = (window.playerInventory['Flashlight'] || 0) + 1;
+                await window.apiCall('/api/game/award-prize', 'POST', { prize_type: 'flashlight' });
+            }
         } else if (prize.type === 'truck_cash') {
             window.playerHasTruck = (window.playerHasTruck || 0) + 1;
             window.playerInventory = window.playerInventory || {};
@@ -4391,6 +4574,32 @@ class GameOrganizer {
             this.positionHistory.shift();
         }
 
+        // Pirate Mode: Battling rival pirates on contact
+        if (window.pirateMode && this.game.pirateModeManager) {
+            const pm = this.game.pirateModeManager;
+            // Check rival ship contact
+            if (pm.rivalShip && pm.rivalShip.alive && pm.rivalShip.stunTimer <= 0) {
+                const dx = this.x - pm.rivalShip.x;
+                const dy = this.y - pm.rivalShip.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 60) {
+                    pm.rivalShip.stunTimer = 5.0;
+                    if (this.game.hud) this.game.hud.showFollowerNotification(`⚓ Captain #${this.index + 1}'s boat battled & stunned the rival pirate ship! 💥🏴‍☠️`, true);
+                }
+            }
+            // Check rival crew members contact
+            if (pm.npcCrew && pm.npcCrew.members) {
+                for (const member of pm.npcCrew.members) {
+                    if (!member.alive || member.stunTimer > 0) continue;
+                    const dx = this.x - member.x;
+                    const dy = this.y - member.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < 48) {
+                        member.stunTimer = 5.0;
+                        if (this.game.hud) this.game.hud.showFollowerNotification(`⚓ Captain #${this.index + 1}'s boat engaged & stunned Pirate #${member.index + 1}! 💥🏴‍☠️`, true);
+                    }
+                }
+            }
+        }
+
         // Update followers
         this.followerManager.update(this, this.game.gameMap);
     }
@@ -4424,6 +4633,35 @@ class GameOrganizer {
                 ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 36);
                 ctx.restore();
                 
+                this.followerManager.render(ctx, camera, this.game.spriteManager);
+                return;
+            }
+        }
+
+        // ── Pirate Mode: render organizer as a pirate ship (Captain) ──
+        if (window.pirateMode && this.game.spriteManager) {
+            const shipImg = this.game.spriteManager.getImage('pirate_ship');
+            if (shipImg && (shipImg.complete || shipImg instanceof HTMLCanvasElement)) {
+                const drawSize = 72;
+                const bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
+                ctx.save();
+                if (this.direction === 'left') {
+                    ctx.translate(screen.x, screen.y + bobY);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(shipImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.drawImage(shipImg, screen.x - drawSize / 2, screen.y - drawSize / 2 + bobY, drawSize, drawSize);
+                }
+                ctx.restore();
+
+                // Captain label above ship
+                ctx.save();
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = 'bold 7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`⚓ CAPTAIN ${this.index + 1}`, screen.x, screen.y - 42 + bobY);
+                ctx.restore();
+
                 this.followerManager.render(ctx, camera, this.game.spriteManager);
                 return;
             }
@@ -4507,9 +4745,24 @@ window.triggerFastFoodOffer = function(posseCount) {
             if (btnNo) btnNo.innerText = 'No';
             if (costText) {
                 const trashWorth = Math.max(1, Math.round(Math.sqrt(16 * posseCount)));
-                const cost = posseCount * trashWorth;
-                costText.innerText = `Cost: $${cost.toLocaleString()}`;
+                let cost = posseCount * trashWorth;
+                const giftCards = (window.playerInventory && (window.playerInventory['Goose Gift Card'] || 0)) || 0;
+                const rewardsCards = (window.playerInventory && (window.playerInventory['Goose Rewards Card'] || 0)) || 0;
+                const totalGooseCards = giftCards + rewardsCards;
+                
+                let discounted = false;
+                if (totalGooseCards > 0) {
+                    cost = Math.round(cost * 0.75); // 25% off
+                    discounted = true;
+                }
                 window.currentFastFoodCost = cost;
+                window.currentFastFoodUsedGooseCard = discounted;
+                
+                if (discounted) {
+                    costText.innerText = `Cost: $${cost.toLocaleString()} (25% OFF w/ Goose Card! [${totalGooseCards} left])`;
+                } else {
+                    costText.innerText = `Cost: $${cost.toLocaleString()}`;
+                }
                 costText.style.display = 'block';
             }
             if (warnText) {
@@ -4555,6 +4808,17 @@ window.addEventListener('DOMContentLoaded', () => {
         if (window.game) {
             window.game.state = GameState.PLAYING;
             const cost = window.currentFastFoodCost || 0;
+
+            // Consume Goose Gift Card / Rewards Card if used
+            if (window.currentFastFoodUsedGooseCard && window.playerInventory) {
+                if (window.playerInventory['Goose Gift Card'] > 0) {
+                    window.playerInventory['Goose Gift Card']--;
+                } else if (window.playerInventory['Goose Rewards Card'] > 0) {
+                    window.playerInventory['Goose Rewards Card']--;
+                }
+                window.currentFastFoodUsedGooseCard = false;
+            }
+
             window.game.trashManager.totalPoints = Math.max(0, window.game.trashManager.totalPoints - cost);
             window.game.hud.updateScore(window.game.trashManager.totalPoints);
             

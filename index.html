@@ -78,12 +78,12 @@
                         Intl Followers: <span id="store-international-followers">0</span>
                     </div>
                     <div id="store-inventory"></div>
-                    <div id="frenzy-toggle-container" class="toggle-container" style="margin-bottom: 8px;">
+                    <div id="pirate-toggle-container" class="toggle-container" style="margin-bottom: 8px;">
                         <label class="switch">
-                            <input type="checkbox" id="frenzy-toggle">
+                            <input type="checkbox" id="pirate-toggle">
                             <span class="slider round"></span>
                         </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Frenzy Mode</span>
+                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ffcc00; margin-left: 8px; vertical-align: middle;">Pirate Mode</span>
                     </div>
                     <div id="crime-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
                         <label class="switch">
@@ -147,6 +147,13 @@
                             <span class="slider round" style="background-color: #ff0055;"></span>
                         </label>
                         <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ff0055; margin-left: 8px; vertical-align: middle;">Chaos Mode 💥</span>
+                    </div>
+                    <div id="music-style-container" style="margin-bottom: 15px; text-align: left; background: rgba(0,0,0,0.5); padding: 8px; border: 2px solid #b55fe6; border-radius: 4px;">
+                        <div style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: #b55fe6; margin-bottom: 6px;">🎵 BGM SOUNDTRACK:</div>
+                        <select id="music-style-select" style="width: 100%; background: #111; border: 1px solid #b55fe6; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 6px; cursor: pointer; border-radius: 3px;">
+                            <option value="game">Retro Arcade (110 BPM)</option>
+                            <option value="dnb">Drum & Bass (160 BPM 🥁)</option>
+                        </select>
                     </div>
                     <button id="btn-start-game" class="btn play-btn">Play Game</button>
                     <button id="btn-view-trophies" class="btn secondary" style="margin-bottom: 12px; background: #ffaa00; border: 2px solid #cc7700; color: #111; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Trophy Case</button>
@@ -490,8 +497,7 @@
         </div>
     </div>
 
-    <!-- Letter Inventory Button -->
-    <button id="btn-open-word-game" class="btn" style="position: absolute; left: 20px; top: 120px; z-index: 999; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; background: #b55fe6; border: 2px solid #9240c5; color: #fff; cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px rgba(181, 95, 230, 0.4); display: none;">Letter Inventory 🎒</button>
+
 
     <!-- Word Game Dialog Modal -->
     <div id="trash-word-game-dialog" class="hidden" style="position: fixed; z-index: 1004; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
@@ -511,7 +517,13 @@
         </div>
     </div>
 
+    <!-- Audio Control Button (Bottom Right) -->
+    <div style="position: absolute; right: 20px; bottom: 20px; z-index: 1005; display: flex; gap: 10px;">
+        <button id="btn-toggle-bgm" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; background: #b55fe6; border: 2px solid #9240c5; color: #fff; cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px rgba(181, 95, 230, 0.4);">🎵 Music: ON (M)</button>
+    </div>
+
     <!-- Game scripts loaded in dependency order -->
+    <script src="js/audio.js?v=3"></script>
     <script src="js/api.js?v=12"></script>
     <script src="js/map.js?v=8"></script>
     <script src="js/map_dahgbad.js?v=2"></script>

@@ -323,10 +323,17 @@ class BaseMap {
             for (let dx = 0; dx < tilesW; dx++) {
                 const worldTX = startTX + dx;
                 const worldTY = startTY + dy;
-                const tx = wrapTileX(worldTX);
-                const ty = wrapTileY(worldTY);
                 const sx = worldTX * TILE_SIZE - camera.x;
                 const sy = worldTY * TILE_SIZE - camera.y;
+
+                if (window.pirateMode && worldTY >= MAP_HEIGHT) {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                    continue;
+                }
+
+                const tx = wrapTileX(worldTX);
+                const ty = wrapTileY(worldTY);
                 this._drawTile(ctx, this.tiles[ty][tx], sx, sy, tx, ty);
 
                 // Draw illegal dump park highlight overlay on main map
@@ -339,6 +346,42 @@ class BaseMap {
                         ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
                     }
                 }
+            }
+        }
+
+        // Render Southern Edge Black Border & Precipice Overlay in Pirate Mode
+        if (window.pirateMode) {
+            const southEdgeY = MAP_PIXEL_H - camera.y;
+            if (southEdgeY < camera.height) {
+                ctx.save();
+                // 1. Black space void below southern edge
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, Math.max(0, southEdgeY), camera.width, camera.height - Math.max(0, southEdgeY) + 500);
+
+                // 2. Solid black border along southern edge
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 14;
+                ctx.beginPath();
+                ctx.moveTo(0, southEdgeY);
+                ctx.lineTo(camera.width, southEdgeY);
+                ctx.stroke();
+
+                // 3. Pulsing hazard line
+                const pulse = Math.sin(performance.now() / 120) * 0.4 + 0.6;
+                ctx.strokeStyle = `rgba(255, 68, 0, ${pulse})`;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(0, southEdgeY - 2);
+                ctx.lineTo(camera.width, southEdgeY - 2);
+                ctx.stroke();
+
+                // 4. Southern edge warning label
+                ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+                ctx.font = 'bold 10px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('⚠️ EDGE OF THE EARTH — DO NOT SAIL PAST! 🌊☠️', camera.width / 2, southEdgeY - 14);
+
+                ctx.restore();
             }
         }
     }

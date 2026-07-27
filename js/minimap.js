@@ -37,8 +37,16 @@ class MiniMap {
             for (let x = 0; x < MAP_WIDTH; x++) {
                 const tile = gameMap.tiles[y][x];
                 let color = miniColors[tile] || '#333';
-                
-                if (window.crimeMode) {
+
+                if (window.pirateMode) {
+                    if (tile === TileType.SIDEWALK) {
+                        color = '#e6ca65'; // Sandy Beach Gold
+                    } else if (tile === TileType.BUILDING || tile === TileType.BUILDING_DOOR) {
+                        color = '#2a9d8f'; // Island Land Green
+                    } else {
+                        color = '#1b4965'; // Ocean Water Blue
+                    }
+                } else if (window.crimeMode) {
                     const bldg = gameMap.getBuildingAtTile(x, y);
                     if (bldg) {
                         if (bldg.type === 'bank') {
@@ -49,16 +57,18 @@ class MiniMap {
                     }
                 }
 
-                const bldg = gameMap.getBuildingAtTile(x, y);
-                if (bldg) {
-                    if (bldg.type === 'fast_food') {
-                        color = '#ffaa00'; // Fast Food: Orange
-                    } else if (bldg.type === 'hospital') {
-                        color = '#ffffff'; // Hospital: White
-                    } else if (bldg.type === 'dump') {
-                        color = '#8b5a2b'; // Dump: Brown
-                    } else if (bldg.type === 'city_hall' || bldg.type === 'cityhall') {
-                        color = '#00ffff'; // City Hall: Cyan
+                if (!window.pirateMode) {
+                    const bldg = gameMap.getBuildingAtTile(x, y);
+                    if (bldg) {
+                        if (bldg.type === 'fast_food') {
+                            color = '#ffaa00'; // Fast Food: Orange
+                        } else if (bldg.type === 'hospital') {
+                            color = '#ffffff'; // Hospital: White
+                        } else if (bldg.type === 'dump') {
+                            color = '#8b5a2b'; // Dump: Brown
+                        } else if (bldg.type === 'city_hall' || bldg.type === 'cityhall') {
+                            color = '#00ffff'; // City Hall: Cyan
+                        }
                     }
                 }
                 
@@ -114,7 +124,9 @@ class MiniMap {
         ctx.clip();
 
         // Draw static map
-        if (this.staticDirty) return;
+        if (this.staticDirty && gameMap) {
+            this.buildStatic(gameMap);
+        }
         ctx.drawImage(this.staticCanvas, mapX, mapY);
 
         // Highlight open frenzy buildings
@@ -233,7 +245,7 @@ class MiniMap {
                 ctx.fillStyle = '#ffea00';
                 ctx.font = 'bold 8px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`LOC ${pm.playerStep + 1}`, tx, ty - 10);
+                ctx.fillText(`ISLAND ${pm.playerStep + 1}`, tx, ty - 10);
             } else if (pm.treasureBuilding && !pm.treasureClaimed) {
                 const target = pm.treasureBuilding;
                 const pulse = Math.sin(performance.now() / 60) * 0.5 + 0.5;

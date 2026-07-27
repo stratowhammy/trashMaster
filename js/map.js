@@ -216,6 +216,7 @@ class BaseMap {
     }
 
     isWalkable(tileX, tileY, curTX, curTY, lenient = false) {
+        if (window.pirateMode) return true;
         if (tileX === undefined || tileY === undefined || isNaN(tileX) || isNaN(tileY)) return false;
         const wx = wrapTileX(tileX);
         const wy = wrapTileY(tileY);
@@ -379,7 +380,91 @@ class BaseMap {
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'left';
             ctx.fillText(text, sx, sy - 4);
+            ctx.restore();
         }
+    }
+
+    _drawWaterTile(ctx, sx, sy, tx, ty, s) {
+        const waveTime = performance.now() / 800;
+        const waveOffset = Math.sin(waveTime + tx * 0.5 + ty * 0.3) * 3;
+
+        // Ocean Water Deep Blue
+        ctx.fillStyle = '#0f4c81';
+        ctx.fillRect(sx, sy, s, s);
+
+        // Wave lines & foam ripples
+        ctx.strokeStyle = 'rgba(0, 210, 255, 0.28)';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(sx + 4, sy + s * 0.3 + waveOffset);
+        ctx.bezierCurveTo(sx + s * 0.3, sy + s * 0.2 + waveOffset, sx + s * 0.6, sy + s * 0.4 + waveOffset, sx + s - 4, sy + s * 0.3 + waveOffset);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(sx + 8, sy + s * 0.7 - waveOffset);
+        ctx.bezierCurveTo(sx + s * 0.4, sy + s * 0.8 - waveOffset, sx + s * 0.7, sy + s * 0.6 - waveOffset, sx + s - 8, sy + s * 0.75 - waveOffset);
+        ctx.stroke();
+
+        if ((tx * 11 + ty * 17) % 7 === 0) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.fillRect(sx + ((tx * 13) % (s - 8)), sy + ((ty * 19) % (s - 8)), 4, 2);
+        }
+    }
+
+    _drawBeachTile(ctx, sx, sy, tx, ty, s) {
+        // Golden Sandy Beach Shoreline
+        ctx.fillStyle = '#e6ca65';
+        ctx.fillRect(sx, sy, s, s);
+
+        // Sand grains
+        ctx.fillStyle = '#d4b853';
+        const seed = (tx * 7 + ty * 13) % 5;
+        for (let i = 0; i < 4; i++) {
+            ctx.fillRect(sx + ((seed + i * 13) % (s - 4)), sy + ((seed + i * 9) % (s - 4)), 2, 2);
+        }
+
+        if ((tx * 5 + ty * 11) % 13 === 0) {
+            ctx.fillStyle = '#f4ebd0';
+            ctx.beginPath();
+            ctx.arc(sx + s * 0.4, sy + s * 0.4, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    _drawIslandTile(ctx, sx, sy, tx, ty, s) {
+        // Tropical Island Green
+        ctx.fillStyle = '#2a9d8f';
+        ctx.fillRect(sx, sy, s, s);
+
+        ctx.fillStyle = '#218376';
+        ctx.fillRect(sx + 2, sy + 2, s - 4, s - 4);
+
+        if ((tx * 17 + ty * 5) % 9 === 0) {
+            this._drawPalmTree(ctx, sx + s / 2, sy + s / 2);
+        }
+    }
+
+    _drawPalmTree(ctx, x, y) {
+        ctx.save();
+        ctx.strokeStyle = '#6e4726';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x, y + 12);
+        ctx.quadraticCurveTo(x + 4, y, x + 2, y - 10);
+        ctx.stroke();
+
+        ctx.fillStyle = '#1b4332';
+        const topX = x + 2;
+        const topY = y - 10;
+
+        for (let i = 0; i < 5; i++) {
+            const angle = (i * Math.PI * 2) / 5;
+            ctx.beginPath();
+            ctx.arc(topX + Math.cos(angle) * 10, topY + Math.sin(angle) * 8, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
     }
 
     _catalogBuildings() {
@@ -564,6 +649,11 @@ class GameMap extends BaseMap {
     }
 
     generate() {
+        if (window.pirateMode) {
+            this._generatePirateMap();
+            return;
+        }
+
         this.tiles = Array.from({ length: MAP_HEIGHT }, () =>
             Array.from({ length: MAP_WIDTH }, () => TileType.GRASS)
         );
@@ -624,8 +714,94 @@ class GameMap extends BaseMap {
         this._createParks();
     }
 
+    _generatePirateMap() {
+        // Initialize 64x64 grid to ocean water (TileType.ROAD)
+        this.tiles = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => TileType.ROAD)
+        );
+        this.buildingMeta = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => -1)
+        );
+        this.roadDirections = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => null)
+        );
+
+        // Generate exactly 12 non-overlapping islands across the map
+        const cols = 4;
+        const rows = 3;
+        const colSpacing = Math.floor(MAP_WIDTH / cols); // 16 tiles
+        const rowSpacing = Math.floor(MAP_HEIGHT / rows); // 21 tiles
+
+        let islandIndex = 0;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (islandIndex >= 12) break;
+
+                const baseCx = Math.floor(c * colSpacing + colSpacing / 2);
+                const baseCy = Math.floor(r * rowSpacing + rowSpacing / 2);
+                const offsetX = Math.floor((Math.random() - 0.5) * 4);
+                const offsetY = Math.floor((Math.random() - 0.5) * 4);
+
+                const cx = Math.max(4, Math.min(MAP_WIDTH - 5, baseCx + offsetX));
+                const cy = Math.max(4, Math.min(MAP_HEIGHT - 5, baseCy + offsetY));
+
+                // Island dimensions (3x3 to 5x5 core landmass)
+                const w = Math.floor(Math.random() * 3) + 3;
+                const h = Math.floor(Math.random() * 3) + 3;
+
+                const startX = Math.floor(cx - w / 2);
+                const startY = Math.floor(cy - h / 2);
+
+                // 1. Shoreline perimeter (Sandy Beach / SIDEWALK)
+                for (let y = startY - 1; y <= startY + h; y++) {
+                    for (let x = startX - 1; x <= startX + w; x++) {
+                        const wx = wrapTileX(x);
+                        const wy = wrapTileY(y);
+                        this.tiles[wy][wx] = TileType.SIDEWALK;
+                    }
+                }
+
+                // 2. Island Core Landmass (BUILDING)
+                for (let y = startY; y < startY + h; y++) {
+                    for (let x = startX; x < startX + w; x++) {
+                        const wx = wrapTileX(x);
+                        const wy = wrapTileY(y);
+                        this.tiles[wy][wx] = TileType.BUILDING;
+                        this.buildingMeta[wy][wx] = islandIndex % BUILDING_COLORS.length;
+                    }
+                }
+
+                islandIndex++;
+            }
+        }
+    }
+
     _drawTile(ctx, tile, sx, sy, tx, ty) {
         const s = TILE_SIZE;
+
+        if (window.pirateMode) {
+            switch (tile) {
+                case TileType.ROAD:
+                case TileType.ROAD_UP:
+                case TileType.ROAD_DOWN:
+                case TileType.ROAD_LEFT:
+                case TileType.ROAD_RIGHT:
+                case TileType.CROSSWALK:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.SIDEWALK:
+                    this._drawBeachTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.BUILDING:
+                case TileType.BUILDING_DOOR:
+                    this._drawIslandTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                default:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+            }
+        }
+
         switch (tile) {
             case TileType.ROAD:
             case TileType.ROAD_UP:

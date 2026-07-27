@@ -1077,7 +1077,7 @@ class PirateModeManager {
                 ctx.fillStyle = '#ffea00';
                 ctx.font = 'bold 12px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`🗺️ LOC #${this.playerStep + 1}`, screen.x, screen.y - 65 - pulse * 5);
+                ctx.fillText(`🏝️ ISLAND #${this.playerStep + 1}`, screen.x, screen.y - 65 - pulse * 5);
                 ctx.restore();
             }
         } else if (this.treasureBuilding && !this.treasureClaimed) {
@@ -1092,7 +1092,7 @@ class PirateModeManager {
             ctx.fillStyle = '#ffd700';
             ctx.font = 'bold 14px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('🪙 TREASURE CHEST HERE! 🏴‍☠️', screen.x, screen.y - 80 + pulse);
+            ctx.fillText('🪙 TREASURE ISLAND HERE! 🏴‍☠️', screen.x, screen.y - 80 + pulse);
             ctx.restore();
         }
 

@@ -23,12 +23,29 @@ const MAP_PIXEL_W = MAP_WIDTH * TILE_SIZE;
 const MAP_PIXEL_H = MAP_HEIGHT * TILE_SIZE;
 
 // ── Wrapping helpers (used by all modules) ──
-function wrapTileX(x) { return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH; }
-function wrapTileY(y) { return ((y % MAP_HEIGHT) + MAP_HEIGHT) % MAP_HEIGHT; }
-function wrapWorldX(x) { return ((x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W; }
-function wrapWorldY(y) { return ((y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H; }
+function wrapTileX(x) {
+    if (window.pirateMode) return Math.max(0, Math.min(MAP_WIDTH - 1, Math.floor(x)));
+    return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
+}
+function wrapTileY(y) {
+    if (window.pirateMode) return Math.max(0, Math.min(MAP_HEIGHT - 1, Math.floor(y)));
+    return ((y % MAP_HEIGHT) + MAP_HEIGHT) % MAP_HEIGHT;
+}
+function wrapWorldX(x) {
+    if (window.pirateMode) return Math.max(0, Math.min(MAP_PIXEL_W, x));
+    return ((x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+}
+function wrapWorldY(y) {
+    if (window.pirateMode) return Math.max(0, Math.min(MAP_PIXEL_H + 300, y));
+    return ((y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
+}
 
 function wrappedDistance(x1, y1, x2, y2) {
+    if (window.pirateMode) {
+        const dx = x1 - x2;
+        const dy = y1 - y2;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
     let dx = Math.abs(x1 - x2);
     let dy = Math.abs(y1 - y2);
     if (dx > MAP_PIXEL_W / 2) dx = MAP_PIXEL_W - dx;
@@ -37,6 +54,9 @@ function wrappedDistance(x1, y1, x2, y2) {
 }
 
 function nearestWrap(entityX, entityY, camCenterX, camCenterY) {
+    if (window.pirateMode) {
+        return { x: entityX, y: entityY };
+    }
     let dx = (entityX - camCenterX) % MAP_PIXEL_W;
     if (dx > MAP_PIXEL_W / 2) dx -= MAP_PIXEL_W;
     else if (dx < -MAP_PIXEL_W / 2) dx += MAP_PIXEL_W;
@@ -467,6 +487,49 @@ class BaseMap {
         ctx.restore();
     }
 
+    _drawIceWallTile(ctx, sx, sy, tx, ty, s) {
+        ctx.save();
+        const iceGrad = ctx.createLinearGradient(sx, sy, sx, sy + s);
+        iceGrad.addColorStop(0, '#a5f3fc');
+        iceGrad.addColorStop(0.5, '#38bdf8');
+        iceGrad.addColorStop(1, '#0284c7');
+        ctx.fillStyle = iceGrad;
+        ctx.fillRect(sx, sy, s, s);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + s);
+        ctx.lineTo(sx + 10, sy + 12);
+        ctx.lineTo(sx + 22, sy + s * 0.7);
+        ctx.lineTo(sx + 35, sy + 4);
+        ctx.lineTo(sx + 50, sy + s * 0.8);
+        ctx.lineTo(sx + s, sy + 16);
+        ctx.lineTo(sx + s, sy + s);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.9)';
+        ctx.beginPath();
+        ctx.moveTo(sx + 8, sy + s);
+        ctx.lineTo(sx + 14, sy + s + 12);
+        ctx.lineTo(sx + 20, sy + s);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(sx + 38, sy + s);
+        ctx.lineTo(sx + 44, sy + s + 16);
+        ctx.lineTo(sx + 50, sy + s);
+        ctx.fill();
+
+        if (tx === 31 || tx === 32) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 9px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('🧊 GIANT ICE WALL 🧊', sx + s / 2, sy + s / 2);
+        }
+        ctx.restore();
+    }
+
     _catalogBuildings() {
         this.buildings = [];
         const visited = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
@@ -780,6 +843,10 @@ class GameMap extends BaseMap {
         const s = TILE_SIZE;
 
         if (window.pirateMode) {
+            if (ty === 0) {
+                this._drawIceWallTile(ctx, sx, sy, tx, ty, s);
+                return;
+            }
             switch (tile) {
                 case TileType.ROAD:
                 case TileType.ROAD_UP:

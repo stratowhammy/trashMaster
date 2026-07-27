@@ -582,6 +582,8 @@ class PirateModeManager {
         this.playerImmunityTimer = 0;
         this.playerCannonAmmo = 8; // Starts with 8 cannon balls
         this.cannonCooldown = 0;
+        this.sailedOffEarth = false;
+        this.offEarthTimer = 0;
         this.initialized = false;
     }
 
@@ -616,6 +618,8 @@ class PirateModeManager {
         this.playerImmunityTimer = 0;
         this.playerCannonAmmo = 8; // Starts with 8 cannon balls
         this.cannonCooldown = 0;
+        this.sailedOffEarth = false;
+        this.offEarthTimer = 0;
 
         // Spawn 12 packs of 8 cannonballs across the map
         for (let i = 0; i < 12; i++) {
@@ -872,7 +876,27 @@ class PirateModeManager {
     }
 
 
+    triggerSailedOffEarth(game) {
+        if (this.sailedOffEarth) return;
+        this.sailedOffEarth = true;
+        this.offEarthTimer = 2.5;
+        if (window.soundManager && window.soundManager.playEngageSFX) {
+            window.soundManager.playEngageSFX();
+        }
+    }
+
     update(dt, game) {
+        if (this.sailedOffEarth) {
+            this.offEarthTimer -= dt;
+            if (this.offEarthTimer <= 0) {
+                this.sailedOffEarth = false;
+                if (typeof showScreen === 'function') {
+                    showScreen('store-screen');
+                }
+            }
+            return;
+        }
+
         if (!this.initialized) {
             this.init(game);
         }
@@ -989,6 +1013,29 @@ class PirateModeManager {
     }
 
     render(ctx, camera, spriteManager, canvasW, canvasH) {
+        // Render Flat Earth Sailing-Off-The-Edge Black Screen Overlay
+        if (this.sailedOffEarth) {
+            ctx.save();
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvasW, canvasH);
+
+            ctx.fillStyle = '#ff4444';
+            ctx.font = 'bold 14px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('🌊☠️ YOU HAVE SAILED OFF THE EDGE OF THE EARTH! ☠️🌊', canvasW / 2, canvasH / 2 - 20);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '10px "Press Start 2P", monospace';
+            ctx.fillText('Your ship has plunged into the cosmic void...', canvasW / 2, canvasH / 2 + 20);
+
+            ctx.fillStyle = '#888888';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.fillText('Returning to Store...', canvasW / 2, canvasH / 2 + 60);
+
+            ctx.restore();
+            return;
+        }
+
         // Render Cannonball Packs on map
         for (const pack of this.cannonballPacks) {
             if (!pack.active) continue;

@@ -90,8 +90,24 @@ class Player {
                 effectiveMultiplier = effectiveMultiplier / (this.athleteBaseMultiplier || 1.0);
             }
             const currentSpeed = (window.pirateMode ? 8.5 : this.speed) * effectiveMultiplier;
-            const newX = this.x + dx * currentSpeed * 60 * dt;
-            const newY = this.y + dy * currentSpeed * 60 * dt;
+            let newX = this.x + dx * currentSpeed * 60 * dt;
+            let newY = this.y + dy * currentSpeed * 60 * dt;
+
+            if (window.pirateMode) {
+                // Left and right ocean boundaries
+                newX = Math.max(32, Math.min(MAP_PIXEL_W - 32, newX));
+                // Top Giant Ice Wall boundary (y <= 32 blocked!)
+                newY = Math.max(32, newY);
+
+                // Bottom edge: Sail off the edge of the Earth!
+                if (this.y + dy * currentSpeed * 60 * dt >= MAP_PIXEL_H + 30) {
+                    this.y = MAP_PIXEL_H + 40;
+                    if (window.game && window.game.pirateModeManager) {
+                        window.game.pirateModeManager.triggerSailedOffEarth(window.game);
+                    }
+                    return;
+                }
+            }
 
             if (this._canMoveTo(newX, this.y, gameMap)) this.x = newX;
             if (this._canMoveTo(this.x, newY, gameMap)) this.y = newY;

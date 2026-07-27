@@ -898,6 +898,22 @@ class GameMap extends BaseMap {
                 islandIndex++;
             }
         }
+
+        // Ensure there is a Sea Dump Dock accessible on water for ships
+        const dumpTX = 10;
+        const dumpTY = 10;
+        this.tiles[dumpTY][dumpTX] = TileType.BUILDING_DOOR;
+        this.buildings.push({
+            id: 999,
+            address: 'SEA DUMP DOCK',
+            tiles: [{ x: dumpTX, y: dumpTY }],
+            doorTiles: [{ x: dumpTX, y: dumpTY }],
+            type: 'dump',
+            x: dumpTX * TILE_SIZE,
+            y: dumpTY * TILE_SIZE,
+            width: TILE_SIZE,
+            height: TILE_SIZE
+        });
     }
 
     _drawTile(ctx, tile, sx, sy, tx, ty) {
@@ -906,6 +922,36 @@ class GameMap extends BaseMap {
         if (window.pirateMode) {
             if (ty === 0) {
                 this._drawIceWallTile(ctx, sx, sy, tx, ty, s);
+                return;
+            }
+
+            const bldg = this.getBuildingAtTile(tx, ty);
+            if (bldg && bldg.type === 'dump') {
+                this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                // Draw Floating Sea Dump Dock / Wooden Barge
+                ctx.save();
+                ctx.fillStyle = '#6e4726';
+                ctx.fillRect(sx + 4, sy + 4, s - 8, s - 8);
+                ctx.strokeStyle = '#4a2f18';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(sx + 4, sy + 4, s - 8, s - 8);
+
+                ctx.fillStyle = '#222222';
+                ctx.fillRect(sx + 12, sy + 12, s - 24, s - 24);
+
+                ctx.fillStyle = '#00ff88';
+                ctx.font = 'bold 9px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🗑️ DUMP', sx + s / 2, sy + s / 2 + 3);
+
+                const pulse = Math.sin(performance.now() / 150) * 3;
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx + s / 2, sy + s / 2, 28 + pulse, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
                 return;
             }
             switch (tile) {

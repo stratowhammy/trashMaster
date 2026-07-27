@@ -89,31 +89,37 @@ class Car {
             ctx.rotate(angle);
 
             const isGreen = this.color === 'green';
-            ctx.fillStyle = isGreen ? '#22b14c' : '#ed1c24';
-            
-            // Boat hull
-            ctx.beginPath();
-            ctx.moveTo(0, -22);
-            ctx.quadraticCurveTo(14, -5, 12, 18);
-            ctx.lineTo(-12, 18);
-            ctx.quadraticCurveTo(-14, -5, 0, -22);
-            ctx.fill();
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            const img = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage('pirate_ship') : null;
 
-            // Mast & Sail
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-2, -10, 4, 18);
-            ctx.beginPath();
-            ctx.moveTo(0, -12);
-            ctx.lineTo(10, -2);
-            ctx.lineTo(0, 4);
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = '#333333';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+                ctx.drawImage(img, -28, -28, 56, 56);
+            } else {
+                ctx.fillStyle = isGreen ? '#22b14c' : '#ed1c24';
+                
+                // Boat hull
+                ctx.beginPath();
+                ctx.moveTo(0, -22);
+                ctx.quadraticCurveTo(14, -5, 12, 18);
+                ctx.lineTo(-12, 18);
+                ctx.quadraticCurveTo(-14, -5, 0, -22);
+                ctx.fill();
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Mast & Sail
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-2, -10, 4, 18);
+                ctx.beginPath();
+                ctx.moveTo(0, -12);
+                ctx.lineTo(10, -2);
+                ctx.lineTo(0, 4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#333333';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
 
             // Flag
             ctx.fillStyle = isGreen ? '#00ff66' : '#ff3366';

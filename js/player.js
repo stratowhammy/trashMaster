@@ -126,36 +126,25 @@ class Player {
             const curTY = this.getTileY();
             const curTile = gameMap.getTile(curTX, curTY);
 
-            if (!this.onFoot) {
-                // Sailing in boat. Dock when reaching beach shore (SIDEWALK) or island land (BUILDING)
-                if (curTile === TileType.SIDEWALK || curTile === TileType.BUILDING || curTile === TileType.BUILDING_DOOR) {
-                    this.onFoot = true;
-                    this.dockedBoat = { x: this.x, y: this.y, direction: this.direction };
-                    if (window.game && window.game.hud) {
-                        window.game.hud.showFollowerNotification('⚓ BOAT DOCKED! Disembarked on foot to explore island! 🏝️', true);
-                    }
-                }
-            } else if (this.onFoot && this.dockedBoat) {
-                // Exploring island on foot. Check returning to docked boat
-                const wBoat = typeof nearestWrap === 'function' ? nearestWrap(this.dockedBoat.x, this.dockedBoat.y, this.x, this.y) : this.dockedBoat;
-                const dxB = this.x - wBoat.x;
-                const dyB = this.y - wBoat.y;
-                const distToBoat = Math.sqrt(dxB * dxB + dyB * dyB);
+            const wasOnFoot = this.onFoot;
+            const isIslandLand = (curTile === TileType.SIDEWALK || curTile === TileType.BUILDING || curTile === TileType.BUILDING_DOOR);
+            this.onFoot = isIslandLand;
 
-                if (distToBoat < 42 && this.moving) {
-                    this.onFoot = false;
-                    this.x = wBoat.x;
-                    this.y = wBoat.y;
-                    this.dockedBoat = null;
-                    if (window.game && window.game.hud) {
-                        window.game.hud.showFollowerNotification('⛵ RE-EMBARKED ONTO BOAT! Sailing open waters! 🌊', true);
-                    }
+            if (!wasOnFoot && this.onFoot) {
+                if (window.game && window.game.hud) {
+                    window.game.hud.showFollowerNotification('⚓ DISEMBARKED ONTO ISLAND! Exploring on foot! 🏝️', true);
+                }
+            } else if (wasOnFoot && !this.onFoot) {
+                if (window.game && window.game.hud) {
+                    window.game.hud.showFollowerNotification('⛵ EMBARKED ONTO PIRATE SHIP! Sailing open waters! 🌊', true);
                 }
             }
         }
     }
 
     _canMoveTo(newX, newY, gameMap) {
+        if (window.pirateMode) return true; // Completely smooth & seamless island entry/exit
+
         const hs = this.size / 2 - 12; // Inset collision bounds by 12px for smooth door/corridor entry
         const corners = [
             { x: newX - hs, y: newY - hs }, { x: newX + hs, y: newY - hs },
@@ -182,23 +171,6 @@ class Player {
                 }
                 return false;
             }
-        }
-
-        // Pirate Mode: Ocean water acts as impassable boundary when on foot
-        if (window.pirateMode && this.onFoot) {
-            const targetTileX = wrapTileX(Math.floor(newX / TILE_SIZE));
-            const targetTileY = wrapTileY(Math.floor(newY / TILE_SIZE));
-            const targetTile = gameMap.getTile(targetTileX, targetTileY);
-
-            if (targetTile === TileType.ROAD || targetTile === TileType.ROAD_UP || targetTile === TileType.ROAD_DOWN || targetTile === TileType.ROAD_LEFT || targetTile === TileType.ROAD_RIGHT || targetTile === TileType.CROSSWALK) {
-                if (this.dockedBoat) {
-                    const wBoat = typeof nearestWrap === 'function' ? nearestWrap(this.dockedBoat.x, this.dockedBoat.y, newX, newY) : this.dockedBoat;
-                    const distToBoat = Math.sqrt((newX - wBoat.x)**2 + (newY - wBoat.y)**2);
-                    if (distToBoat < 45) return true;
-                }
-                return false;
-            }
-            return true;
         }
 
         // 1. Check center tile transition strictly!

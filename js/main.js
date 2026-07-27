@@ -380,19 +380,22 @@ class Game {
                     }
 
                     // Dump interaction
-                    if (window.playerHasTruck > 0) {
+                    if (window.playerHasTruck > 0 || window.pirateMode) {
                         const px = wrapWorldX(this.player.x);
                         const py = wrapWorldY(this.player.y);
-                        const dumpBldg = this.gameMap.buildings.find(b => b.type === 'dump');
-                        if (dumpBldg && dumpBldg.doorTiles.length > 0) {
+                        const dumpBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'dump') : null;
+                        if (dumpBldg && dumpBldg.doorTiles && dumpBldg.doorTiles.length > 0) {
                             const door = dumpBldg.doorTiles[0];
                             const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
-                            if (dist < TILE_SIZE * 1.5) {
+                            if (dist < TILE_SIZE * 2.5) {
                                 if (this.trashCollectedInTruck > 0) {
+                                    const amt = this.trashCollectedInTruck;
                                     this.trashCollectedInTruck = 0;
-                                    this.hud.showFollowerNotification("Unloaded garbage at the Dump!", true);
+                                    this.trashManager.totalPoints += amt * 25;
+                                    this.hud.updateScore(this.trashManager.totalPoints);
+                                    this.hud.showFollowerNotification(`🗑️ Unloaded ${amt} trash load at the Sea Dump Dock! +$${(amt * 25).toLocaleString()}! 🏴‍☠️`, true);
                                 } else {
-                                    this.hud.showFollowerNotification("Garbage truck is already empty.", true);
+                                    this.hud.showFollowerNotification("Hold is already empty of trash.", true);
                                 }
                                 return;
                             }

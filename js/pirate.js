@@ -297,20 +297,33 @@ class NpcPirateMember {
         ctx.save();
 
         if (!this.onFoot) {
-            // ── In Water: Each rival pirate travels in their OWN pirate boat ──
+            // ── In Water: Each rival pirate travels in their OWN pirate boat with RED OUTLINE ──
             const boatImg = spriteManager ? spriteManager.getImage('pirate_ship') : null;
             const drawSize = 64;
+
+            ctx.save();
+            ctx.translate(screen.x, screen.y);
+            if (this.direction === 'left') {
+                ctx.scale(-1, 1);
+            }
+
+            // Flashing Red Outline Glow around Rival Pirate Ship
+            const rPulse = Math.sin(performance.now() / 100) * 0.4 + 0.6;
+            ctx.strokeStyle = `rgba(255, 0, 0, ${rPulse})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(0, 0, 32, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-drawSize / 2 - 2, -drawSize / 2 - 2, drawSize + 4, drawSize + 4);
+
             if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
-                if (this.direction === 'left') {
-                    ctx.translate(screen.x, screen.y);
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(boatImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
-                } else {
-                    ctx.drawImage(boatImg, screen.x - drawSize / 2, screen.y - drawSize / 2, drawSize, drawSize);
-                }
+                ctx.drawImage(boatImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             } else {
                 ctx.fillStyle = '#8b0000';
-                ctx.fillRect(screen.x - 24, screen.y - 16, 48, 32);
+                ctx.fillRect(-24, -16, 48, 32);
             }
             ctx.restore();
 
@@ -320,10 +333,10 @@ class NpcPirateMember {
                 ctx.textAlign = 'center';
                 ctx.fillText(`STUNNED (${Math.ceil(this.stunTimer)}s)`, screen.x, screen.y - 38);
             } else {
-                ctx.fillStyle = '#ffea00';
-                ctx.font = '8px "Press Start 2P", monospace';
+                ctx.fillStyle = '#ff3333';
+                ctx.font = 'bold 9px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`⛵ Rival #${this.index + 1}`, screen.x, screen.y - 36);
+                ctx.fillText(`🏴‍☠️ Rival Ship #${this.index + 1}`, screen.x, screen.y - 38);
             }
             return;
         }

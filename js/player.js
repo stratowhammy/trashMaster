@@ -28,6 +28,8 @@ class Player {
         this.fertilizers = 0;           // Scientist gets 10; does not count vs inventory slots
         this.capturedAnimals = [];      // Ranger: captured animal objects
         this.speedMultiplier = 1.0;     // Can be overridden by character class or items
+        this.onFoot = false;            // Pirate Mode: false when sailing in boat, true when disembarked on island
+        this.dockedBoat = null;         // Pirate Mode: { x, y, direction } of anchored boat on shore
     }
 
     handleKeyDown(e) {
@@ -102,6 +104,39 @@ class Player {
             this.positionHistory.push({ x: this.x, y: this.y });
             if (this.positionHistory.length > this.historyMaxLength) this.positionHistory.shift();
         }
+
+        if (window.pirateMode && gameMap) {
+            const curTX = this.getTileX();
+            const curTY = this.getTileY();
+            const curTile = gameMap.getTile(curTX, curTY);
+
+            if (!this.onFoot) {
+                // Sailing in boat. Dock when reaching beach shore (SIDEWALK) or island land (BUILDING)
+                if (curTile === TileType.SIDEWALK || curTile === TileType.BUILDING || curTile === TileType.BUILDING_DOOR) {
+                    this.onFoot = true;
+                    this.dockedBoat = { x: this.x, y: this.y, direction: this.direction };
+                    if (window.game && window.game.hud) {
+                        window.game.hud.showFollowerNotification('⚓ BOAT DOCKED! Disembarked on foot to explore island! 🏝️', true);
+                    }
+                }
+            } else if (this.onFoot && this.dockedBoat) {
+                // Exploring island on foot. Check returning to docked boat
+                const wBoat = typeof nearestWrap === 'function' ? nearestWrap(this.dockedBoat.x, this.dockedBoat.y, this.x, this.y) : this.dockedBoat;
+                const dxB = this.x - wBoat.x;
+                const dyB = this.y - wBoat.y;
+                const distToBoat = Math.sqrt(dxB * dxB + dyB * dyB);
+
+                if (distToBoat < 42 && this.moving) {
+                    this.onFoot = false;
+                    this.x = wBoat.x;
+                    this.y = wBoat.y;
+                    this.dockedBoat = null;
+                    if (window.game && window.game.hud) {
+                        window.game.hud.showFollowerNotification('⛵ RE-EMBARKED ONTO BOAT! Sailing open waters! 🌊', true);
+                    }
+                }
+            }
+        }
     }
 
     _canMoveTo(newX, newY, gameMap) {
@@ -133,6 +168,23 @@ class Player {
             }
         }
 
+        // Pirate Mode: Ocean water acts as impassable boundary when on foot
+        if (window.pirateMode && this.onFoot) {
+            const targetTileX = wrapTileX(Math.floor(newX / TILE_SIZE));
+            const targetTileY = wrapTileY(Math.floor(newY / TILE_SIZE));
+            const targetTile = gameMap.getTile(targetTileX, targetTileY);
+
+            if (targetTile === TileType.ROAD || targetTile === TileType.ROAD_UP || targetTile === TileType.ROAD_DOWN || targetTile === TileType.ROAD_LEFT || targetTile === TileType.ROAD_RIGHT || targetTile === TileType.CROSSWALK) {
+                if (this.dockedBoat) {
+                    const wBoat = typeof nearestWrap === 'function' ? nearestWrap(this.dockedBoat.x, this.dockedBoat.y, newX, newY) : this.dockedBoat;
+                    const distToBoat = Math.sqrt((newX - wBoat.x)**2 + (newY - wBoat.y)**2);
+                    if (distToBoat < 45) return true;
+                }
+                return false;
+            }
+            return true;
+        }
+
         // 1. Check center tile transition strictly!
         if (!gameMap.isWalkable(targetWX, targetWY, curTX, curTY, false)) {
             return false;
@@ -154,19 +206,36 @@ class Player {
     getTileY() { return wrapTileY(Math.floor(this.y / TILE_SIZE)); }
 
     render(ctx, camera, spriteManager) {
+        // Render docked boat on shore if player is exploring island on foot
+        if (window.pirateMode && this.onFoot && this.dockedBoat) {
+            const bScreen = camera.worldToScreen(this.dockedBoat.x, this.dockedBoat.y);
+            const boatImg = spriteManager.getImage('pirate_ship');
+            if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
+                ctx.save();
+                ctx.translate(bScreen.x, bScreen.y);
+                if (this.dockedBoat.direction === 'left') ctx.scale(-1, 1);
+                ctx.drawImage(boatImg, -32, -32, 64, 64);
+                ctx.restore();
+            }
+            ctx.fillStyle = '#ffea00';
+            ctx.font = 'bold 8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('⚓ DOCKED BOAT', bScreen.x, bScreen.y - 36);
+        }
+
         const screen = camera.worldToScreen(this.x, this.y);
         let drawSize = 64;
         
         let imgId = this.spriteId;
         if (window.pirateMode) {
-            imgId = 'pirate_ship';
+            imgId = this.onFoot ? (this.spriteId || 'char1') : 'pirate_ship';
         } else if (window.crimeMode) {
             imgId = 'black_cadillac';
         } else if (window.politicsMode) {
             imgId = 'black_suv';
         }
         
-        const img = spriteManager.getImage(imgId);
+        const img = (window.pirateMode && this.onFoot) ? spriteManager.getCharacterImage(imgId) : spriteManager.getImage(imgId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
             let bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 1.5 : 0;

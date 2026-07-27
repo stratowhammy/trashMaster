@@ -17,6 +17,36 @@ class Car {
     update(dt, gameMap) {
         if (!this.active) return;
 
+        if (window.pirateMode && gameMap) {
+            let nextX = this.x + this.dir[0] * this.speed * dt;
+            let nextY = this.y + this.dir[1] * this.speed * dt;
+            const mapWidthPx = MAP_WIDTH * TILE_SIZE;
+            const mapHeightPx = MAP_HEIGHT * TILE_SIZE;
+            nextX = (nextX + mapWidthPx) % mapWidthPx;
+            nextY = (nextY + mapHeightPx) % mapHeightPx;
+
+            const tx = Math.floor(nextX / TILE_SIZE);
+            const ty = Math.floor(nextY / TILE_SIZE);
+            const tile = gameMap.getTile(tx, ty);
+
+            // Encountered island shore or landmass boundary! Turn around & pick a random water direction
+            if (tile === TileType.SIDEWALK || tile === TileType.BUILDING || tile === TileType.BUILDING_DOOR) {
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.707, 0.707], [-0.707, 0.707], [0.707, -0.707], [-0.707, -0.707]];
+                this.dir = dirs[Math.floor(Math.random() * dirs.length)];
+                return;
+            }
+
+            // Haphazard sailing direction shifts in open water
+            if (Math.random() < 0.02) {
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.707, 0.707], [-0.707, 0.707], [0.707, -0.707], [-0.707, -0.707]];
+                this.dir = dirs[Math.floor(Math.random() * dirs.length)];
+            }
+
+            this.x = nextX;
+            this.y = nextY;
+            return;
+        }
+
         let nextX = this.x + this.dir[0] * this.speed * dt;
         let nextY = this.y + this.dir[1] * this.speed * dt;
 
@@ -51,6 +81,47 @@ class Car {
         if (!this.active) return;
         const screen = camera.worldToScreen(this.x, this.y);
         if (!camera.isVisible(this.x - 20, this.y - 20, 40, 40)) return;
+
+        if (window.pirateMode) {
+            ctx.save();
+            ctx.translate(screen.x, screen.y);
+            let angle = Math.atan2(this.dir[0], -this.dir[1]);
+            ctx.rotate(angle);
+
+            const isGreen = this.color === 'green';
+            ctx.fillStyle = isGreen ? '#22b14c' : '#ed1c24';
+            
+            // Boat hull
+            ctx.beginPath();
+            ctx.moveTo(0, -22);
+            ctx.quadraticCurveTo(14, -5, 12, 18);
+            ctx.lineTo(-12, 18);
+            ctx.quadraticCurveTo(-14, -5, 0, -22);
+            ctx.fill();
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Mast & Sail
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-2, -10, 4, 18);
+            ctx.beginPath();
+            ctx.moveTo(0, -12);
+            ctx.lineTo(10, -2);
+            ctx.lineTo(0, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Flag
+            ctx.fillStyle = isGreen ? '#00ff66' : '#ff3366';
+            ctx.fillRect(0, -16, 6, 4);
+
+            ctx.restore();
+            return;
+        }
 
         ctx.save();
         ctx.translate(screen.x, screen.y);

@@ -142,8 +142,11 @@ class Follower {
         const screen = camera.worldToScreen(this.x, this.y);
         const drawSize = 64;
 
-        // ── Pirate Mode: draw posse member as pixel pirate (black + BLUE bandana) ──
+        // ── Pirate Mode: draw posse member as pixel pirate when disembarked on foot ──
         if (window.pirateMode) {
+            if (window.game && window.game.player && !window.game.player.onFoot) {
+                return; // Followers are aboard the sailing ship with player
+            }
             ctx.save();
             const bob = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
             const s = screen.x;

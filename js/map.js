@@ -294,6 +294,24 @@ class BaseMap {
         return this.tiles[wrapTileY(tileY)][wrapTileX(tileX)];
     }
 
+    getIslandGreenTiles() {
+        const greenTiles = [];
+        if (!this.tiles) return greenTiles;
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (this.tiles[y][x] === TileType.BUILDING) {
+                    greenTiles.push({
+                        tileX: x,
+                        tileY: y,
+                        x: x * TILE_SIZE + TILE_SIZE / 2,
+                        y: y * TILE_SIZE + TILE_SIZE / 2
+                    });
+                }
+            }
+        }
+        return greenTiles;
+    }
+
     isParkTile(tx, ty) {
         if (!this.parkBlocks) return null;
         for (const park of this.parkBlocks) {

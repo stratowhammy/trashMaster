@@ -161,17 +161,26 @@ class NpcPirateMember {
         this.x = startX;
         this.y = startY;
         this.index = index;
-        this.speed = 80 + Math.random() * 30; // 80–110 px/sec
+        this.speedBoat = 180 + (index * 10); // Faster boat speed ~180-210 px/sec
+        this.speedFoot = 135 + (index * 5);  // Faster foot speed ~135-150 px/sec
         this.stunTimer = 0;
         this.immunityTimer = 0;
         this.ammo = 8; // Starts with 8 cannon balls
         this.alive = true;
         this.direction = 'right';
         this.animTimer = 0;
-        this.shootCooldown = 3 + Math.random() * 2; // stagger initial shots
+        this.shootCooldown = 2 + Math.random() * 2;
+        this.onFoot = false;
+        // Unique offset per pirate member when disembarked on foot so they separate on islands
+        const angles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+        const angle = angles[index % 4];
+        this.targetOffset = {
+            x: Math.cos(angle) * 35,
+            y: Math.sin(angle) * 35
+        };
     }
 
-    update(dt, targetLocation, game) {
+    update(dt, targetLocation, game, allMembers = []) {
         if (!this.alive) return;
 
         this.animTimer += dt;
@@ -184,21 +193,64 @@ class NpcPirateMember {
         if (this.immunityTimer > 0) this.immunityTimer -= dt;
         if (this.shootCooldown > 0) this.shootCooldown -= dt;
 
+        // Check if pirate is on foot (disembarked on island) or on boat (water)
+        if (game && game.gameMap) {
+            const tx = wrapTileX(Math.floor(this.x / TILE_SIZE));
+            const ty = wrapTileY(Math.floor(this.y / TILE_SIZE));
+            const tile = game.gameMap.getTile(tx, ty);
+            this.onFoot = (tile === TileType.SIDEWALK || tile === TileType.BUILDING || tile === TileType.BUILDING_DOOR);
+        }
+
         if (!targetLocation) return;
 
-        const wTarget = typeof nearestWrap === 'function'
-            ? nearestWrap(targetLocation.x, targetLocation.y, this.x, this.y)
-            : { x: targetLocation.x, y: targetLocation.y };
+        let tX = targetLocation.x;
+        let tY = targetLocation.y;
 
-        const dx = wTarget.x - this.x;
-        const dy = wTarget.y - this.y;
+        // Apply separation offset when disembarked on foot
+        if (this.onFoot) {
+            tX += this.targetOffset.x;
+            tY += this.targetOffset.y;
+        }
+
+        const wTarget = typeof nearestWrap === 'function'
+            ? nearestWrap(tX, tY, this.x, this.y)
+            : { x: tX, y: tY };
+
+        let dx = wTarget.x - this.x;
+        let dy = wTarget.y - this.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist > 5) {
-            const nx = dx / dist;
-            const ny = dy / dist;
-            this.x += nx * this.speed * dt;
-            this.y += ny * this.speed * dt;
+        // Repulsion force to separate rival pirates when disembarked on foot
+        let moveDirX = dist > 0.001 ? dx / dist : 0;
+        let moveDirY = dist > 0.001 ? dy / dist : 0;
+
+        if (this.onFoot && allMembers && allMembers.length > 1) {
+            let repelX = 0, repelY = 0;
+            for (const other of allMembers) {
+                if (other === this || !other.alive || !other.onFoot) continue;
+                const oDx = this.x - other.x;
+                const oDy = this.y - other.y;
+                const oDist = Math.sqrt(oDx * oDx + oDy * oDy);
+                if (oDist < 40 && oDist > 0.1) {
+                    const force = (40 - oDist) / 40;
+                    repelX += (oDx / oDist) * force;
+                    repelY += (oDy / oDist) * force;
+                }
+            }
+            moveDirX += repelX * 0.7;
+            moveDirY += repelY * 0.7;
+            const moveLen = Math.sqrt(moveDirX * moveDirX + moveDirY * moveDirY);
+            if (moveLen > 0.001) {
+                moveDirX /= moveLen;
+                moveDirY /= moveLen;
+            }
+        }
+
+        const currentSpeed = this.onFoot ? this.speedFoot : this.speedBoat;
+
+        if (dist > 5 || (this.onFoot && Math.sqrt(dx * dx + dy * dy) > 10)) {
+            this.x += moveDirX * currentSpeed * dt;
+            this.y += moveDirY * currentSpeed * dt;
 
             // Wrap
             if (typeof MAP_PIXEL_W !== 'undefined') {
@@ -221,8 +273,8 @@ class NpcPirateMember {
             const pdx = pw.x - this.x;
             const pdy = pw.y - this.y;
             const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
-            if (pdist < 320 && pdist > 20) {
-                this.shootCooldown = 4.0 + Math.random() * 2;
+            if (pdist < 340 && pdist > 20) {
+                this.shootCooldown = 3.0 + Math.random() * 2;
                 this.ammo--;
                 if (game.pirateModeManager) {
                     game.pirateModeManager.cannonballs.push(
@@ -233,20 +285,51 @@ class NpcPirateMember {
         }
     }
 
-    render(ctx, camera) {
+    render(ctx, camera, spriteManager) {
         if (!this.alive) return;
         const wPos = typeof nearestWrap === 'function'
             ? nearestWrap(this.x, this.y, camera.getCenterX(), camera.getCenterY())
             : { x: this.x, y: this.y };
 
-        if (!camera.isVisible(wPos.x - 40, wPos.y - 40, 80, 80)) return;
+        if (!camera.isVisible(wPos.x - 50, wPos.y - 50, 100, 100)) return;
         const screen = camera.worldToScreen(wPos.x, wPos.y);
 
         ctx.save();
 
-        const bob = Math.sin(this.animTimer * 3.5) * 2;
+        if (!this.onFoot) {
+            // ── In Water: Each rival pirate travels in their OWN pirate boat ──
+            const boatImg = spriteManager ? spriteManager.getImage('pirate_ship') : null;
+            const drawSize = 64;
+            if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
+                if (this.direction === 'left') {
+                    ctx.translate(screen.x, screen.y);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(boatImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.drawImage(boatImg, screen.x - drawSize / 2, screen.y - drawSize / 2, drawSize, drawSize);
+                }
+            } else {
+                ctx.fillStyle = '#8b0000';
+                ctx.fillRect(screen.x - 24, screen.y - 16, 48, 32);
+            }
+            ctx.restore();
 
-        // ── Pixel-art pirate (black coat, red bandana) ──
+            if (this.stunTimer > 0) {
+                ctx.fillStyle = '#ff3333';
+                ctx.font = 'bold 9px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`STUNNED (${Math.ceil(this.stunTimer)}s)`, screen.x, screen.y - 38);
+            } else {
+                ctx.fillStyle = '#ffea00';
+                ctx.font = '8px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`⛵ Rival #${this.index + 1}`, screen.x, screen.y - 36);
+            }
+            return;
+        }
+
+        // ── Disembarked on Island: Render individual pirate on foot ──
+        const bob = Math.sin(this.animTimer * 4.0) * 2;
         const s = screen.x;
         const t = screen.y + bob;
 
@@ -278,7 +361,6 @@ class NpcPirateMember {
         // Red bandana
         ctx.fillStyle = '#dc2626';
         ctx.fillRect(s - 11, t - 28, 22, 8);
-        // Bandana knot
         ctx.fillRect(s + 9, t - 22, 5, 4);
 
         // Eyes
@@ -286,7 +368,7 @@ class NpcPirateMember {
         ctx.fillRect(s - 5, t - 22, 3, 3);
         ctx.fillRect(s + 2, t - 22, 3, 3);
 
-        // Stun indicator
+        // Stun indicator or pirate label
         if (this.stunTimer > 0) {
             ctx.fillStyle = '#ff3333';
             ctx.font = 'bold 9px "Press Start 2P", monospace';
@@ -296,7 +378,7 @@ class NpcPirateMember {
             ctx.fillStyle = '#ff4444';
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(`🏴‍☠️ ${this.index + 1}`, s, t - 38);
+            ctx.fillText(`🏴‍☠️ Pirate #${this.index + 1}`, s, t - 38);
         }
 
         ctx.restore();
@@ -318,8 +400,8 @@ class NpcPirateCrew {
         this.members = [];
         const count = 4;
         for (let i = 0; i < count; i++) {
-            const ox = (Math.random() - 0.5) * 120;
-            const oy = (Math.random() - 0.5) * 120;
+            const ox = (Math.random() - 0.5) * 80;
+            const oy = (Math.random() - 0.5) * 80;
             this.members.push(new NpcPirateMember(startX + ox, startY + oy, i));
         }
     }
@@ -333,7 +415,7 @@ class NpcPirateCrew {
                 : { x: target.x, y: target.y };
             const dx = m.x - wt.x;
             const dy = m.y - wt.y;
-            if (Math.sqrt(dx * dx + dy * dy) < 100) return true;
+            if (Math.sqrt(dx * dx + dy * dy) < 90) return true;
         }
         return false;
     }
@@ -347,7 +429,7 @@ class NpcPirateCrew {
                 this.currentStep++;
                 if (this.currentStep < 8) {
                     if (game && game.hud) {
-                        game.hud.showFollowerNotification(`🏴‍☠️ Rival Pirate Crew tagged Location ${this.currentStep}/8!`, false);
+                        game.hud.showFollowerNotification(`🏴‍☠️ Rival Pirates tagged Location ${this.currentStep}/8!`, false);
                     }
                 } else if (this.currentStep === 8) {
                     if (game && game.hud) {
@@ -367,203 +449,49 @@ class NpcPirateCrew {
 
         const target = this.rivalWon ? null : this.locations[Math.min(this.currentStep, this.locations.length - 1)];
         for (const m of this.members) {
-            m.update(dt, target, game);
+            m.update(dt, target, game, this.members);
         }
     }
 
-    render(ctx, camera) {
+    render(ctx, camera, spriteManager) {
         for (const m of this.members) {
-            m.render(ctx, camera);
+            m.render(ctx, camera, spriteManager);
         }
     }
 }
 
 class RivalPirateShip {
-
     constructor(startX, startY) {
         this.x = startX;
         this.y = startY;
-        this.speed = 110; // speed in px/sec
+        this.speed = 180;
         this.stunTimer = 0;
         this.immunityTimer = 0;
-        this.ammo = 8; // Starts with 8 cannon balls
+        this.ammo = 16;
         this.alive = true;
         this.targets = [];
         this.currentTargetIndex = 0;
-        this.shootCooldown = 0;
         this.direction = 'right';
     }
 
     setTargets(locations) {
         this.targets = locations;
-        this.currentTargetIndex = 0;
     }
 
     update(dt, game) {
-        if (!this.alive) return;
-
-        // Update stun timer
-        if (this.stunTimer > 0) {
-            this.stunTimer -= dt;
-            return; // Cannot move or shoot while stunned
-        }
-
-        if (this.immunityTimer > 0) {
-            this.immunityTimer -= dt;
-        }
-
-        // Shoot cooldown
-        if (this.shootCooldown > 0) {
-            this.shootCooldown -= dt;
-        }
-
-        if (!this.targets || this.targets.length === 0) return;
-
-        const currentTarget = this.targets[Math.min(this.currentTargetIndex, this.targets.length - 1)];
-        if (!currentTarget || isNaN(currentTarget.x) || isNaN(currentTarget.y)) return;
-
-        if (isNaN(this.x) || isNaN(this.y)) {
-            this.x = currentTarget.x;
-            this.y = currentTarget.y;
-        }
-
-        const wTarget = typeof nearestWrap === 'function'
-            ? nearestWrap(currentTarget.x, currentTarget.y, this.x, this.y)
-            : { x: currentTarget.x, y: currentTarget.y };
-
-        const dx = wTarget.x - this.x;
-        const dy = wTarget.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (isNaN(dist)) return;
-
-        if (dist < 60) {
-            // Tagged current location, advance to next
-            if (this.currentTargetIndex < this.targets.length - 1) {
-                this.currentTargetIndex++;
-                if (this.currentTargetIndex < 8) {
-                    if (game.hud) {
-                        game.hud.showFollowerNotification(`🏴‍☠️ Rival Pirate Ship visited Location ${this.currentTargetIndex}/8!`, false);
-                    }
-                } else if (this.currentTargetIndex === 8) {
-                    if (game.hud) {
-                        game.hud.showFollowerNotification(`🚨 Rival Pirate Ship revealed the Treasure & is racing for it! 🏁🏴‍☠️`, false);
-                    }
-                }
-            } else {
-                // Reached final treasure building!
-                if (game.pirateModeManager && !game.pirateModeManager.treasureClaimed && !game.pirateModeManager.rivalWon) {
-                    game.pirateModeManager.rivalWon = true;
-                    if (game.hud) {
-                        game.hud.showFollowerNotification(`☠️ RIVAL PIRATES FOUND THE TREASURE FIRST! 🏴‍☠️`, false);
-                    }
-                }
-            }
-        } else if (dist > 0.001) {
-            // Politics-mode style smooth navigation toward currentTarget
-            const vx = (dx / dist) * this.speed;
-            const vy = (dy / dist) * this.speed;
-            const nextX = this.x + vx * dt;
-            const nextY = this.y + vy * dt;
-
-            if (isNaN(nextX) || isNaN(nextY)) return;
-
-            if (game.gameMap && typeof game.gameMap.isWalkable === 'function') {
-                const tx = Math.floor(nextX / TILE_SIZE);
-                const ty = Math.floor(nextY / TILE_SIZE);
-                const curTX = Math.floor(this.x / TILE_SIZE);
-                const curTY = Math.floor(this.y / TILE_SIZE);
-
-                if (game.gameMap.isWalkable(tx, ty, curTX, curTY)) {
-                    this.x = nextX;
-                    this.y = nextY;
-                } else {
-                    const txX = Math.floor(nextX / TILE_SIZE);
-                    const tyX = Math.floor(this.y / TILE_SIZE);
-                    if (game.gameMap.isWalkable(txX, tyX, curTX, curTY)) {
-                        this.x = nextX;
-                    } else {
-                        const txY = Math.floor(this.x / TILE_SIZE);
-                        const tyY = Math.floor(nextY / TILE_SIZE);
-                        if (game.gameMap.isWalkable(tyY, txY, curTX, curTY)) {
-                            this.y = nextY;
-                        } else {
-                            // Slide forward if obstacle
-                            this.x = nextX;
-                            this.y = nextY;
-                        }
-                    }
-                }
-            } else {
-                this.x = nextX;
-                this.y = nextY;
-            }
-
-            // Wrap map bounds
-            if (typeof MAP_PIXEL_W !== 'undefined' && typeof MAP_PIXEL_H !== 'undefined') {
-                this.x = ((this.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
-                this.y = ((this.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
-            }
-
-            if (Math.abs(dx) > Math.abs(dy)) {
-                this.direction = dx > 0 ? 'right' : 'left';
-            } else {
-                this.direction = dy > 0 ? 'down' : 'up';
-            }
-        }
-
-        // Periodically shoot at player if within range (requires ammo > 0)
-        if (game.player && this.shootCooldown <= 0 && this.ammo > 0) {
-            const pw = typeof nearestWrap === 'function' ? nearestWrap(game.player.x, game.player.y, this.x, this.y) : { x: game.player.x, y: game.player.y };
-            const pdx = pw.x - this.x;
-            const pdy = pw.y - this.y;
-            const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
-
-            if (pdist < 320 && pdist > 20) {
-                this.shootCooldown = 3.5; // Shoot every 3.5 seconds
-                this.ammo--;
-                const dirX = pdx / pdist;
-                const dirY = pdy / pdist;
-                game.pirateModeManager.cannonballs.push(new Cannonball(this.x, this.y, dirX, dirY, false));
-            }
+        if (game && game.pirateModeManager && game.pirateModeManager.npcCrew && game.pirateModeManager.npcCrew.members.length > 0) {
+            const leader = game.pirateModeManager.npcCrew.members[0];
+            this.x = leader.x;
+            this.y = leader.y;
+            this.stunTimer = leader.stunTimer;
+            this.immunityTimer = leader.immunityTimer;
+            this.ammo = leader.ammo;
+            this.direction = leader.direction;
         }
     }
 
     render(ctx, camera, spriteManager) {
-        if (!this.alive) return;
-        const screen = camera.worldToScreen(this.x, this.y);
-
-        ctx.save();
-        const img = spriteManager ? spriteManager.getImage('pirate_ship') : null;
-        const drawSize = 64;
-
-        if (img && (img.complete || img instanceof HTMLCanvasElement)) {
-            if (this.direction === 'left') {
-                ctx.translate(screen.x, screen.y);
-                ctx.scale(-1, 1);
-                ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
-            } else {
-                ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2, drawSize, drawSize);
-            }
-        } else {
-            ctx.fillStyle = '#8b0000';
-            ctx.fillRect(screen.x - 24, screen.y - 16, 48, 32);
-        }
-
-        ctx.restore();
-
-        // Stun indicator
-        if (this.stunTimer > 0) {
-            ctx.fillStyle = '#ff3333';
-            ctx.font = 'bold 12px "Press Start 2P", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(`STUNNED! (${Math.ceil(this.stunTimer)}s)`, screen.x, screen.y - 38);
-        } else {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '12px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('🏴‍☠️ Rival Pirates', screen.x, screen.y - 36);
-        }
+        // Individual boat rendering handled per member inside NpcPirateMember
     }
 }
 
@@ -593,17 +521,12 @@ class PirateModeManager {
         let px = Math.random() * MAP_W;
         let py = Math.random() * MAP_H;
 
-        if (game && game.gameMap && typeof game.gameMap.isWalkable === 'function') {
-            for (let attempt = 0; attempt < 25; attempt++) {
-                const rx = Math.random() * MAP_W;
-                const ry = Math.random() * MAP_H;
-                const tx = Math.floor(rx / TILE_SIZE);
-                const ty = Math.floor(ry / TILE_SIZE);
-                if (game.gameMap.isWalkable(tx, ty)) {
-                    px = rx;
-                    py = ry;
-                    break;
-                }
+        if (game && game.gameMap && typeof game.gameMap.getIslandGreenTiles === 'function') {
+            const greenTiles = game.gameMap.getIslandGreenTiles();
+            if (greenTiles.length > 0) {
+                const randomTile = greenTiles[Math.floor(Math.random() * greenTiles.length)];
+                px = randomTile.x;
+                py = randomTile.y;
             }
         }
         this.cannonballPacks.push(new CannonballPack(px, py));
@@ -621,86 +544,53 @@ class PirateModeManager {
         this.sailedOffEarth = false;
         this.offEarthTimer = 0;
 
-        // Spawn 12 packs of 8 cannonballs across the map
+        // Spawn 12 packs of 8 cannonballs strictly on green tiles on islands
         for (let i = 0; i < 12; i++) {
             this.spawnCannonballPack(game);
         }
 
-        const allBuildings = game.gameMap ? game.gameMap.buildings : [];
-        const EXCLUDED_TYPES = new Set([
-            'hospital', 'fast_food', 'fastfood', 'dump', 'city_hall', 'cityhall', 'bank', 'police',
-            'airport', 'station', 'art_museum', 'liberty_bell', 'one_liberty', 'franklin_institute',
-            'burj_khalifa', 'petra', 'dome_of_rock', 'pyramids', 'burj_al_arab', 'kingdom_centre',
-            'christ_redeemer', 'machu_picchu', 'obelisco_ba', 'torre_entel', 'palacio_salvo', 'congresso_nacional'
-        ]);
+        // Gather all green tiles on islands
+        const greenTiles = (game && game.gameMap && typeof game.gameMap.getIslandGreenTiles === 'function')
+            ? game.gameMap.getIslandGreenTiles()
+            : [];
 
-        // Filter out functional and landmark buildings
-        const standardBuildings = allBuildings.filter(b => {
-            if (!b || !b.tiles || b.tiles.length === 0) return false;
-            const typeStr = (b.type || '').toLowerCase();
-            const nameStr = (b.name || '').toLowerCase();
-            if (EXCLUDED_TYPES.has(typeStr) || EXCLUDED_TYPES.has(nameStr)) return false;
-            if (b.isLandmark || b.isFunctional) return false;
-            return true;
-        });
-
-        // Gather valid standard building locations on map
         let pool = [];
-        if (standardBuildings && standardBuildings.length > 0) {
-            pool = pool.concat(standardBuildings.map(b => {
-                let bx = b.x, by = b.y, bw = b.width, bh = b.height;
-                if ((bx === undefined || isNaN(bx)) && b.tiles && b.tiles.length > 0) {
-                    let minTileX = Infinity, minTileY = Infinity, maxTileX = -Infinity, maxTileY = -Infinity;
-                    for (const t of b.tiles) {
-                        if (t.x < minTileX) minTileX = t.x;
-                        if (t.x > maxTileX) maxTileX = t.x;
-                        if (t.y < minTileY) minTileY = t.y;
-                        if (t.y > maxTileY) maxTileY = t.y;
-                    }
-                    bx = minTileX * TILE_SIZE;
-                    by = minTileY * TILE_SIZE;
-                    bw = (maxTileX - minTileX + 1) * TILE_SIZE;
-                    bh = (maxTileY - minTileY + 1) * TILE_SIZE;
-                }
-                const centerX = (bx !== undefined && bw !== undefined && !isNaN(bx) && !isNaN(bw)) ? bx + bw / 2 : 1500;
-                const centerY = (by !== undefined && bh !== undefined && !isNaN(by) && !isNaN(bh)) ? by + bh / 2 : 1500;
-                return {
-                    x: centerX,
-                    y: centerY,
-                    name: b.name || 'Standard Building',
-                    type: 'building',
-                    id: b.id,
-                    buildingObj: b
-                };
+        if (greenTiles.length > 0) {
+            const shuffledGreen = [...greenTiles].sort(() => 0.5 - Math.random());
+            pool = shuffledGreen.map((gt, idx) => ({
+                x: gt.x,
+                y: gt.y,
+                tileX: gt.tileX,
+                tileY: gt.tileY,
+                name: `Island Green #${idx + 1}`,
+                type: 'green_tile'
             }));
         }
 
-        // Fallback random non-functional points if pool is small
         while (pool.length < 16) {
             const rx = Math.random() * (typeof MAP_PIXEL_W !== 'undefined' ? MAP_PIXEL_W : 3000);
             const ry = Math.random() * (typeof MAP_PIXEL_H !== 'undefined' ? MAP_PIXEL_H : 3000);
-            pool.push({ x: rx, y: ry, name: 'Secret Waypoint', type: 'point' });
+            pool.push({ x: rx, y: ry, name: 'Island Green Fallback', type: 'green_tile' });
         }
 
-        // Shuffle pool
-        const shuffled = [...pool].sort(() => 0.5 - Math.random());
-        this.playerLocations = shuffled.slice(0, 8);
-        this.rivalLocations = shuffled.slice(8, 16);
+        const selectedPool = pool.slice(0, 16);
+        this.playerLocations = selectedPool.slice(0, 8);
+        this.rivalLocations = selectedPool.slice(8, 16);
 
-        // Target 8 is the treasure building
+        // Target 8 is the final treasure island location on a green tile
         this.treasureBuilding = this.playerLocations[7];
 
         // Rival targets: 8 waypoints + final race to treasure building!
         const rivalTargets = [...this.rivalLocations.slice(0, 8), this.treasureBuilding];
 
-        // Create rival ship starting near location 1
         const startLoc = rivalTargets[0];
-        this.rivalShip = new RivalPirateShip(startLoc.x - 100, startLoc.y - 100);
-        this.rivalShip.setTargets(rivalTargets);
 
-        // Create NPC pirate crew (4 members) on their own route
+        // Create NPC pirate crew (4 members) each sailing in their own boat on water
         this.npcCrew = new NpcPirateCrew();
-        this.npcCrew.init(rivalTargets, startLoc.x + 200, startLoc.y + 200);
+        this.npcCrew.init(rivalTargets, startLoc.x, startLoc.y);
+
+        this.rivalShip = new RivalPirateShip(startLoc.x, startLoc.y);
+        this.rivalShip.setTargets(rivalTargets);
 
         this.initialized = true;
         if (game.hud) {

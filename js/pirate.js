@@ -632,6 +632,7 @@ class PirateModeManager {
         this.cannonCooldown = 0.5; // 0.5 sec cooldown between shots
         window.playerInventory['Cannonballs']--;
         this.playerCannonAmmo = window.playerInventory['Cannonballs'];
+        if (window.apiCall) window.apiCall('/api/game/consume', 'POST', { item_name: 'Cannonballs' }).catch(e => console.error(e));
 
         const player = game.player;
         if (!player) return;

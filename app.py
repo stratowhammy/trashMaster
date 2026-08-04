@@ -386,7 +386,11 @@ def buy_item():
         'trashpickers': 1000,
         'price fixing': 2000,
         'burninator': 1000000,
-        'flashlight': 1500
+        'flashlight': 1500,
+        'cannonballs': 100,
+        'portal gun': 1000,
+        'trash bomb': 500,
+        'bottomless pit': 750
     }
     
     canonical_names = {
@@ -404,7 +408,11 @@ def buy_item():
         'trashpickers': 'Trashpickers',
         'price fixing': 'Price Fixing',
         'burninator': 'Burninator',
-        'flashlight': 'Flashlight'
+        'flashlight': 'Flashlight',
+        'cannonballs': 'Cannonballs',
+        'portal gun': 'Portal Gun',
+        'trash bomb': 'Trash Bomb',
+        'bottomless pit': 'Bottomless Pit'
     }
 
     key = raw_item_name.lower()
@@ -422,7 +430,7 @@ def buy_item():
     if user['balance'] < price:
         return jsonify({'error': 'Insufficient funds'}), 400
         
-    allowed_items = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade', 'Flashlight']        
+    allowed_items = ['Wings', 'Mushrooms', 'Organizer', 'Magic 8-Ball', 'Borrowed Time', 'Filthadelphia', 'Parade', 'Flashlight', 'Cannonballs', 'Portal Gun', 'Trash Bomb', 'Bottomless Pit']        
     if item_name == 'Burninator':
         cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Burninator'))
         row = cursor.fetchone()
@@ -458,15 +466,6 @@ def buy_item():
         reqs = {1: 0, 2: 27, 3: 81, 4: 343}
         req_followers = reqs[next_truck_num]
         
-    if item_name == 'Bruno The Trash Truck':
-        current_trucks = user['has_truck']
-        if current_trucks >= 4:
-            return jsonify({'error': 'Maximum of 4 trash trucks allowed'}), 400
-            
-        next_truck_num = current_trucks + 1
-        reqs = {1: 0, 2: 27, 3: 81, 4: 343}
-        req_followers = reqs[next_truck_num]
-        
         if user['movement_size'] < req_followers:
             return jsonify({'error': f'Requires {req_followers} followers for truck #{next_truck_num}'}), 400
             
@@ -475,8 +474,9 @@ def buy_item():
         db.execute("UPDATE users SET has_truck = has_truck + ? WHERE id=?", (added_trucks, user_data['user_id']))
     else:
         added_qty = 1
-        limited_items = ['Mushrooms', 'Borrowed Time', 'Wings', 'Protection', 'Flashlight']
-        if item_name in limited_items:
+        if item_name == 'Cannonballs':
+            added_qty = 10
+        elif item_name in limited_items:
             cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
             row = cursor.fetchone()
             qty = row['quantity'] if row else 0
@@ -498,6 +498,27 @@ def buy_item():
             else:
                 db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, ?)", (user_data['user_id'], item_name, added_qty))
             
+    db.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/game/add-inventory', methods=['POST'])
+def add_inventory():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    item_name = request.json.get('item_name')
+    quantity = int(request.json.get('quantity', 1))
+    if not item_name or quantity <= 0:
+        return jsonify({'error': 'Invalid request'}), 400
+        
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], item_name))
+    row = cursor.fetchone()
+    if row:
+        db.execute("UPDATE inventory SET quantity = quantity + ? WHERE user_id=? AND item_name=?", (quantity, user_data['user_id'], item_name))
+    else:
+        db.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, ?)", (user_data['user_id'], item_name, quantity))
     db.commit()
     return jsonify({'success': True})
 

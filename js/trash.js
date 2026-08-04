@@ -125,6 +125,13 @@ class TrashManager {
         }
     }
 
+    spawnTrashAt(x, y) {
+        const tileX = typeof wrapTileX === 'function' ? wrapTileX(Math.floor(x / TILE_SIZE)) : Math.floor(x / TILE_SIZE);
+        const tileY = typeof wrapTileY === 'function' ? wrapTileY(Math.floor(y / TILE_SIZE)) : Math.floor(y / TILE_SIZE);
+        const type = Math.floor(Math.random() * 4);
+        this.items.push(new TrashItem(tileX, tileY, type));
+    }
+
     update(gameMap) {
         // Periodic respawn
         this.respawnTimer++;

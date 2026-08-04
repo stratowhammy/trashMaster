@@ -479,6 +479,7 @@ class Game {
                                 window.playerInventory = window.playerInventory || {};
                                 window.playerInventory['Paper'] = (window.playerInventory['Paper'] || 0) + paperGained;
                                 this.treesCarried = 0;
+                                if (window.apiCall) window.apiCall('/api/game/add-inventory', 'POST', { item_name: 'Paper', quantity: paperGained }).catch(e => console.error(e));
                                 if (window.soundManager) window.soundManager.playEngageSFX();
                                 this.hud.showFollowerNotification(`🪵 Processed ${trees} tree(s) at Pulp Mill! Gained ${paperGained} Paper! 📄`, true);
                             } else {
@@ -1271,6 +1272,11 @@ class Game {
         }
 
         window.playerInventory['Mushrooms'] -= countToSell;
+        if (window.apiCall) {
+            for (let i = 0; i < countToSell; i++) {
+                window.apiCall('/api/game/consume', 'POST', { item_name: 'Mushrooms' }).catch(e => console.error(e));
+            }
+        }
         if (totalEarned > 0) {
             window.playerBalance = (window.playerBalance || 0) + totalEarned;
             this.trashManager.totalPoints += totalEarned;
@@ -1288,23 +1294,35 @@ class Game {
         this.updateBlackMarketDialogUI(logMsg);
     }
 
-    buyContrabandItem(itemName, price, qty = 1) {
+    async buyContrabandItem(itemName, price, qty = 1) {
         const bal = window.playerBalance || 0;
         if (bal < price) {
             this.updateBlackMarketDialogUI(`❌ Not enough cash to buy ${itemName}! (Need $${price})`);
             return;
         }
 
-        window.playerBalance -= price;
-        window.playerInventory = window.playerInventory || {};
-        if (itemName === 'Cannonballs') {
-            window.playerInventory['Cannonballs'] = (window.playerInventory['Cannonballs'] !== undefined ? window.playerInventory['Cannonballs'] : 20) + qty;
-        } else {
-            window.playerInventory[itemName] = (window.playerInventory[itemName] || 0) + qty;
-        }
+        try {
+            if (window.apiCall) {
+                const res = await window.apiCall('/api/game/buy', 'POST', { item_name: itemName });
+                if (res && res.error) {
+                    this.updateBlackMarketDialogUI(`❌ ${res.error}`);
+                    return;
+                }
+            }
+            window.playerBalance -= price;
+            window.playerInventory = window.playerInventory || {};
+            if (itemName === 'Cannonballs') {
+                window.playerInventory['Cannonballs'] = (window.playerInventory['Cannonballs'] !== undefined ? window.playerInventory['Cannonballs'] : 20) + qty;
+            } else {
+                window.playerInventory[itemName] = (window.playerInventory[itemName] || 0) + qty;
+            }
 
-        if (window.soundManager) window.soundManager.playEngageSFX();
-        this.updateBlackMarketDialogUI(`🛒 Purchased ${qty} ${itemName} for $${price}!`);
+            if (window.soundManager) window.soundManager.playEngageSFX();
+            this.updateBlackMarketDialogUI(`🛒 Purchased ${qty} ${itemName} for $${price}!`);
+        } catch (e) {
+            console.error("Error buying contraband item:", e);
+            this.updateBlackMarketDialogUI(`❌ Error buying ${itemName}`);
+        }
     }
 
     activatePortalGun() {
@@ -1316,6 +1334,7 @@ class Game {
         }
 
         window.playerInventory['Portal Gun'] -= 1;
+        if (window.apiCall) window.apiCall('/api/game/consume', 'POST', { item_name: 'Portal Gun' }).catch(e => console.error(e));
         const p1X = wrapWorldX(this.player.x);
         const p1Y = wrapWorldY(this.player.y);
         const p2X = wrapWorldX(MAP_PIXEL_W - p1X);
@@ -1340,6 +1359,7 @@ class Game {
         }
 
         window.playerInventory['Trash Bomb'] -= 1;
+        if (window.apiCall) window.apiCall('/api/game/consume', 'POST', { item_name: 'Trash Bomb' }).catch(e => console.error(e));
         const px = wrapWorldX(this.player.x);
         const py = wrapWorldY(this.player.y);
         const centerTX = this.player.getTileX();
@@ -1410,6 +1430,7 @@ class Game {
         }
 
         window.playerInventory['Bottomless Pit'] -= 1;
+        if (window.apiCall) window.apiCall('/api/game/consume', 'POST', { item_name: 'Bottomless Pit' }).catch(e => console.error(e));
 
         // Place 3x3 pit directly behind the user based on movement vector
         let dirX = this.player.vx !== 0 ? Math.sign(this.player.vx) : 1;
@@ -1472,6 +1493,7 @@ class Game {
         }
 
         window.playerInventory['Paper'] -= 1;
+        if (window.apiCall) window.apiCall('/api/game/consume', 'POST', { item_name: 'Paper' }).catch(e => console.error(e));
         this.closePosterDialog();
 
         const px = wrapWorldX(this.player.x);

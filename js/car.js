@@ -89,7 +89,7 @@ class Car {
             ctx.rotate(angle);
 
             const isGreen = this.color === 'green';
-            const img = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage('pirate_ship') : null;
+            const img = (window.game && window.game.spriteManager) ? (window.game.spriteManager.getImage('pirate_ship_blue') || window.game.spriteManager.getImage('pirate_ship')) : null;
 
             if (img && (img.complete || img instanceof HTMLCanvasElement)) {
                 ctx.drawImage(img, -28, -28, 56, 56);

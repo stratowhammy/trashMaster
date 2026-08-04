@@ -57,15 +57,15 @@ class MiniMap {
                     }
                 }
 
-                if (!window.pirateMode) {
-                    const bldg = gameMap.getBuildingAtTile(x, y);
-                    if (bldg) {
+                const bldg = gameMap.getBuildingAtTile(x, y);
+                if (bldg) {
+                    if (bldg.type === 'dump') {
+                        color = '#8b5a2b'; // Dump: Brown
+                    } else if (!window.pirateMode) {
                         if (bldg.type === 'fast_food') {
                             color = '#ffaa00'; // Fast Food: Orange
                         } else if (bldg.type === 'hospital') {
                             color = '#ffffff'; // Hospital: White
-                        } else if (bldg.type === 'dump') {
-                            color = '#8b5a2b'; // Dump: Brown
                         } else if (bldg.type === 'city_hall' || bldg.type === 'cityhall') {
                             color = '#00ffff'; // City Hall: Cyan
                         }
@@ -359,6 +359,53 @@ class MiniMap {
                 ctx.font = 'bold 9px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('HOSPITAL', cx, cy - 6);
+            }
+        }
+        // Draw Dump square marker on minimap in all modes
+        if (gameMap && gameMap.buildings) {
+            const dumpBldg = gameMap.buildings.find(b => b.type === 'dump');
+            if (dumpBldg) {
+                const dx = mapX + (dumpBldg.x / MAP_PIXEL_W) * this.width;
+                const dy = mapY + (dumpBldg.y / MAP_PIXEL_H) * this.height;
+                ctx.fillStyle = '#00ff88';
+                ctx.strokeStyle = '#006633';
+                ctx.lineWidth = 1.5;
+                ctx.fillRect(dx - 4, dy - 4, 8, 8);
+                ctx.strokeRect(dx - 4, dy - 4, 8, 8);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🗑️ DUMP', dx, dy - 6);
+            }
+
+            const pulpBldg = gameMap.buildings.find(b => b.type === 'pulp_mill');
+            if (pulpBldg) {
+                const px = mapX + (pulpBldg.x / MAP_PIXEL_W) * this.width;
+                const py = mapY + (pulpBldg.y / MAP_PIXEL_H) * this.height;
+                ctx.fillStyle = '#8b5a2b';
+                ctx.strokeStyle = '#5c4033';
+                ctx.lineWidth = 1.5;
+                ctx.fillRect(px - 4, py - 4, 8, 8);
+                ctx.strokeRect(px - 4, py - 4, 8, 8);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🪵 PULP', px, py - 6);
+            }
+
+            const bmBldg = gameMap.buildings.find(b => b.type === 'black_market');
+            if (bmBldg) {
+                const bx = mapX + (bmBldg.x / MAP_PIXEL_W) * this.width;
+                const by = mapY + (bmBldg.y / MAP_PIXEL_H) * this.height;
+                ctx.fillStyle = '#ff0055';
+                ctx.strokeStyle = '#550011';
+                ctx.lineWidth = 1.5;
+                ctx.fillRect(bx - 4, by - 4, 8, 8);
+                ctx.strokeRect(bx - 4, by - 4, 8, 8);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('☠️ B.MARKET', bx, by - 6);
             }
         }
 

@@ -297,8 +297,9 @@ class NpcPirateMember {
         ctx.save();
 
         if (!this.onFoot) {
-            // ── In Water: Each rival pirate travels in their OWN pirate boat with RED OUTLINE ──
-            const boatImg = spriteManager ? spriteManager.getImage('pirate_ship') : null;
+            // ── In Water: Each rival pirate travels in their OWN pirate boat with RED FLAG ──
+            const sm = spriteManager || (window.game ? window.game.spriteManager : null);
+            const boatImg = sm ? (sm.getImage('pirate_ship_red') || sm.getImage('pirate_ship')) : null;
             const drawSize = 64;
 
             ctx.save();
@@ -307,23 +308,27 @@ class NpcPirateMember {
                 ctx.scale(-1, 1);
             }
 
-            // Flashing Red Outline Glow around Rival Pirate Ship
+            // Subtle glowing ring around Rival Pirate Ship
             const rPulse = Math.sin(performance.now() / 100) * 0.4 + 0.6;
             ctx.strokeStyle = `rgba(255, 0, 0, ${rPulse})`;
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(0, 0, 32, 0, Math.PI * 2);
+            ctx.arc(0, 0, 30, 0, Math.PI * 2);
             ctx.stroke();
-
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-drawSize / 2 - 2, -drawSize / 2 - 2, drawSize + 4, drawSize + 4);
 
             if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
                 ctx.drawImage(boatImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             } else {
-                ctx.fillStyle = '#8b0000';
-                ctx.fillRect(-24, -16, 48, 32);
+                // Detailed red-flagged pirate ship canvas fallback if image loading is pending
+                ctx.fillStyle = '#8b4513';
+                ctx.fillRect(-20, 0, 40, 16);
+                ctx.fillStyle = '#5a3010';
+                ctx.fillRect(-2, -24, 4, 24);
+                ctx.fillStyle = '#f0f0e6';
+                ctx.fillRect(-12, -20, 24, 14);
+                // Red Flag
+                ctx.fillStyle = '#e61e1e';
+                ctx.fillRect(0, -28, 12, 8);
             }
             ctx.restore();
 
@@ -613,15 +618,20 @@ class PirateModeManager {
 
     firePlayerCannon(game) {
         if (this.cannonCooldown > 0 || this.playerStunTimer > 0) return;
-        if (this.playerCannonAmmo <= 0) {
+        window.playerInventory = window.playerInventory || {};
+        if (window.playerInventory['Cannonballs'] === undefined) {
+            window.playerInventory['Cannonballs'] = 20;
+        }
+        if (window.playerInventory['Cannonballs'] <= 0) {
             if (game.hud) {
-                game.hud.showFollowerNotification('OUT OF CANNONBALLS! Press [E] near Cannonball Packs on map! 📦💣', false);
+                game.hud.showFollowerNotification('💣 Out of Cannonballs! Buy more at Black Market [E]!', false);
             }
             return;
         }
 
         this.cannonCooldown = 0.5; // 0.5 sec cooldown between shots
-        this.playerCannonAmmo--;
+        window.playerInventory['Cannonballs']--;
+        this.playerCannonAmmo = window.playerInventory['Cannonballs'];
 
         const player = game.player;
         if (!player) return;
@@ -986,7 +996,7 @@ class PirateModeManager {
 
         // Render NPC pirate crew (4 pirates walking the board)
         if (this.npcCrew) {
-            this.npcCrew.render(ctx, camera);
+            this.npcCrew.render(ctx, camera, spriteManager);
         }
 
         // Highlight current player target location on map & building
@@ -1058,52 +1068,41 @@ class PirateModeManager {
             ctx.restore();
         }
 
-        // Render Treasure Claim Victory Popup Overlay displaying treasure.png
+        // Render Treasure Claim Victory Screen (Solid black with treasure.png scaled to 80% view width)
         if (this.treasureClaimed) {
             ctx.save();
-            const cx = canvasW / 2;
-            const cy = canvasH / 2;
-            const pW = 440;
-            const pH = 260;
-
-            // Dimmed background backdrop
-            ctx.fillStyle = 'rgba(10, 15, 25, 0.75)';
+            
+            // 1. Cut to solid black screen
+            ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvasW, canvasH);
 
-            // Modal card
-            ctx.fillStyle = 'rgba(25, 20, 15, 0.95)';
-            ctx.strokeStyle = '#ffd700';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.roundRect(cx - pW/2, cy - pH/2, pW, pH, 16);
-            ctx.fill();
-            ctx.stroke();
-
-            // Treasure.png image
             const treasureImg = spriteManager ? spriteManager.getImage('treasure') : null;
             if (treasureImg && (treasureImg.complete || treasureImg instanceof HTMLCanvasElement)) {
-                ctx.drawImage(treasureImg, cx - 48, cy - pH/2 + 20, 96, 96);
+                // 2. Scale treasure image to fill center 80% of view width
+                const targetW = canvasW * 0.8;
+                const nativeW = treasureImg.naturalWidth || treasureImg.width || 64;
+                const nativeH = treasureImg.naturalHeight || treasureImg.height || 64;
+                const aspect = nativeH / nativeW;
+                const targetH = targetW * aspect;
+
+                const targetX = (canvasW - targetW) / 2;
+                const targetY = (canvasH - targetH) / 2;
+
+                ctx.drawImage(treasureImg, targetX, targetY, targetW, targetH);
             }
+
+            // Bottom victory announcement banner
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillRect(0, canvasH - 80, canvasW, 80);
 
             ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 14px "Press Start 2P", monospace';
+            ctx.font = 'bold 16px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('🏴‍☠️ TREASURE CLAIMED! 🪙', cx, cy + 25);
+            ctx.fillText('🏴‍☠️ TREASURE CLAIMED! 🪙 100 Gold Doubloons ($25,000)!', canvasW / 2, canvasH - 48);
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = '10px "Press Start 2P", monospace';
-            ctx.fillText('100 Gold Doubloons ($25,000)!', cx, cy + 55);
-
-            const gooseCardImg = spriteManager ? spriteManager.getImage('item_goose_card') : null;
-            if (gooseCardImg && (gooseCardImg.complete || gooseCardImg instanceof HTMLCanvasElement)) {
-                ctx.drawImage(gooseCardImg, cx - 125, cy + 70, 24, 24);
-            }
-            ctx.fillStyle = '#ff9900';
-            ctx.fillText('+4 Goose Gift Cards Added!', cx + 10, cy + 86);
-
-            ctx.fillStyle = '#888888';
-            ctx.font = '8px "Press Start 2P", monospace';
-            ctx.fillText('(Used immediately at Fast Food for 25% OFF)', cx, cy + 112);
+            ctx.font = '11px "Press Start 2P", monospace';
+            ctx.fillText('+4 Goose Gift Cards Added to Inventory! 🎟️', canvasW / 2, canvasH - 22);
 
             ctx.restore();
         }

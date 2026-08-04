@@ -197,7 +197,7 @@ class Player {
         // Render docked boat on shore if player is exploring island on foot
         if (window.pirateMode && this.onFoot && this.dockedBoat) {
             const bScreen = camera.worldToScreen(this.dockedBoat.x, this.dockedBoat.y);
-            const boatImg = spriteManager.getImage('pirate_ship');
+            const boatImg = spriteManager.getImage('pirate_ship_blue') || spriteManager.getImage('pirate_ship');
             if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
                 ctx.save();
                 ctx.translate(bScreen.x, bScreen.y);
@@ -216,7 +216,7 @@ class Player {
         
         let imgId = this.spriteId;
         if (window.pirateMode) {
-            imgId = this.onFoot ? (this.spriteId || 'char1') : 'pirate_ship';
+            imgId = this.onFoot ? (this.spriteId || 'char1') : 'pirate_ship_blue';
         } else if (window.crimeMode) {
             imgId = 'black_cadillac';
         } else if (window.politicsMode) {

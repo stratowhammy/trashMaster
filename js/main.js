@@ -200,9 +200,45 @@ class Game {
     _bindEvents() {
         window.addEventListener('resize', () => this._resizeCanvas());
 
+        const btnPause = document.getElementById('btn-pause');
+        if (btnPause) {
+            btnPause.addEventListener('click', () => this.togglePause());
+        }
+
+        const btnBmSellOne = document.getElementById('btn-bm-sell-one');
+        const btnBmSellAll = document.getElementById('btn-bm-sell-all');
+        const btnBmClose = document.getElementById('btn-bm-close');
+
+        const btnBmBuyCannon = document.getElementById('btn-bm-buy-cannon');
+        const btnBmBuyPortal = document.getElementById('btn-bm-buy-portal');
+        const btnBmBuyTrashBomb = document.getElementById('btn-bm-buy-trashbomb');
+        const btnBmBuyPit = document.getElementById('btn-bm-buy-pit');
+
+        if (btnBmSellOne) btnBmSellOne.addEventListener('click', () => this.sellMushroomOnBlackMarket(false));
+        if (btnBmSellAll) btnBmSellAll.addEventListener('click', () => this.sellMushroomOnBlackMarket(true));
+        if (btnBmClose) btnBmClose.addEventListener('click', () => this.closeBlackMarketDialog());
+
+        if (btnBmBuyCannon) btnBmBuyCannon.addEventListener('click', () => this.buyContrabandItem('Cannonballs', 100, 10));
+        if (btnBmBuyPortal) btnBmBuyPortal.addEventListener('click', () => this.buyContrabandItem('Portal Gun', 1000, 1));
+        if (btnBmBuyTrashBomb) btnBmBuyTrashBomb.addEventListener('click', () => this.buyContrabandItem('Trash Bomb', 500, 1));
+        if (btnBmBuyPit) btnBmBuyPit.addEventListener('click', () => this.buyContrabandItem('Bottomless Pit', 750, 1));
+
+        const btnPosterRecruitment = document.getElementById('btn-poster-recruitment');
+        const btnPosterPropaganda = document.getElementById('btn-poster-propaganda');
+        const btnPosterClose = document.getElementById('btn-poster-close');
+
+        if (btnPosterRecruitment) btnPosterRecruitment.addEventListener('click', () => this.postPoster('recruitment'));
+        if (btnPosterPropaganda) btnPosterPropaganda.addEventListener('click', () => this.postPoster('propaganda'));
+        if (btnPosterClose) btnPosterClose.addEventListener('click', () => this.closePosterDialog());
+
         // Use both document and window for maximum compatibility
         const keyHandler = (e) => {
-            if (this.state === GameState.PLAYING && this.player) {
+            if (e.key === 'Escape') {
+                this.togglePause();
+                return;
+            }
+
+            if (this.state === GameState.PLAYING && this.player && !this.isPaused) {
                 this.player.handleKeyDown(e);
 
                 // Q or q key to pick up trash
@@ -379,26 +415,92 @@ class Game {
                         }
                     }
 
-                    // Dump interaction
-                    if (window.playerHasTruck > 0 || window.pirateMode) {
+                    // Dump interaction - Available in ALL modes
+                    const dumpBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'dump') : null;
+                    if (dumpBldg && dumpBldg.doorTiles && dumpBldg.doorTiles.length > 0) {
+                        const door = dumpBldg.doorTiles[0];
+                        const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
+                        const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
                         const px = wrapWorldX(this.player.x);
                         const py = wrapWorldY(this.player.y);
-                        const dumpBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'dump') : null;
-                        if (dumpBldg && dumpBldg.doorTiles && dumpBldg.doorTiles.length > 0) {
-                            const door = dumpBldg.doorTiles[0];
-                            const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
-                            if (dist < TILE_SIZE * 2.5) {
-                                if (this.trashCollectedInTruck > 0) {
-                                    const amt = this.trashCollectedInTruck;
-                                    this.trashCollectedInTruck = 0;
-                                    this.trashManager.totalPoints += amt * 25;
-                                    this.hud.updateScore(this.trashManager.totalPoints);
-                                    this.hud.showFollowerNotification(`🗑️ Unloaded ${amt} trash load at the Sea Dump Dock! +$${(amt * 25).toLocaleString()}! 🏴‍☠️`, true);
-                                } else {
-                                    this.hud.showFollowerNotification("Hold is already empty of trash.", true);
-                                }
+                        const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
+                        const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
+                        if (dist < TILE_SIZE * 3.0) {
+                            if (this.trashCollectedInTruck > 0) {
+                                const amt = this.trashCollectedInTruck;
+                                this.trashCollectedInTruck = 0;
+                                this.trashManager.totalPoints += amt * 25;
+                                this.hud.updateScore(this.trashManager.totalPoints);
+                                const locName = window.pirateMode ? "Sea Dump Dock" : "Dump";
+                                this.hud.showFollowerNotification(`🗑️ Unloaded ${amt} trash load at the ${locName}! +$${(amt * 25).toLocaleString()}! 🏴‍☠️`, true);
+                            } else if ((this.treesCarried || 0) > 0) {
+                                this.hud.showFollowerNotification("🗑️ Dump only accepts garbage! Take cut trees to the Pulp Mill [E].", true);
+                            } else {
+                                const emptyMsg = window.pirateMode ? "Ship hold is already empty of trash." : "Garbage container is already empty.";
+                                this.hud.showFollowerNotification(emptyMsg, true);
+                            }
+                            return;
+                        }
+                    }
+
+                    // Foraging wild shrooms on park tiles
+                    if (this.gameMap && this.gameMap.shrooms) {
+                        const px = wrapWorldX(this.player.x);
+                        const py = wrapWorldY(this.player.y);
+                        for (const shroom of this.gameMap.shrooms) {
+                            if (shroom.collected) continue;
+                            const wShroom = typeof nearestWrap === 'function' ? nearestWrap(shroom.x, shroom.y, px, py) : { x: shroom.x, y: shroom.y };
+                            const dist = Math.sqrt((px - wShroom.x)**2 + (py - wShroom.y)**2);
+                            if (dist < TILE_SIZE * 1.5) {
+                                shroom.collected = true;
+                                window.playerInventory = window.playerInventory || {};
+                                window.playerInventory['Mushrooms'] = (window.playerInventory['Mushrooms'] || 0) + 1;
+                                if (window.soundManager) window.soundManager.playEngageSFX();
+                                this.hud.showFollowerNotification("🍄 Foraged Wild Mushroom! Added to inventory. (Shift+M to eat)", true);
                                 return;
                             }
+                        }
+                    }
+
+                    // Pulp Mill interaction - Convert trees to Paper
+                    const pulpBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'pulp_mill') : null;
+                    if (pulpBldg && pulpBldg.doorTiles && pulpBldg.doorTiles.length > 0) {
+                        const door = pulpBldg.doorTiles[0];
+                        const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
+                        const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
+                        const px = wrapWorldX(this.player.x);
+                        const py = wrapWorldY(this.player.y);
+                        const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
+                        const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
+                        if (dist < TILE_SIZE * 3.0) {
+                            const trees = this.treesCarried || 0;
+                            if (trees > 0) {
+                                const paperGained = trees * 5;
+                                window.playerInventory = window.playerInventory || {};
+                                window.playerInventory['Paper'] = (window.playerInventory['Paper'] || 0) + paperGained;
+                                this.treesCarried = 0;
+                                if (window.soundManager) window.soundManager.playEngageSFX();
+                                this.hud.showFollowerNotification(`🪵 Processed ${trees} tree(s) at Pulp Mill! Gained ${paperGained} Paper! 📄`, true);
+                            } else {
+                                this.hud.showFollowerNotification("🪵 Pulp Mill: Bring cut trees here to convert into Paper! (0 trees carried)", true);
+                            }
+                            return;
+                        }
+                    }
+
+                    // Black Market interaction - Open retro dialog box to buy/sell
+                    const bmBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'black_market') : null;
+                    if (bmBldg && bmBldg.doorTiles && bmBldg.doorTiles.length > 0) {
+                        const door = bmBldg.doorTiles[0];
+                        const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
+                        const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
+                        const px = wrapWorldX(this.player.x);
+                        const py = wrapWorldY(this.player.y);
+                        const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
+                        const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
+                        if (dist < TILE_SIZE * 3.0) {
+                            this.openBlackMarketDialog();
+                            return;
                         }
                     }
                 }
@@ -786,7 +888,11 @@ class Game {
                 if (e.key === 't' || e.key === 'T') this.useConsumable('Borrowed Time');
                 if (e.key === 'u' || e.key === 'U') this.useConsumable('Mushrooms');
                 if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
-                if (e.key === 'p' || e.key === 'P') this.useConsumable('Protection');
+                if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+                    this.tryOpenPosterDialog();
+                } else if (e.key === 'p' || e.key === 'P') {
+                    this.useConsumable('Protection');
+                }
                 if (e.key === 'm' || e.key === 'M') {
                     if (window.soundManager) {
                         const isMuted = window.soundManager.toggleMute();
@@ -799,15 +905,32 @@ class Game {
                         this.hud.showFollowerNotification(sfxMuted ? "🔊 SFX: OFF" : "🔊 SFX: ON", true);
                     }
                 }
-                if (e.key === 'b' || e.key === 'B') {
+                if (e.shiftKey && (e.key === 'B' || e.key === 'b')) {
+                    this.activateBottomlessPit();
+                } else if (e.key === 'b' || e.key === 'B') {
                     if (this.priceFixingActive) {
                         this.triggerPriceFixingBribe();
                     }
                 }
-                if (e.key === 'd' || e.key === 'D') {
-                    if (this.crimeManager && this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'illegal_dump') {
-                        this.performIllegalDump();
+
+                if (e.key === 'g' || e.key === 'G') {
+                    this.activatePortalGun();
+                }
+
+                if (e.key === 't' || e.key === 'T') {
+                    if (window.playerInventory && window.playerInventory['Trash Bomb'] > 0) {
+                        this.plantTrashBomb();
+                    } else {
+                        this.useConsumable('Borrowed Time');
                     }
+                }
+
+                if (e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+                    this.eatShroom();
+                }
+
+                if (e.key === 'x' || e.key === 'X') {
+                    this.harvestTree();
                 }
 
                 // C key: Ranger animal capture (if near an animal node)
@@ -982,18 +1105,19 @@ class Game {
         if (this.state !== GameState.PLAYING || !this.player) return;
 
         let maxToPick = Infinity;
-        if (window.playerHasTruck > 0) {
-            // Reduce max truck capacity by 10 per captured animal (Ranger)
-            const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
-            const maxCap = Math.max(0, window.playerHasTruck * 100 - animalPenalty);
-            maxToPick = Math.max(0, maxCap - this.trashCollectedInTruck);
-            if (maxToPick <= 0) {
-                if (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000) {
-                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
-                    this.lastCapacityNotificationTime = Date.now();
-                }
-                return;
+        // Capacity logic for all modes
+        const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
+        const totalCap = window.pirateMode ? 100 : (window.playerHasTruck > 0 ? Math.max(0, window.playerHasTruck * 100 - animalPenalty) : 100);
+        const usedCap = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
+        maxToPick = Math.max(0, totalCap - usedCap);
+
+        if (maxToPick <= 0) {
+            if (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000) {
+                const msg = window.pirateMode ? "Ship hold full! Unload at the Sea Dump Dock [E]." : "Garbage container full! Unload at the Dump [E].";
+                this.hud.showFollowerNotification(msg, false);
+                this.lastCapacityNotificationTime = Date.now();
             }
+            return;
         }
 
         // Trashpickers: double the effective pickup radius for the player
@@ -1002,16 +1126,441 @@ class Game {
         const picked = this.trashManager.checkPickup(this.player.x, this.player.y, pickupRadius, this.getRoundTotalFollowersForValue(), maxToPick);
 
         if (picked.length > 0) {
-            if (window.playerHasTruck > 0) {
-                this.trashCollectedInTruck += picked.length;
-                if (this.trashCollectedInTruck >= window.playerHasTruck * 100) {
-                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
-                }
+            this.trashCollectedInTruck += picked.length;
+            const newUsed = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
+            if (newUsed >= totalCap) {
+                const msg = window.pirateMode ? "Ship hold full! Unload at the Sea Dump Dock [E]." : "Garbage container full! Unload at the Dump [E].";
+                this.hud.showFollowerNotification(msg, false);
             }
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += picked.length;
             this.trashCollectedInRound = (this.trashCollectedInRound || 0) + picked.length;
             this.trashManager.spawnMore(this.gameMap, picked.length);
+        }
+    }
+
+    harvestTree() {
+        if (this.state !== GameState.PLAYING || !this.player || !this.gameMap || !this.gameMap.trees) return;
+
+        const px = wrapWorldX(this.player.x);
+        const py = wrapWorldY(this.player.y);
+        let nearestTree = null;
+        let minDist = TILE_SIZE * 1.5;
+
+        for (const tree of this.gameMap.trees) {
+            if (tree.cut) continue;
+            const wTree = typeof nearestWrap === 'function' ? nearestWrap(tree.x, tree.y, px, py) : { x: tree.x, y: tree.y };
+            const dist = Math.sqrt((px - wTree.x)**2 + (py - wTree.y)**2);
+            if (dist < minDist) {
+                minDist = dist;
+                nearestTree = tree;
+            }
+        }
+
+        if (!nearestTree) {
+            this.hud.showFollowerNotification("🌲 Move closer to a tree to cut it down [X]!", false);
+            return;
+        }
+
+        const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
+        const totalCap = Math.max(100, (window.playerHasTruck > 0 ? window.playerHasTruck * 100 : 100) - animalPenalty);
+        const treesCarried = this.treesCarried || 0;
+        const usedCap = (treesCarried * 100) + this.trashCollectedInTruck;
+        const freeCap = totalCap - usedCap;
+
+        // Requirement: Block user from cutting down a tree if they have less than 100 units of free capacity
+        if (freeCap < 100) {
+            this.hud.showFollowerNotification(`🌲 Not enough free capacity to harvest tree! (Need 100 free units, available: ${freeCap}/${totalCap}). Offload at Pulp Mill [E] or Dump [E].`, false);
+            return;
+        }
+
+        nearestTree.cut = true;
+        this.treesCarried = treesCarried + 1;
+        if (window.soundManager) window.soundManager.playEngageSFX();
+        const newUsed = ((this.treesCarried) * 100) + this.trashCollectedInTruck;
+        this.hud.showFollowerNotification(`🪓 Cut down tree! (+100 capacity used: ${newUsed}/${totalCap}). Process at Pulp Mill [E]! 🪵`, true);
+    }
+
+    eatShroom() {
+        if (this.state !== GameState.PLAYING) return;
+        const mCount = (window.playerInventory && window.playerInventory['Mushrooms']) || 0;
+        if (mCount <= 0) {
+            this.hud.showFollowerNotification("🍄 No Mushrooms in inventory to eat!", false);
+            return;
+        }
+
+        window.playerInventory['Mushrooms'] -= 1;
+
+        const rand = Math.random();
+        if (rand < 0.50) {
+            // 50% Chance: Normal Mushroom (slows down time)
+            this.hud.timerSpeed = 0.5;
+            this.mushroomTimer = 20;
+            if (window.soundManager) window.soundManager.playEngageSFX();
+            this.hud.showFollowerNotification("🍄 Ate Normal Mushroom! Time slowed for 20s! ⏳", true);
+        } else if (rand < 0.75) {
+            // 25% Chance: Magic Mushroom (trippy speed & extra slow motion)
+            this.hud.timerSpeed = 0.3;
+            this.mushroomTimer = 25;
+            if (this.player) this.player.speedMultiplier = (this.player.speedMultiplier || 1.0) * 1.5;
+            if (window.soundManager) window.soundManager.playEngageSFX();
+            this.hud.showFollowerNotification("✨ Ate MAGIC MUSHROOM! Trippy speed & extra slow motion! 🍄✨", true);
+        } else {
+            // 25% Chance: Poison Mushroom (immediately end the round)
+            this.hud.timeRemaining = 0;
+            this.state = GameState.UI_OVERLAY;
+            this._showSplashGameOver("POISONED!", "☠️ You ate a poisonous wild mushroom! Incapacitated immediately. Round ended! ☠️", false);
+        }
+    }
+
+    openBlackMarketDialog() {
+        const dialog = document.getElementById('black-market-dialog');
+        if (!dialog) return;
+        this.state = GameState.UI_OVERLAY;
+        dialog.classList.remove('hidden');
+        this.updateBlackMarketDialogUI();
+    }
+
+    closeBlackMarketDialog() {
+        const dialog = document.getElementById('black-market-dialog');
+        if (dialog) dialog.classList.add('hidden');
+        this.state = GameState.PLAYING;
+    }
+
+    updateBlackMarketDialogUI(logText = '') {
+        const statusEl = document.getElementById('bm-status-info');
+        const logEl = document.getElementById('bm-log');
+        const mCount = (window.playerInventory && window.playerInventory['Mushrooms']) || 0;
+        const bal = window.playerBalance || 0;
+
+        if (statusEl) {
+            statusEl.innerHTML = `MUSHROOMS IN STOCK: <strong>${mCount}</strong> | BALANCE: <strong>$${bal.toLocaleString()}</strong>`;
+        }
+        if (logEl && logText !== undefined) {
+            logEl.innerHTML = logText;
+        }
+    }
+
+    sellMushroomOnBlackMarket(sellAll = false) {
+        let mCount = (window.playerInventory && window.playerInventory['Mushrooms']) || 0;
+        if (mCount <= 0) {
+            this.updateBlackMarketDialogUI("❌ You have no wild mushrooms in stock to sell!");
+            return;
+        }
+
+        const countToSell = sellAll ? mCount : 1;
+        let totalEarned = 0;
+        let normalCount = 0;
+        let magicCount = 0;
+        let deadlyCount = 0;
+
+        for (let i = 0; i < countToSell; i++) {
+            const rand = Math.random();
+            if (rand < 0.50) {
+                // 50% Chance: Normal mushroom ($0)
+                normalCount++;
+            } else if (rand < 0.75) {
+                // 25% Chance: Magic mushroom ($500)
+                magicCount++;
+                totalEarned += 500;
+            } else {
+                // 25% Chance: Deadly mushroom (triggers 6 police chase penalty next round)
+                deadlyCount++;
+                this.blackMarketPenaltyNextRound = true;
+            }
+        }
+
+        window.playerInventory['Mushrooms'] -= countToSell;
+        if (totalEarned > 0) {
+            window.playerBalance = (window.playerBalance || 0) + totalEarned;
+            this.trashManager.totalPoints += totalEarned;
+            this.hud.updateScore(this.trashManager.totalPoints);
+        }
+
+        let logMsg = `Sold ${countToSell} shroom(s): `;
+        if (normalCount > 0) logMsg += `${normalCount} Normal ($0) `;
+        if (magicCount > 0) logMsg += `${magicCount} Magic (+$${magicCount * 500}) `;
+        if (deadlyCount > 0) {
+            logMsg += `🚨 ${deadlyCount} DEADLY SHROOM! 6 POLICE WILL HUNT YOU NEXT ROUND! 🚨`;
+        }
+
+        if (window.soundManager) window.soundManager.playEngageSFX();
+        this.updateBlackMarketDialogUI(logMsg);
+    }
+
+    buyContrabandItem(itemName, price, qty = 1) {
+        const bal = window.playerBalance || 0;
+        if (bal < price) {
+            this.updateBlackMarketDialogUI(`❌ Not enough cash to buy ${itemName}! (Need $${price})`);
+            return;
+        }
+
+        window.playerBalance -= price;
+        window.playerInventory = window.playerInventory || {};
+        if (itemName === 'Cannonballs') {
+            window.playerInventory['Cannonballs'] = (window.playerInventory['Cannonballs'] !== undefined ? window.playerInventory['Cannonballs'] : 20) + qty;
+        } else {
+            window.playerInventory[itemName] = (window.playerInventory[itemName] || 0) + qty;
+        }
+
+        if (window.soundManager) window.soundManager.playEngageSFX();
+        this.updateBlackMarketDialogUI(`🛒 Purchased ${qty} ${itemName} for $${price}!`);
+    }
+
+    activatePortalGun() {
+        if (this.state !== GameState.PLAYING || !this.player) return;
+        const count = (window.playerInventory && window.playerInventory['Portal Gun']) || 0;
+        if (count <= 0) {
+            this.hud.showFollowerNotification("🌀 No Portal Gun in inventory! Buy at Black Market [E]!", false);
+            return;
+        }
+
+        window.playerInventory['Portal Gun'] -= 1;
+        const p1X = wrapWorldX(this.player.x);
+        const p1Y = wrapWorldY(this.player.y);
+        const p2X = wrapWorldX(MAP_PIXEL_W - p1X);
+        const p2Y = wrapWorldY(MAP_PIXEL_H - p1Y);
+
+        this.activePortals = {
+            p1: { x: p1X, y: p1Y },
+            p2: { x: p2X, y: p2Y },
+            teleportCooldown: 0
+        };
+
+        if (window.soundManager) window.soundManager.playEngageSFX();
+        this.hud.showFollowerNotification(`🌀 PORTAL GUN ACTIVATED! Blue Portal created at player, Orange Portal created at inverse coordinates!`, true);
+    }
+
+    plantTrashBomb() {
+        if (this.state !== GameState.PLAYING || !this.player) return;
+        const count = (window.playerInventory && window.playerInventory['Trash Bomb']) || 0;
+        if (count <= 0) {
+            this.hud.showFollowerNotification("💥 No Trash Bomb in inventory! Buy at Black Market [E]!", false);
+            return;
+        }
+
+        window.playerInventory['Trash Bomb'] -= 1;
+        const px = wrapWorldX(this.player.x);
+        const py = wrapWorldY(this.player.y);
+        const centerTX = this.player.getTileX();
+        const centerTY = this.player.getTileY();
+
+        // Drop trash on every street square (road tile / burm tile) within 10-square radius
+        let streetTilesCount = 0;
+        for (let dy = -10; dy <= 10; dy++) {
+            for (let dx = -10; dx <= 10; dx++) {
+                if (Math.sqrt(dx*dx + dy*dy) <= 10) {
+                    const tx = wrapTileX(centerTX + dx);
+                    const ty = wrapTileY(centerTY + dy);
+                    const attr = this.gameMap.getTileAttribute(tx, ty);
+                    if (attr === 'road tile' || attr === 'burm tile') {
+                        streetTilesCount++;
+                        this.trashManager.spawnTrashAt(tx * TILE_SIZE + TILE_SIZE/2, ty * TILE_SIZE + TILE_SIZE/2);
+                    }
+                }
+            }
+        }
+
+        // Check if an NPC is in eyeshot (within 6 tile radius)
+        let npcInEyeshot = false;
+        if (this.npcManager && this.npcManager.npcs) {
+            for (const npc of this.npcManager.npcs) {
+                const dist = Math.sqrt((px - npc.x)**2 + (py - npc.y)**2);
+                if (dist < TILE_SIZE * 6.0) {
+                    npcInEyeshot = true;
+                    break;
+                }
+            }
+        }
+
+        if (npcInEyeshot) {
+            this.blackMarketPenalized = true;
+            if (this.crimeManager) {
+                this.crimeManager.policeActive = true;
+                this.crimeManager.policeActiveTimer = 30.0;
+                for (let i = 0; i < 3; i++) {
+                    this.crimeManager.police.push(new PoliceOfficer(px, py, true));
+                }
+            }
+            this.hud.showFollowerNotification("💥 TRASH BOMB EXPLODED! An NPC spotted you planting it! POLICE CHASE INITIATED! 🚨", false);
+        } else {
+            if (this.crimeManager) {
+                for (let i = 0; i < 3; i++) {
+                    this.crimeManager.police.push(new PoliceOfficer(px, py, true));
+                }
+            }
+            this.hud.showFollowerNotification(`💥 TRASH BOMB EXPLODED! ${streetTilesCount} street squares covered in trash! Police dispatched! 🚔`, true);
+        }
+
+        if (window.soundManager) window.soundManager.playEngageSFX();
+    }
+
+    activateBottomlessPit() {
+        if (this.state !== GameState.PLAYING || !this.player) return;
+        const count = (window.playerInventory && window.playerInventory['Bottomless Pit']) || 0;
+        if (count <= 0) {
+            this.hud.showFollowerNotification("🕳️ No Bottomless Pit in inventory! Buy at Black Market [E]!", false);
+            return;
+        }
+
+        const isBeingChased = this.blackMarketPenalized || (this.crimeManager && (this.crimeManager.policeActive || this.crimeManager.police.length > 0));
+        if (!isBeingChased) {
+            this.hud.showFollowerNotification("🕳️ Bottomless Pit can only be activated while running away from police!", false);
+            return;
+        }
+
+        window.playerInventory['Bottomless Pit'] -= 1;
+
+        // Place 3x3 pit directly behind the user based on movement vector
+        let dirX = this.player.vx !== 0 ? Math.sign(this.player.vx) : 1;
+        let dirY = this.player.vy !== 0 ? Math.sign(this.player.vy) : 0;
+        const centerTX = wrapTileX(Math.floor((this.player.x - dirX * TILE_SIZE * 2) / TILE_SIZE));
+        const centerTY = wrapTileY(Math.floor((this.player.y - dirY * TILE_SIZE * 2) / TILE_SIZE));
+
+        this.bottomlessPits = this.bottomlessPits || [];
+        const pitTiles = [];
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                pitTiles.push({
+                    tileX: wrapTileX(centerTX + dx),
+                    tileY: wrapTileY(centerTY + dy),
+                    x: wrapWorldX((centerTX + dx) * TILE_SIZE + TILE_SIZE / 2),
+                    y: wrapWorldY((centerTY + dy) * TILE_SIZE + TILE_SIZE / 2)
+                });
+            }
+        }
+        this.bottomlessPits.push({ tiles: pitTiles, centerTX, centerTY });
+
+        if (window.soundManager) window.soundManager.playEngageSFX();
+        this.hud.showFollowerNotification("🕳️ BOTTOMLESS PIT OPENED! 3x3 Void Pit placed behind you! Posse members who cross will fall in! 🕳️", true);
+    }
+
+    tryOpenPosterDialog() {
+        if (this.state !== GameState.PLAYING || !this.player) return;
+        const paperCount = (window.playerInventory && window.playerInventory['Paper']) || 0;
+        if (paperCount <= 0) {
+            this.hud.showFollowerNotification("📄 No Paper in inventory! Convert trees at Pulp Mill [E].", false);
+            return;
+        }
+
+        const tx = this.player.getTileX();
+        const ty = this.player.getTileY();
+        const attr = this.gameMap.getTileAttribute(tx, ty);
+        if (attr !== 'sidewalk tile' && attr !== 'burm tile') {
+            this.hud.showFollowerNotification("📄 Posters can strictly be placed on sidewalk tiles!", false);
+            return;
+        }
+
+        const dialog = document.getElementById('poster-dialog');
+        if (!dialog) return;
+        this.state = GameState.UI_OVERLAY;
+        dialog.classList.remove('hidden');
+    }
+
+    closePosterDialog() {
+        const dialog = document.getElementById('poster-dialog');
+        if (dialog) dialog.classList.add('hidden');
+        this.state = GameState.PLAYING;
+    }
+
+    postPoster(posterType = 'recruitment') {
+        const paperCount = (window.playerInventory && window.playerInventory['Paper']) || 0;
+        if (paperCount <= 0) {
+            this.hud.showFollowerNotification("📄 No Paper in inventory!", false);
+            this.closePosterDialog();
+            return;
+        }
+
+        window.playerInventory['Paper'] -= 1;
+        this.closePosterDialog();
+
+        const px = wrapWorldX(this.player.x);
+        const py = wrapWorldY(this.player.y);
+        const centerTX = this.player.getTileX();
+        const centerTY = this.player.getTileY();
+
+        this.posters = this.posters || [];
+        this.posters.push({
+            type: posterType,
+            x: px,
+            y: py,
+            tileX: centerTX,
+            tileY: centerTY
+        });
+
+        if (window.soundManager) window.soundManager.playEngageSFX();
+
+        // 1. Check NPC Eyeshot (within 6 tiles radius) -> Send 6 police with normal arrest consequences
+        let npcInEyeshot = false;
+        if (this.npcManager && this.npcManager.npcs) {
+            for (const npc of this.npcManager.npcs) {
+                const dist = Math.sqrt((px - npc.x)**2 + (py - npc.y)**2);
+                if (dist < TILE_SIZE * 6.0) {
+                    npcInEyeshot = true;
+                    break;
+                }
+            }
+        }
+
+        if (npcInEyeshot) {
+            this.blackMarketPenalized = true;
+            if (this.crimeManager) {
+                this.crimeManager.policeActive = true;
+                this.crimeManager.policeActiveTimer = 30.0;
+                for (let i = 0; i < 6; i++) {
+                    this.crimeManager.police.push(new PoliceOfficer(px, py, true));
+                }
+            }
+            this.hud.showFollowerNotification("🚨 SPOTTED! An NPC saw you putting up illegal posters! 6 Police dispatched to arrest you! 🚨", false);
+        } else {
+            this.hud.showFollowerNotification(`📄 Placed ${posterType.toUpperCase()} POSTER on sidewalk!`, true);
+        }
+
+        // 2. Organizer recruitment (1 in 6 chance)
+        if (Math.random() < (1 / 6)) {
+            window.playerInventory['Organizer'] = (window.playerInventory['Organizer'] || 0) + 1;
+            setTimeout(() => {
+                this.hud.showFollowerNotification("📢 Poster Success! Recruited an Organizer (+1 Organizer in inventory)!", true);
+            }, 800);
+        }
+
+        // 3. Cult member recruitment (1 in 4 chance, Cult Mode ONLY)
+        if (window.cultMode && Math.random() < (1 / 4)) {
+            this.followerManager.addFollower(this.player.x, this.player.y);
+            this.cultMembersRecruitedThisRound = (this.cultMembersRecruitedThisRound || 0) + 1;
+            setTimeout(() => {
+                this.hud.showFollowerNotification("😇 Poster Success! Recruited a new Cult Member into your posse!", true);
+            }, 1200);
+
+            // Send a police officer to investigate if two new cult members are recruited in a single round
+            if (this.cultMembersRecruitedThisRound >= 2) {
+                setTimeout(() => {
+                    this.hud.showFollowerNotification("🚔 WARNING: 2 Cult Members recruited this round! An investigating officer is tracking you down!", false);
+                }, 1800);
+                if (this.crimeManager) {
+                    const cop = new PoliceOfficer(px, py, true);
+                    cop.isInvestigatingOfficer = true;
+                    this.crimeManager.police.push(cop);
+                }
+            }
+        }
+
+        // 4. Rebellion / Riot incitement (1 in 10 chance -> trash on every tile in 6-tile radius)
+        if (Math.random() < (1 / 10)) {
+            let trashCount = 0;
+            for (let dy = -6; dy <= 6; dy++) {
+                for (let dx = -6; dx <= 6; dx++) {
+                    if (Math.sqrt(dx*dx + dy*dy) <= 6) {
+                        const rx = wrapTileX(centerTX + dx);
+                        const ry = wrapTileY(centerTY + dy);
+                        this.trashManager.spawnTrashAt(rx * TILE_SIZE + TILE_SIZE / 2, ry * TILE_SIZE + TILE_SIZE / 2);
+                        trashCount++;
+                    }
+                }
+            }
+            setTimeout(() => {
+                this.hud.showFollowerNotification(`🔥 REBELLION INCITED! Rioting crowd dumped trash on every tile in a 6-tile radius! (${trashCount} trash spawned) 💥🗑️`, false);
+            }, 1600);
         }
     }
 
@@ -1174,7 +1723,23 @@ class Game {
         }
     }
 
+    togglePause() {
+        if (this.state !== GameState.PLAYING) return;
+        this.isPaused = !this.isPaused;
+        const btn = document.getElementById('btn-pause');
+        if (btn) {
+            btn.innerHTML = this.isPaused ? '▶️ PLAY' : '⏸️ PAUSE';
+            btn.style.background = this.isPaused ? '#22c55e' : 'rgba(20, 25, 40, 0.88)';
+            btn.style.borderColor = this.isPaused ? '#40ff80' : '#ffcc00';
+        }
+        if (this.hud) {
+            this.hud.showFollowerNotification(this.isPaused ? "⏸️ GAME PAUSED" : "▶️ GAME RESUMED", true);
+        }
+    }
+
     _update(dt) {
+        if (this.isPaused) return;
+
         if (this.dragonSplashTimer > 0) {
             this.dragonSplashTimer -= dt;
             if (this.dragonSplashTimer <= 0) {
@@ -1325,6 +1890,81 @@ class Game {
             return;
         }
 
+        // ── Active Portals Teleportation ──
+        if (this.activePortals && this.player) {
+            if (this.activePortals.teleportCooldown > 0) {
+                this.activePortals.teleportCooldown -= dt;
+            } else {
+                const px = wrapWorldX(this.player.x);
+                const py = wrapWorldY(this.player.y);
+                const d1 = Math.sqrt((px - this.activePortals.p1.x)**2 + (py - this.activePortals.p1.y)**2);
+                const d2 = Math.sqrt((px - this.activePortals.p2.x)**2 + (py - this.activePortals.p2.y)**2);
+
+                if (d1 < TILE_SIZE * 0.8) {
+                    this.player.x = this.activePortals.p2.x;
+                    this.player.y = this.activePortals.p2.y;
+                    this.activePortals.teleportCooldown = 1.2;
+                    if (window.soundManager) window.soundManager.playEngageSFX();
+                    this.hud.showFollowerNotification("🌀 Seamless Portal Transport! Teleported to Orange Portal!", true);
+                } else if (d2 < TILE_SIZE * 0.8) {
+                    this.player.x = this.activePortals.p1.x;
+                    this.player.y = this.activePortals.p1.y;
+                    this.activePortals.teleportCooldown = 1.2;
+                    if (window.soundManager) window.soundManager.playEngageSFX();
+                    this.hud.showFollowerNotification("🌀 Seamless Portal Transport! Teleported to Blue Portal!", true);
+                }
+            }
+        }
+
+        // ── Bottomless Pits Falling Collisions ──
+        if (this.bottomlessPits && this.bottomlessPits.length > 0) {
+            for (const pit of this.bottomlessPits) {
+                for (const tile of pit.tiles) {
+                    // Check followers falling into pit
+                    if (this.followerManager && this.followerManager.followers) {
+                        for (let i = this.followerManager.followers.length - 1; i >= 0; i--) {
+                            const f = this.followerManager.followers[i];
+                            const dist = Math.sqrt((f.x - tile.x)**2 + (f.y - tile.y)**2);
+                            if (dist < TILE_SIZE * 0.75) {
+                                this.followerManager.followers.splice(i, 1);
+                                this.hud.followerCount = this.followerManager.getFollowerCount();
+                                this.hud.showFollowerNotification("🕳️ A posse member fell into the Bottomless Pit and was lost!", false);
+                            }
+                        }
+                    }
+
+                    // Check police officers falling into pit
+                    if (this.crimeManager && this.crimeManager.police) {
+                        for (const cop of this.crimeManager.police) {
+                            if (cop.alive) {
+                                const dist = Math.sqrt((cop.x - tile.x)**2 + (cop.y - tile.y)**2);
+                                if (dist < TILE_SIZE * 0.75) {
+                                    cop.alive = false;
+                                    this.hud.showFollowerNotification("🕳️ A Police Officer fell into the Bottomless Pit and disappeared!", true);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Investigating Officer Catch Check (Cult Mode) ──
+        if (this.crimeManager && this.crimeManager.police && this.player) {
+            const px = wrapWorldX(this.player.x);
+            const py = wrapWorldY(this.player.y);
+            for (const cop of this.crimeManager.police) {
+                if (cop.alive && cop.isInvestigatingOfficer) {
+                    const dist = Math.sqrt((px - cop.x)**2 + (py - cop.y)**2);
+                    if (dist < TILE_SIZE * 0.8) {
+                        this.state = GameState.UI_OVERLAY;
+                        this._showSplashGameOver("INVESTIGATED!", "🚔 An investigating police officer caught you recruiting cult members! Round ended with no other penalties.", false);
+                        return;
+                    }
+                }
+            }
+        }
+
         // Pirate/Frenzy/Politics/Flowers/Crime/Cult/Builder Mode updates
         if (window.pirateMode || window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
             this.npcManager.update();
@@ -1450,8 +2090,8 @@ class Game {
             }
         }
 
-        // Crime or Politics (with mafia votes) updates
-        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive) && this.crimeManager) {
+        // Crime, Politics, Price Fixing, or Black Market Penalty updates
+        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized) && this.crimeManager) {
             if (window.crimeMode) {
                 this.npcManager.update();
                 this.npcManager.checkInteraction(this.player.x, this.player.y);
@@ -2158,6 +2798,38 @@ class Game {
         this.truckChain = [];
         this.trashCollectedInTruck = 0;
         this.trashCollectedInRound = 0;
+        this.activePortals = null;
+        this.bottomlessPits = [];
+        this.posters = [];
+        this.cultMembersRecruitedThisRound = 0;
+        window.playerInventory = window.playerInventory || {};
+        if (window.playerInventory['Cannonballs'] === undefined) {
+            window.playerInventory['Cannonballs'] = 20;
+        }
+
+        // Check Black Market Deadly Mushroom Police Penalty
+        if (this.blackMarketPenaltyNextRound) {
+            this.blackMarketPenalized = true;
+            this.blackMarketPenaltyNextRound = false;
+            setTimeout(() => {
+                this.hud.showFollowerNotification("🚨 WANTED BY POLICE! You sold deadly mushrooms! 6 Police Officers are chasing you for the entire round! 🚨", false);
+            }, 1000);
+
+            if (this.crimeManager) {
+                this.crimeManager.police = [];
+                for (let i = 0; i < 6; i++) {
+                    const station = this.gameMap.buildings[1];
+                    let sx = this.player.x, sy = this.player.y;
+                    if (station && station.doorTiles && station.doorTiles.length > 0) {
+                        sx = station.doorTiles[0].x * TILE_SIZE;
+                        sy = station.doorTiles[0].y * TILE_SIZE;
+                    }
+                    this.crimeManager.police.push(new PoliceOfficer(sx, sy, false));
+                }
+            }
+        } else {
+            this.blackMarketPenalized = false;
+        }
         if (window.playerHasTruck > 1) {
             for (let i = 0; i < window.playerHasTruck - 1; i++) {
                 this.truckChain.push(new GarbageTruckFollower(this.player.x, this.player.y, i));
@@ -2818,9 +3490,8 @@ class Game {
             }
         }
 
-        // Draw Dump marker
-        if (window.playerHasTruck > 0 && this.spriteManager) {
-            const dumpImg = this.spriteManager.getImage('dump');
+        // Draw Dump & Pulp Mill markers in all modes
+        if (this.spriteManager && this.gameMap && this.gameMap.buildings) {
             const dumpBldg = this.gameMap.buildings.find(b => b.type === 'dump');
             if (dumpBldg && dumpBldg.doorTiles && dumpBldg.doorTiles.length > 0) {
                 const door = dumpBldg.doorTiles[0];
@@ -2829,13 +3500,48 @@ class Game {
                 const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
                 if (this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) {
                     const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
-                    if (dumpImg) {
+                    const dumpImg = this.spriteManager.getImage('dump');
+                    if (dumpImg && (dumpImg.complete || dumpImg instanceof HTMLCanvasElement)) {
                         ctx.drawImage(dumpImg, screen.x - 32, screen.y - 64, 64, 64);
                     }
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = '#00ff88';
                     ctx.font = 'bold 8px "Press Start 2P", monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText('DUMP', screen.x, screen.y - 70);
+                    ctx.fillText('🗑️ DUMP [E]', screen.x, screen.y - 70);
+                }
+            }
+
+            const pulpBldg = this.gameMap.buildings.find(b => b.type === 'pulp_mill');
+            if (pulpBldg && pulpBldg.doorTiles && pulpBldg.doorTiles.length > 0) {
+                const door = pulpBldg.doorTiles[0];
+                const cx = door.x * TILE_SIZE + TILE_SIZE / 2;
+                const cy = door.y * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    ctx.fillStyle = '#8b5a2b';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🪵 PULP MILL [E]', screen.x, screen.y - 70);
+                }
+            }
+
+            const bmBldg = this.gameMap.buildings.find(b => b.type === 'black_market');
+            if (bmBldg && bmBldg.doorTiles && bmBldg.doorTiles.length > 0) {
+                const door = bmBldg.doorTiles[0];
+                const cx = door.x * TILE_SIZE + TILE_SIZE / 2;
+                const cy = door.y * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    const bmImg = this.spriteManager.getImage('black_market');
+                    if (bmImg && (bmImg.complete || bmImg instanceof HTMLCanvasElement)) {
+                        ctx.drawImage(bmImg, screen.x - 32, screen.y - 64, 64, 64);
+                    }
+                    ctx.fillStyle = '#ff0055';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('☠️ BLACK MARKET [E]', screen.x, screen.y - 70);
                 }
             }
         }
@@ -2936,7 +3642,83 @@ class Game {
             }
         }
 
-        // ── Phase 3: Cult Mode search-for-family building highlight ──
+        // ── Render Placed Posters ──
+        if (this.posters && this.posters.length > 0) {
+            for (const poster of this.posters) {
+                const wrapped = nearestWrap(poster.x, poster.y, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 20, wrapped.y - 20, 40, 40)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    const isRecruit = poster.type === 'recruitment';
+                    ctx.fillStyle = isRecruit ? '#0088cc' : '#cc0044';
+                    ctx.fillRect(screen.x - 8, screen.y - 10, 16, 20);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screen.x - 8, screen.y - 10, 16, 20);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '7px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(isRecruit ? '📢' : '🔥', screen.x, screen.y + 4);
+                }
+            }
+        }
+
+        // ── Render Active Portals ──
+        if (this.activePortals) {
+            const now = performance.now() / 1000;
+            const drawPortal = (portal, color1, color2, label) => {
+                const wrapped = nearestWrap(portal.x, portal.y, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 40, wrapped.y - 40, 80, 80)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    ctx.save();
+                    ctx.translate(screen.x, screen.y);
+                    ctx.rotate(now * 3);
+                    ctx.strokeStyle = color1;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.strokeStyle = color2;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    ctx.fillStyle = color1;
+                    ctx.font = 'bold 7px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(label, screen.x, screen.y - 20);
+                }
+            };
+
+            drawPortal(this.activePortals.p1, '#00d2ff', '#0044ff', '🌀 PORTAL A');
+            drawPortal(this.activePortals.p2, '#ff6600', '#ffaa00', '🌀 PORTAL B');
+        }
+
+        // ── Render Bottomless Pits ──
+        if (this.bottomlessPits && this.bottomlessPits.length > 0) {
+            const now = performance.now() / 1000;
+            for (const pit of this.bottomlessPits) {
+                for (const tile of pit.tiles) {
+                    const wrapped = nearestWrap(tile.x, tile.y, this.camera.getCenterX(), this.camera.getCenterY());
+                    if (this.camera.isVisible(wrapped.x - 20, wrapped.y - 20, 40, 40)) {
+                        const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                        // Dark void pit square
+                        ctx.fillStyle = '#05020a';
+                        ctx.fillRect(screen.x - TILE_SIZE/2, screen.y - TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = '#ff0055';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(screen.x - TILE_SIZE/2, screen.y - TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
+
+                        // Animated inner void swirl
+                        ctx.fillStyle = 'rgba(255, 0, 85, 0.25)';
+                        ctx.beginPath();
+                        ctx.arc(screen.x, screen.y, 6 + Math.sin(now * 4 + tile.tileX) * 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
 
         // ── Phase 3: Render Child + Parent NPCs ──
         if (this.npcManager) {
@@ -3031,7 +3813,7 @@ class Game {
             }
         }
 
-        if (window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive) {
+        if (window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized) {
             if (window.crimeMode) {
                 this.gameMap.renderAddresses(ctx, this.camera);
                 this.npcManager.render(ctx, this.camera, this.spriteManager);
@@ -3207,6 +3989,23 @@ class Game {
             ctx.fillText(`Tile: (${this.player.getTileX()}, ${this.player.getTileY()})`, w - 270, h - 48);
             ctx.fillText(`Keys: U:${k.up} D:${k.down} L:${k.left} R:${k.right}`, w - 270, h - 34);
             ctx.fillText(`Arrows to move, Q to pickup`, w - 270, h - 20);
+        }
+
+        // Render Pause Screen Overlay
+        if (this.isPaused) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.fillStyle = '#ffcc00';
+            ctx.font = 'bold 36px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', w / 2, h / 2 - 20);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '11px "Press Start 2P", monospace';
+            ctx.fillText('Press [P], [ESC] or click PAUSE button to resume', w / 2, h / 2 + 30);
+            ctx.restore();
         }
     }
 
@@ -4643,7 +5442,7 @@ class GameOrganizer {
 
         // ── Pirate Mode: render organizer as a pirate ship (Captain) ──
         if (window.pirateMode && this.game.spriteManager) {
-            const shipImg = this.game.spriteManager.getImage('pirate_ship');
+            const shipImg = this.game.spriteManager.getImage('pirate_ship_blue') || this.game.spriteManager.getImage('pirate_ship');
             if (shipImg && (shipImg.complete || shipImg instanceof HTMLCanvasElement)) {
                 const drawSize = 72;
                 const bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;

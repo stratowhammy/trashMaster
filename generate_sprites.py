@@ -1,20 +1,38 @@
 import os
-from PIL import Image
+import struct
+import zlib
+
+def write_png(filename, width, height, rgba_data):
+    raw_lines = bytearray()
+    for y in range(height):
+        raw_lines.append(0)
+        for x in range(width):
+            r, g, b, a = rgba_data[y * width + x]
+            raw_lines.extend([r, g, b, a])
+    
+    compressed = zlib.compress(bytes(raw_lines))
+    
+    def chunk(chunk_type, data):
+        c = chunk_type + data
+        crc = zlib.crc32(c) & 0xffffffff
+        return struct.pack('>I', len(data)) + c + struct.pack('>I', crc)
+    
+    ihdr = struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)
+    png_bytes = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', compressed) + chunk(b'IEND', b'')
+    with open(filename, 'wb') as f:
+        f.write(png_bytes)
 
 def create_sprite(matrix, palette, filename, size=64):
     height = len(matrix)
     width = len(matrix[0])
-    img = Image.new("RGBA", (width, height), (0,0,0,0))
-    pixels = img.load()
-    for y in range(height):
-        for x in range(width):
-            char = matrix[y][x]
-            if char in palette:
-                pixels[x, y] = palette[char]
-            else:
-                pixels[x, y] = (0,0,0,0)
-    img = img.resize((size, size), resample=Image.NEAREST)
-    img.save(filename, "PNG")
+    pixels = []
+    for sy in range(size):
+        my = int(sy * height / size)
+        for sx in range(size):
+            mx = int(sx * width / size)
+            char = matrix[my][mx]
+            pixels.append(palette.get(char, (0, 0, 0, 0)))
+    write_png(filename, size, size, pixels)
 
 emp_matrix = [
     "                ",
@@ -35,40 +53,13 @@ emp_matrix = [
     "                "
 ]
 emp_palette = {
-    'b': (20, 60, 150, 255), # blue cap
-    's': (255, 204, 153, 255), # skin
-    'e': (0, 0, 0, 255), # eye
-    'u': (180, 110, 50, 255), # brown uniform
-    'y': (255, 204, 153, 255), # skin arm
-    'p': (130, 80, 40, 255), # dark brown pants
-    'k': (30, 30, 30, 255) # black shoes
-}
-
-truck_matrix = [
-    "                ",
-    "                ",
-    "                ",
-    "    ggggggggg   ",
-    "   ggggggggggg  ",
-    "  ggcccccccggww ",
-    "  ggcccccccggwwh",
-    "  ggcccccccggggg",
-    "  ggcccccccggggy",
-    "   ggggggggggggg",
-    "   gggggggggggg ",
-    "    k k    k k  ",
-    "   kkkkk  kkkkk ",
-    "    k k    k k  ",
-    "                ",
-    "                "
-]
-truck_palette = {
-    'g': (30, 160, 60, 255),
-    'w': (150, 220, 255, 255),
-    'c': (80, 90, 80, 255),
-    'h': (255, 255, 0, 255),
-    'y': (255, 180, 0, 255),
-    'k': (20, 20, 20, 255)
+    'b': (20, 60, 150, 255),
+    's': (255, 204, 153, 255),
+    'e': (0, 0, 0, 255),
+    'u': (180, 110, 50, 255),
+    'y': (255, 204, 153, 255),
+    'p': (130, 80, 40, 255),
+    'k': (30, 30, 30, 255)
 }
 
 filth_matrix = [
@@ -147,29 +138,6 @@ mush_palette = {
     's': (240, 230, 200, 255)
 }
 
-wings_matrix = [
-    "                ",
-    "   w        w   ",
-    "  wgw      wgw  ",
-    "  wggw    wggw  ",
-    "  wgggw  wgggw  ",
-    "  wwwww  wwwww  ",
-    "  wgggw  wgggw  ",
-    "   wggw  wggw   ",
-    "   www    www   ",
-    "    ww    ww    ",
-    "    w      w    ",
-    "                ",
-    "                ",
-    "                ",
-    "                ",
-    "                "
-]
-wings_palette = {
-    'w': (250, 250, 255, 255),
-    'g': (200, 220, 250, 255)
-}
-
 ship_matrix = [
     "       fff      ",
     "       fff      ",
@@ -188,8 +156,17 @@ ship_matrix = [
     "                ",
     "                "
 ]
-ship_palette = {
-    'f': (30, 30, 30, 255),
+ship_palette_blue = {
+    'f': (30, 120, 255, 255),
+    'w': (240, 240, 230, 255),
+    'm': (100, 60, 20, 255),
+    'b': (140, 80, 30, 255),
+    'd': (90, 50, 20, 255),
+    'c': (20, 20, 20, 255)
+}
+
+ship_palette_red = {
+    'f': (230, 30, 30, 255),
     'w': (240, 240, 230, 255),
     'm': (100, 60, 20, 255),
     'b': (140, 80, 30, 255),
@@ -243,9 +220,10 @@ create_sprite(emp_matrix, emp_palette, 'assets/sprites/employee.png')
 create_sprite(filth_matrix, filth_palette, 'assets/sprites/filthadelphia.png')
 create_sprite(watch_matrix, watch_palette, 'assets/sprites/borrowed_time.png')
 create_sprite(mush_matrix, mush_palette, 'assets/sprites/mushrooms.png')
-create_sprite(ship_matrix, ship_palette, 'assets/sprites/pirate_ship.png')
+create_sprite(ship_matrix, ship_palette_blue, 'assets/sprites/pirate_ship_blue.png')
+create_sprite(ship_matrix, ship_palette_red, 'assets/sprites/pirate_ship_red.png')
+create_sprite(ship_matrix, ship_palette_blue, 'assets/sprites/pirate_ship.png')
 create_sprite(map_matrix, map_palette, 'assets/sprites/treasure_map.png')
 create_sprite(cannonball_matrix, cannonball_palette, 'assets/sprites/cannonball.png', size=32)
 
 print("All png pixel art generated successfully.")
-

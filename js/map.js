@@ -108,9 +108,172 @@ class BaseMap {
         this.roadDirections = [];
     }
 
+    getTileAttribute(x, y) {
+        const wx = wrapTileX(x);
+        const wy = wrapTileY(y);
+        const tile = this.tiles[wy] ? this.tiles[wy][wx] : null;
+        if (tile === null || tile === undefined) return 'sidewalk tile';
+
+        if (window.pirateMode) {
+            if (tile === TileType.ROAD) return 'water tile';
+            if (tile === TileType.BUILDING_DOOR) return 'door tiles';
+            return 'island tiles';
+        }
+
+        switch (tile) {
+            case TileType.BUILDING_DOOR:
+                return 'door tiles';
+            case TileType.BUILDING:
+                return 'building tile';
+            case TileType.GRASS:
+            case TileType.PARK_PATH:
+                return 'park tile';
+            case TileType.ROAD:
+            case TileType.CROSSWALK:
+            case TileType.ROAD_UP:
+            case TileType.ROAD_DOWN:
+            case TileType.ROAD_LEFT:
+            case TileType.ROAD_RIGHT:
+                return 'road tile';
+            case TileType.SIDEWALK: {
+                const neighbors = [
+                    [wx, wrapTileY(wy - 1)],
+                    [wx, wrapTileY(wy + 1)],
+                    [wrapTileX(wx - 1), wy],
+                    [wrapTileX(wx + 1), wy]
+                ];
+                for (const [nx, ny] of neighbors) {
+                    const nt = this.tiles[ny] ? this.tiles[ny][nx] : null;
+                    if (
+                        nt === TileType.ROAD ||
+                        nt === TileType.CROSSWALK ||
+                        nt === TileType.ROAD_UP ||
+                        nt === TileType.ROAD_DOWN ||
+                        nt === TileType.ROAD_LEFT ||
+                        nt === TileType.ROAD_RIGHT
+                    ) {
+                        return 'burm tile';
+                    }
+                }
+                return 'sidewalk tile';
+            }
+            default:
+                return 'sidewalk tile';
+        }
+    }
+
+    _spawnTrees() {
+        this.trees = [];
+        const burmTiles = [];
+        const parkTiles = [];
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                const attr = this.getTileAttribute(x, y);
+                if (attr === 'burm tile') {
+                    burmTiles.push({ x, y });
+                } else if (attr === 'park tile') {
+                    parkTiles.push({ x, y });
+                }
+            }
+        }
+
+        const shuffle = (arr) => {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        };
+
+        shuffle(burmTiles);
+        shuffle(parkTiles);
+
+        const numBurmTrees = Math.floor(burmTiles.length / 6);
+        const numParkTrees = Math.floor(parkTiles.length / 4);
+
+        let treeId = 1;
+        for (let i = 0; i < numBurmTrees; i++) {
+            const t = burmTiles[i];
+            this.trees.push({
+                id: treeId++,
+                tileX: t.x,
+                tileY: t.y,
+                x: t.x * TILE_SIZE + TILE_SIZE / 2,
+                y: t.y * TILE_SIZE + TILE_SIZE / 2,
+                cut: false,
+                type: 'burm'
+            });
+        }
+        for (let i = 0; i < numParkTrees; i++) {
+            const t = parkTiles[i];
+            this.trees.push({
+                id: treeId++,
+                tileX: t.x,
+                tileY: t.y,
+                x: t.x * TILE_SIZE + TILE_SIZE / 2,
+                y: t.y * TILE_SIZE + TILE_SIZE / 2,
+                cut: false,
+                type: 'park'
+            });
+        }
+    }
+
+    _spawnShrooms() {
+        this.shrooms = [];
+        const parkTiles = [];
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (this.getTileAttribute(x, y) === 'park tile') {
+                    parkTiles.push({ x, y });
+                }
+            }
+        }
+
+        for (let i = parkTiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [parkTiles[i], parkTiles[j]] = [parkTiles[j], parkTiles[i]];
+        }
+
+        const numShrooms = Math.floor(parkTiles.length / 20);
+        let shroomId = 1;
+        for (let i = 0; i < numShrooms; i++) {
+            const t = parkTiles[i];
+            this.shrooms.push({
+                id: shroomId++,
+                tileX: t.x,
+                tileY: t.y,
+                x: t.x * TILE_SIZE + TILE_SIZE / 2,
+                y: t.y * TILE_SIZE + TILE_SIZE / 2,
+                collected: false
+            });
+        }
+    }
+
+    _drawShroom(ctx, x, y) {
+        if (window.game && window.game.spriteManager) {
+            const shroomImg = window.game.spriteManager.getImage('shroom');
+            if (shroomImg && (shroomImg.complete || shroomImg instanceof HTMLCanvasElement)) {
+                ctx.drawImage(shroomImg, x - 12, y - 12, 24, 24);
+                return;
+            }
+        }
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(x - 3, y, 6, 8);
+        ctx.fillStyle = '#d946ef';
+        ctx.beginPath();
+        ctx.arc(x, y - 2, 8, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(x - 4, y - 6, 2, 2);
+        ctx.fillRect(x + 2, y - 5, 2, 2);
+    }
+
     regenerate() {
         this.generate();
         this._catalogBuildings();
+        this._spawnTrees();
+        this._spawnShrooms();
     }
 
     _placeProceduralBuildings() {
@@ -750,10 +913,31 @@ class BaseMap {
             if (availableIds.length > 0) {
                 this.buildings[availableIds.pop()].type = 'dump';
             }
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'pulp_mill';
+            }
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'black_market';
+            }
             for (let i = 0; i < 8; i++) {
                 if (availableIds.length > 0) {
                     this.buildings[availableIds.pop()].type = 'fast_food';
                 }
+            }
+            
+            // Guarantee a dump building exists on every map
+            if (this.buildings.length > 0 && !this.buildings.some(b => b.type === 'dump')) {
+                this.buildings[this.buildings.length - 1].type = 'dump';
+            }
+            // Guarantee a pulp_mill building exists on every map
+            if (this.buildings.length > 1 && !this.buildings.some(b => b.type === 'pulp_mill')) {
+                const nonDump = this.buildings.find(b => b.type !== 'dump');
+                if (nonDump) nonDump.type = 'pulp_mill';
+            }
+            // Guarantee a black_market building exists on every map
+            if (this.buildings.length > 2 && !this.buildings.some(b => b.type === 'black_market')) {
+                const availableBldg = this.buildings.find(b => !['dump', 'pulp_mill'].includes(b.type));
+                if (availableBldg) availableBldg.type = 'black_market';
             }
         }
     }
@@ -900,8 +1084,18 @@ class GameMap extends BaseMap {
         }
 
         // Ensure there is a Sea Dump Dock accessible on water for ships
-        const dumpTX = 10;
-        const dumpTY = 10;
+        const dumpTX = 3;
+        const dumpTY = 3;
+
+        // Clear 3x3 surrounding tiles to open water
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const wx = wrapTileX(dumpTX + dx);
+                const wy = wrapTileY(dumpTY + dy);
+                this.tiles[wy][wx] = TileType.ROAD;
+            }
+        }
+
         this.tiles[dumpTY][dumpTX] = TileType.BUILDING_DOOR;
         this.buildings.push({
             id: 999,
@@ -931,18 +1125,23 @@ class GameMap extends BaseMap {
                 // Draw Floating Sea Dump Dock / Wooden Barge
                 ctx.save();
                 ctx.fillStyle = '#6e4726';
-                ctx.fillRect(sx + 4, sy + 4, s - 8, s - 8);
+                ctx.fillRect(sx + 2, sy + 2, s - 4, s - 4);
                 ctx.strokeStyle = '#4a2f18';
                 ctx.lineWidth = 3;
-                ctx.strokeRect(sx + 4, sy + 4, s - 8, s - 8);
+                ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
 
-                ctx.fillStyle = '#222222';
-                ctx.fillRect(sx + 12, sy + 12, s - 24, s - 24);
+                const dumpImg = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage('dump') : null;
+                if (dumpImg && (dumpImg.complete || dumpImg instanceof HTMLCanvasElement)) {
+                    ctx.drawImage(dumpImg, sx + s / 2 - 16, sy + s / 2 - 20, 32, 32);
+                } else {
+                    ctx.fillStyle = '#222222';
+                    ctx.fillRect(sx + 12, sy + 12, s - 24, s - 24);
+                }
 
                 ctx.fillStyle = '#00ff88';
                 ctx.font = 'bold 9px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('🗑️ DUMP', sx + s / 2, sy + s / 2 + 3);
+                ctx.fillText('🗑️ DUMP', sx + s / 2, sy + s - 5);
 
                 const pulse = Math.sin(performance.now() / 150) * 3;
                 ctx.strokeStyle = '#ffcc00';
@@ -995,8 +1194,11 @@ class GameMap extends BaseMap {
                 ctx.strokeStyle=sidewalkDetail; ctx.lineWidth=0.5;
                 ctx.strokeRect(sx+1,sy+1,s-2,s-2);
                 if((tx+ty)%3===0) ctx.strokeRect(sx+s/4,sy+s/4,s/2,s/2);
-                if ((tx * 11 + ty * 13) % 23 === 0) {
-                    this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                if (this.trees && this.trees.length > 0) {
+                    const tree = this.trees.find(tr => tr.tileX === tx && tr.tileY === ty && !tr.cut);
+                    if (tree) {
+                        this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                    }
                 }
                 break;
             case TileType.GRASS:
@@ -1008,8 +1210,17 @@ class GameMap extends BaseMap {
                 for(let i=0;i<3;i++){ctx.fillRect(sx+((seed+i*11)%s),sy+((seed+i*7)%s),1,3);}
                 if((tx*3+ty*7)%17===0){ctx.fillStyle='#e8d44d';ctx.fillRect(sx+10,sy+12,3,3);}
                 else if((tx*5+ty*11)%19===0){ctx.fillStyle='#d46a6a';ctx.fillRect(sx+20,sy+8,3,3);}
-                if ((tx * 17 + ty * 5) % 11 === 0 || (tx * 7 + ty * 3) % 13 === 0) {
-                    this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                if (this.trees && this.trees.length > 0) {
+                    const tree = this.trees.find(tr => tr.tileX === tx && tr.tileY === ty && !tr.cut);
+                    if (tree) {
+                        this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                    }
+                }
+                if (this.shrooms && this.shrooms.length > 0) {
+                    const shroom = this.shrooms.find(sh => sh.tileX === tx && sh.tileY === ty && !sh.collected);
+                    if (shroom) {
+                        this._drawShroom(ctx, sx + s/2, sy + s/2);
+                    }
                 }
                 break;
             case TileType.BUILDING: {
@@ -1048,11 +1259,17 @@ class GameMap extends BaseMap {
                 let c = BUILDING_COLORS[ci>=0?ci:0];
                 let isHospital = bldg && bldg.type === 'hospital';
                 let isAirport = bldg && bldg.type === 'airport';
+                let isPulpMill = bldg && bldg.type === 'pulp_mill';
+                let isBlackMarket = bldg && bldg.type === 'black_market';
                 
                 if (isHospital) {
                     ctx.fillStyle = '#e8e8e8';
                 } else if (isAirport) {
                     ctx.fillStyle = '#b0b8c0';
+                } else if (isPulpMill) {
+                    ctx.fillStyle = '#8b5a2b';
+                } else if (isBlackMarket) {
+                    ctx.fillStyle = '#12061c';
                 } else {
                     ctx.fillStyle = c.base;
                 }

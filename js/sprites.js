@@ -25,6 +25,8 @@ const SPRITE_CONFIG = {
         { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },
         { id: 'char_pirate', name: 'Pirate', src: 'assets/sprites/pirate.png', color: '#aa3333' },
         { id: 'pirate_ship', name: 'Pirate Ship', src: 'assets/sprites/pirate_ship.png', color: '#8b4513' },
+        { id: 'pirate_ship_blue', name: 'Player Pirate Ship (Blue)', src: 'assets/sprites/pirate_ship_blue.png', color: '#1e90ff' },
+        { id: 'pirate_ship_red', name: 'Rival Pirate Ship (Red)', src: 'assets/sprites/pirate_ship_red.png', color: '#ff3333' },
         { id: 'treasure', name: 'Treasure Chest', src: 'assets/sprites/treasure.png', color: '#ffd700' },
         { id: 'treasure_map', name: 'Treasure Map', src: 'assets/sprites/treasure_map.png', color: '#d2b48c' },
         { id: 'goose', name: 'Goose Logo', src: 'assets/sprites/goose.png', color: '#ffaa00' },
@@ -39,6 +41,7 @@ const SPRITE_CONFIG = {
         { id: 'item_trashpickers', name: 'Trashpickers', src: 'assets/sprites/trashpickers.png' },
         { id: 'item_quinine', name: 'Quinine', src: 'assets/sprites/quinine.png' },
         { id: 'item_organizer', name: 'Organizer', src: 'assets/sprites/organizer.png' },
+        { id: 'shroom', name: 'Wild Mushroom', src: 'assets/sprites/shroom.png', color: '#d946ef' },
         { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/goose.png', color: '#ffaa00' },
         { id: 'flower', name: 'Flower', src: 'assets/sprites/flower.png' },
         { id: 'mud', name: 'Mud', src: 'assets/sprites/mud.png' },
@@ -46,6 +49,7 @@ const SPRITE_CONFIG = {
         { id: 'red_balloon', name: 'Red Balloon', src: 'assets/sprites/red_balloon.png' },
         { id: 'parade', name: 'Parade', src: 'assets/sprites/parade.png' },
         { id: 'dump', name: 'Dump', src: 'assets/sprites/dump.png' },
+        { id: 'black_market', name: 'Black Market', src: 'assets/sprites/black_market.png', color: '#ff0055' },
         { id: 'philly_city_hall', name: 'City Hall', src: 'assets/sprites/philly_city_hall.png' },
         { id: 'philly_art_museum', name: 'Art Museum', src: 'assets/sprites/philly_art_museum.png' },
         { id: 'philly_liberty_bell', name: 'Liberty Bell', src: 'assets/sprites/philly_liberty_bell.png' },
@@ -264,6 +268,54 @@ class SpriteManager {
             ctx.fillStyle = '#ffffff'; // white hot center
             ctx.fillRect(28, 28, 8, 8);
             
+        } else if (sprite.id === 'shroom') {
+            // Draw visually distinct wild mushroom (purple cap with glowing yellow spots)
+            ctx.fillStyle = '#fef08a'; // Stem
+            ctx.fillRect(12, 18, 8, 12);
+            ctx.fillStyle = '#d946ef'; // Purple/Magenta cap
+            ctx.beginPath();
+            ctx.arc(16, 14, 12, Math.PI, 0);
+            ctx.fill();
+            ctx.fillStyle = '#facc15'; // Glowing spots
+            ctx.fillRect(8, 8, 3, 3);
+            ctx.fillRect(16, 5, 4, 4);
+            ctx.fillRect(22, 10, 3, 3);
+        } else if (sprite.id === 'black_market') {
+            // Draw 16-bit retro Black Market building with crimson neon glow
+            ctx.fillStyle = '#12061c';
+            ctx.fillRect(0, 0, 32, 32);
+            ctx.fillStyle = '#ff0055';
+            ctx.fillRect(2, 2, 28, 6);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '8px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('☠️', 16, 22);
+            ctx.strokeStyle = '#ff0055';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(1, 1, 30, 30);
+        } else if (sprite.id && sprite.id.includes('pirate_ship')) {
+            const isRed = sprite.id.includes('red');
+            const flagColor = isRed ? '#e61e1e' : '#1e78ff';
+            ctx.fillStyle = '#8b4513';
+            ctx.beginPath();
+            ctx.moveTo(12, 40);
+            ctx.lineTo(52, 40);
+            ctx.lineTo(44, 54);
+            ctx.lineTo(20, 54);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#4a250a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#5a3010';
+            ctx.fillRect(30, 10, 4, 30);
+
+            ctx.fillStyle = '#f0f0e6';
+            ctx.fillRect(18, 14, 28, 18);
+
+            ctx.fillStyle = flagColor;
+            ctx.fillRect(28, 6, 14, 8);
         } else if (sprite.id.startsWith('char')) {
             // Character fallback: colored circle with initial
             const color = sprite.color || '#888';

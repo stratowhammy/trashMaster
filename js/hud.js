@@ -331,8 +331,11 @@ class HUD {
         if (window.playerHasTruck > 0 && window.game) {
             const currentTrash = window.game.trashCollectedInTruck || 0;
             const animalPenalty = window.game.player ? (window.game.player.capturedAnimals || []).length * 10 : 0;
-            const maxTrash = Math.max(0, (window.playerHasTruck * 100) - animalPenalty);
-            const fillPct = maxTrash > 0 ? Math.max(0, Math.min(1, currentTrash / maxTrash)) : 1;
+            const totalCap = Math.max(0, (window.playerHasTruck * 100) - animalPenalty);
+            const treesCarried = window.game.treesCarried || 0;
+            const treeUnits = treesCarried * 100;
+            const trashUnits = currentTrash;
+            const usedCap = treeUnits + trashUnits;
 
             const barW = Math.min(400, canvasWidth * 0.5);
             const barH = 16;
@@ -344,9 +347,23 @@ class HUD {
             ctx.fillStyle = 'rgba(50, 30, 10, 0.6)';
             ctx.fillRect(barX, barY, barW, barH);
 
-            // Fill (brown color)
-            ctx.fillStyle = '#8b5a2b';
-            ctx.fillRect(barX, barY, barW * fillPct, barH);
+            if (totalCap > 0) {
+                // Green fill for trees (100 capacity per tree)
+                const greenPct = Math.min(1, treeUnits / totalCap);
+                const greenW = barW * greenPct;
+                if (greenW > 0) {
+                    ctx.fillStyle = '#2e8b57';
+                    ctx.fillRect(barX, barY, greenW, barH);
+                }
+
+                // Brown fill for regular trash (1 capacity per trash piece)
+                const trashPct = Math.min(1 - greenPct, trashUnits / totalCap);
+                const brownW = barW * trashPct;
+                if (brownW > 0) {
+                    ctx.fillStyle = '#8b5a2b';
+                    ctx.fillRect(barX + greenW, barY, brownW, barH);
+                }
+            }
 
             // Border
             ctx.strokeStyle = '#fff';
@@ -358,7 +375,7 @@ class HUD {
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`TRUCK: ${currentTrash}/${maxTrash}`, barX + barW / 2, barY + barH / 2 + 1);
+            ctx.fillText(`TRUCK: ${usedCap}/${totalCap}`, barX + barW / 2, barY + barH / 2 + 1);
         }
 
         // ── Hunger Bar (Bottom Center) ──
@@ -396,6 +413,69 @@ class HUD {
             ctx.textBaseline = 'middle';
             ctx.fillText('HUNGER', canvasWidth / 2, barY + barH / 2 + 1);
             nextBarY -= 20;
+        }
+
+        // ── On-Screen Inventory UI (Middle Right) ──
+        if (window.game && window.game.state === GameState.PLAYING) {
+            const inv = window.playerInventory || {};
+            const items = [
+                { name: 'Wings', icon: '🪽', count: inv['Wings'] || 0 },
+                { name: 'Shrooms', icon: '🍄', count: inv['Shrooms'] || inv['Mushrooms'] || 0 },
+                { name: 'Paper', icon: '📄', count: inv['Paper'] || 0 },
+                { name: 'Cannonballs', icon: '💣', count: inv['Cannonballs'] !== undefined ? inv['Cannonballs'] : 20 },
+                { name: 'Portal Gun', icon: '🌀', count: inv['Portal Gun'] || 0 },
+                { name: 'Trash Bomb', icon: '💥', count: inv['Trash Bomb'] || 0 },
+                { name: 'Bottomless Pit', icon: '🕳️', count: inv['Bottomless Pit'] || 0 },
+                { name: 'Flashlight', icon: '🔦', count: inv['Flashlight'] || 0 },
+                { name: 'Borrowed Time', icon: '⏳', count: inv['Borrowed Time'] || 0 }
+            ];
+
+            if (window.flowersMode) {
+                items.push({ name: 'Fertilizer', icon: '🌸', count: inv['Fertilizer'] || 0 });
+            }
+
+            items.push({ name: 'Quinine', icon: '💊', count: inv['Quinine'] || 0 });
+
+            const rowH = 18;
+            const boxW = 160;
+            const boxH = 28 + items.length * rowH;
+            const boxX = canvasWidth - boxW - 15;
+            const boxY = Math.max(80, canvasHeight / 2 - boxH / 2);
+
+            // Background Panel
+            ctx.fillStyle = 'rgba(12, 18, 34, 0.85)';
+            ctx.fillRect(boxX, boxY, boxW, boxH);
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+            // Header Title
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 8px "Press Start 2P", monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('📦 INVENTORY', boxX + 10, boxY + 8);
+
+            // Separator Line
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(boxX + 8, boxY + 20);
+            ctx.lineTo(boxX + boxW - 8, boxY + 20);
+            ctx.stroke();
+
+            // Items List
+            ctx.font = '7px "Press Start 2P", monospace';
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const itemY = boxY + 26 + i * rowH;
+                ctx.fillStyle = item.count > 0 ? '#ffffff' : '#888888';
+                ctx.fillText(`${item.icon} ${item.name}:`, boxX + 8, itemY);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = item.count > 0 ? '#00ffaa' : '#666666';
+                ctx.fillText(`${item.count}`, boxX + boxW - 10, itemY);
+                ctx.textAlign = 'left';
+            }
         }
 
         // ── Happiness Bar (Bottom Center, Cult Mode) ──

@@ -3650,6 +3650,30 @@ class Game {
                 ctx.textAlign = 'center';
                 ctx.fillText(config.label, screen.x, screen.y - 70);
             }
+
+            if (this.gameMap && this.gameMap.landmarks) {
+                for (const lm of this.gameMap.landmarks) {
+                    const wrapped = nearestWrap(lm.x, lm.y, this.camera.getCenterX(), this.camera.getCenterY());
+                    if (!this.camera.isVisible(wrapped.x - 60, wrapped.y - 60, 120, 120)) continue;
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.beginPath();
+                    ctx.roundRect(screen.x - 60, screen.y - 12, 120, 24, 4);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#00ffcc';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffea00';
+                    ctx.font = 'bold 7px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`📍 ${lm.name.toUpperCase()}`, screen.x, screen.y + 4);
+                    ctx.restore();
+                }
+            }
         }
 
         if (window.pirateMode && this.pirateModeManager) {

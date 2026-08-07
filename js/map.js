@@ -16,9 +16,9 @@ const TileType = {
     ROAD_RIGHT: 10,
 };
 
-const TILE_SIZE = 64;
-const MAP_WIDTH = 64;
-const MAP_HEIGHT = 64;
+const TILE_SIZE = 16;
+const MAP_WIDTH = 200;
+const MAP_HEIGHT = 200;
 const MAP_PIXEL_W = MAP_WIDTH * TILE_SIZE;
 const MAP_PIXEL_H = MAP_HEIGHT * TILE_SIZE;
 
@@ -943,6 +943,114 @@ class BaseMap {
     }
 }
 
+const FILTHADELPHIA_MAP_SPEC = {
+    engine: "retro_16bit_tilemap",
+    canvas_dimensions: {
+        width_tiles: 200,
+        height_tiles: 200,
+        tile_size_pixels: 16
+    },
+    street_specifications: {
+        major_arterials_width: 2,
+        minor_streets_width: 1
+    },
+    neighborhoods: {
+        chestnut_hill: {
+            section: "northwest_philly",
+            bounds: [20, 10, 50, 30],
+            landmark: { name: "Morris Arboretum", coordinates: [35, 20], sprite: "tree_tower_icon" }
+        },
+        mt_airy: {
+            section: "northwest_philly",
+            bounds: [20, 30, 50, 50],
+            landmark: { name: "Mt. Airy Center", coordinates: [35, 40], sprite: "historic_home_icon" }
+        },
+        germantown: {
+            section: "northwest_philly",
+            bounds: [50, 20, 80, 50],
+            landmark: { name: "Cliveden", coordinates: [65, 30], sprite: "mansion_icon" }
+        },
+        strawberry_mansion: {
+            section: "north_philly_corridor",
+            bounds: [50, 50, 80, 70],
+            landmark: { name: "Historic Strawberry Mansion", coordinates: [65, 60], sprite: "estate_icon" }
+        },
+        logan: {
+            section: "north_philly",
+            bounds: [80, 10, 105, 35],
+            landmark: { name: "Logan Hub", coordinates: [92, 20], sprite: "statue_icon" }
+        },
+        olney: {
+            section: "north_philly",
+            bounds: [105, 10, 130, 35],
+            landmark: { name: "Olney Transportation Center", coordinates: [117, 20], sprite: "industrial_hub_icon" }
+        },
+        hunting_park: {
+            section: "north_philly",
+            bounds: [105, 35, 130, 60],
+            landmark: { name: "Hunting Park Center", coordinates: [117, 47], sprite: "park_icon" }
+        },
+        university_city: {
+            section: "west_philly",
+            bounds: [10, 60, 70, 130],
+            landmark: { name: "University of Pennsylvania Campus", coordinates: [45, 95], sprite: "u_pen_shield_icon" }
+        },
+        rittenhouse: {
+            section: "center_city",
+            bounds: [70, 95, 95, 110],
+            landmark: { name: "Rittenhouse Square", coordinates: [82, 102], sprite: "park_gazebo_icon" }
+        },
+        logan_square: {
+            section: "center_city",
+            bounds: [70, 110, 95, 125],
+            landmark: { name: "Philadelphia Museum of Art / Parkway", coordinates: [82, 117], sprite: "art_museum_icon" }
+        },
+        chinatown: {
+            section: "center_city",
+            bounds: [95, 110, 130, 125],
+            landmark: { name: "Chinatown Arch", coordinates: [112, 117], sprite: "arch_icon" }
+        },
+        old_city: {
+            section: "center_city",
+            bounds: [95, 80, 130, 110],
+            landmark: { name: "Independence Hall & Liberty Bell", coordinates: [112, 95], sprite: "independence_hall_icon" }
+        },
+        fishtown: {
+            section: "riverwards",
+            bounds: [130, 35, 170, 65],
+            landmark: { name: "Frankford Ave Corridor", coordinates: [150, 50], sprite: "fish_icon" }
+        },
+        northern_liberties: {
+            section: "riverwards",
+            bounds: [130, 65, 170, 90],
+            landmark: { name: "NoLibs Piazza", coordinates: [150, 77], sprite: "factory_loft_icon" }
+        },
+        passyunk: {
+            section: "south_philly",
+            bounds: [70, 125, 140, 155],
+            landmark: { name: "The Singing Fountain", coordinates: [105, 140], sprite: "fountain_icon" }
+        },
+        stadium_district: {
+            section: "south_philly",
+            bounds: [70, 155, 140, 185],
+            landmark: { name: "Sports Complex (Linc, Bank Park, Wells Fargo)", coordinates: [105, 170], sprite: "stadium_icon" }
+        }
+    },
+    waterways: {
+        schuylkill_river: {
+            path_type: "diagonal_flow",
+            start_node: [70, 50],
+            end_node: [100, 185],
+            width_tiles: 4
+        },
+        delaware_river: {
+            path_type: "eastern_boundary",
+            x_start: 170,
+            width_tiles: 30
+        }
+    }
+};
+
 class GameMap extends BaseMap {
     constructor() {
         const theme = (window.travelDestination) ? window.travelDestination.toLowerCase() : 'default';
@@ -972,38 +1080,157 @@ class GameMap extends BaseMap {
             Array.from({ length: MAP_WIDTH }, () => null)
         );
 
-        const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
-        const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+        this.neighborhoods = FILTHADELPHIA_MAP_SPEC.neighborhoods;
+        this.landmarks = [];
 
-        for (const ry of hRoads) {
-            const type = (ry % 2 === 0) ? TileType.ROAD_LEFT : TileType.ROAD_RIGHT;
+        // 1. Major Arterials (Width 2) from neighborhood boundaries
+        const vSet = new Set();
+        const hSet = new Set();
+        for (const nKey in FILTHADELPHIA_MAP_SPEC.neighborhoods) {
+            const n = FILTHADELPHIA_MAP_SPEC.neighborhoods[nKey];
+            const [x1, y1, x2, y2] = n.bounds;
+            vSet.add(x1); vSet.add(x2);
+            hSet.add(y1); hSet.add(y2);
+        }
+        const vMajor = Array.from(vSet).sort((a,b) => a-b);
+        const hMajor = Array.from(hSet).sort((a,b) => a-b);
+
+        const isMajorRoad = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
+        const isRoad = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
+
+        // Major Vertical Arterials (width 2)
+        for (const rx of vMajor) {
+            for (let w = 0; w < 2; w++) {
+                const x = rx + w;
+                if (x < MAP_WIDTH) {
+                    const dir = (w === 0) ? [0, 1] : [0, -1];
+                    const type = (w === 0) ? TileType.ROAD_DOWN : TileType.ROAD_UP;
+                    for (let y = 0; y < MAP_HEIGHT; y++) {
+                        this.tiles[y][x] = type;
+                        this.roadDirections[y][x] = dir;
+                        isMajorRoad[y][x] = true;
+                        isRoad[y][x] = true;
+                    }
+                }
+            }
+        }
+
+        // Major Horizontal Arterials (width 2)
+        for (const ry of hMajor) {
+            for (let w = 0; w < 2; w++) {
+                const y = ry + w;
+                if (y < MAP_HEIGHT) {
+                    const dir = (w === 0) ? [-1, 0] : [1, 0];
+                    const type = (w === 0) ? TileType.ROAD_LEFT : TileType.ROAD_RIGHT;
+                    for (let x = 0; x < MAP_WIDTH; x++) {
+                        this.tiles[y][x] = type;
+                        this.roadDirections[y][x] = dir;
+                        isMajorRoad[y][x] = true;
+                        isRoad[y][x] = true;
+                    }
+                }
+            }
+        }
+
+        // 2. Minor Streets (width 1) inside neighborhood blocks
+        const vMinor = [];
+        const hMinor = [];
+        for (const nKey in FILTHADELPHIA_MAP_SPEC.neighborhoods) {
+            const n = FILTHADELPHIA_MAP_SPEC.neighborhoods[nKey];
+            const [x1, y1, x2, y2] = n.bounds;
+            const midX = Math.floor((x1 + x2) / 2);
+            const midY = Math.floor((y1 + y2) / 2);
+
+            vMinor.push(midX);
+            hMinor.push(midY);
+
+            for (let y = y1; y <= y2; y++) {
+                if (y < MAP_HEIGHT && midX < MAP_WIDTH && !isMajorRoad[y][midX]) {
+                    this.tiles[y][midX] = TileType.ROAD_DOWN;
+                    this.roadDirections[y][midX] = [0, 1];
+                    isRoad[y][midX] = true;
+                }
+            }
+            for (let x = x1; x <= x2; x++) {
+                if (x < MAP_WIDTH && midY < MAP_HEIGHT && !isMajorRoad[midY][x]) {
+                    this.tiles[midY][x] = TileType.ROAD_RIGHT;
+                    this.roadDirections[midY][x] = [1, 0];
+                    isRoad[midY][x] = true;
+                }
+            }
+        }
+
+        // 3. Waterways (Delaware & Schuylkill Rivers)
+        const delawareXStart = FILTHADELPHIA_MAP_SPEC.waterways.delaware_river.x_start; // 170
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = delawareXStart; x < MAP_WIDTH; x++) {
+                if (isMajorRoad[y][x]) {
+                    this.tiles[y][x] = TileType.CROSSWALK; // Bridge over Delaware River
+                } else {
+                    this.tiles[y][x] = TileType.ROAD; // Water tile
+                    this.roadDirections[y][x] = null;
+                    isRoad[y][x] = false;
+                }
+            }
+        }
+
+        // Schuylkill River (Diagonal Flow)
+        const [sX1, sY1] = FILTHADELPHIA_MAP_SPEC.waterways.schuylkill_river.start_node;
+        const [sX2, sY2] = FILTHADELPHIA_MAP_SPEC.waterways.schuylkill_river.end_node;
+        const schuylkillWidth = FILTHADELPHIA_MAP_SPEC.waterways.schuylkill_river.width_tiles;
+        
+        for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
-                this.tiles[ry][x] = type;
-                this.roadDirections[ry][x] = (ry % 2 === 0) ? [-1, 0] : [1, 0];
+                if (x >= delawareXStart) continue;
+                const A = x - sX1;
+                const B = y - sY1;
+                const C = sX2 - sX1;
+                const D = sY2 - sY1;
+
+                const dot = A * C + B * D;
+                const len_sq = C * C + D * D;
+                let param = -1;
+                if (len_sq !== 0) param = dot / len_sq;
+
+                let xx, yy;
+                if (param < 0) { xx = sX1; yy = sY1; }
+                else if (param > 1) { xx = sX2; yy = sY2; }
+                else { xx = sX1 + param * C; yy = sY1 + param * D; }
+
+                const dx = x - xx;
+                const dy = y - yy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist <= schuylkillWidth / 2) {
+                    if (isMajorRoad[y][x]) {
+                        this.tiles[y][x] = TileType.CROSSWALK; // Bridge over Schuylkill River
+                    } else {
+                        this.tiles[y][x] = TileType.ROAD; // Water tile
+                        this.roadDirections[y][x] = null;
+                        isRoad[y][x] = false;
+                    }
+                }
             }
         }
-        for (const rx of vRoads) {
-            const type = (rx % 2 === 0) ? TileType.ROAD_DOWN : TileType.ROAD_UP;
-            for (let y = 0; y < MAP_HEIGHT; y++) {
-                this.tiles[y][rx] = type;
-                this.roadDirections[y][rx] = (rx % 2 === 0) ? [0, 1] : [0, -1];
-            }
-        }
-        for (const ry of hRoads) {
-            for (const rx of vRoads) {
-                this.tiles[ry][rx] = TileType.CROSSWALK;
-                this.roadDirections[ry][rx] = (ry % 2 === 0) ? [-1, 0] : [1, 0];
+
+        // 4. Sidewalks & Intersections
+        const allHRoads = [...hMajor, ...hMinor];
+        const allVRoads = [...vMajor, ...vMinor];
+        for (const ry of allHRoads) {
+            for (const rx of allVRoads) {
+                if (ry < MAP_HEIGHT && rx < MAP_WIDTH && isRoad[ry][rx]) {
+                    this.tiles[ry][rx] = TileType.CROSSWALK;
+                }
             }
         }
 
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
-                if (this.tiles[y][x] !== TileType.ROAD && this.tiles[y][x] !== TileType.ROAD_UP && this.tiles[y][x] !== TileType.ROAD_DOWN && this.tiles[y][x] !== TileType.ROAD_LEFT && this.tiles[y][x] !== TileType.ROAD_RIGHT && this.tiles[y][x] !== TileType.CROSSWALK) {
+                if (!isRoad[y][x] && x < delawareXStart && this.tiles[y][x] !== TileType.ROAD && this.tiles[y][x] !== TileType.CROSSWALK) {
                     const neighbors = [[y-1,x],[y+1,x],[y,x-1],[y,x+1]];
                     for (const [ny, nx] of neighbors) {
                         if (ny >= 0 && ny < MAP_HEIGHT && nx >= 0 && nx < MAP_WIDTH) {
-                            const nt = this.tiles[ny][nx];
-                            if (nt === TileType.ROAD || nt === TileType.ROAD_UP || nt === TileType.ROAD_DOWN || nt === TileType.ROAD_LEFT || nt === TileType.ROAD_RIGHT || nt === TileType.CROSSWALK) {
+                            if (isRoad[ny][nx]) {
                                 this.tiles[y][x] = TileType.SIDEWALK;
                                 break;
                             }
@@ -1013,12 +1240,32 @@ class GameMap extends BaseMap {
             }
         }
 
+        // 5. Buildings & Landmarks
         let buildingIndex = 0;
-        const blockRanges = this._getBlockRanges(hRoads, vRoads);
+        const blockRanges = this._getBlockRanges(allHRoads, allVRoads);
         for (const block of blockRanges) {
+            if (block.x2 >= delawareXStart) continue;
             this._fillBlock(block, buildingIndex % BUILDING_COLORS.length);
             buildingIndex++;
         }
+
+        // Register Landmarks from Specification
+        for (const nKey in FILTHADELPHIA_MAP_SPEC.neighborhoods) {
+            const n = FILTHADELPHIA_MAP_SPEC.neighborhoods[nKey];
+            const [lx, ly] = n.landmark.coordinates;
+            if (lx < MAP_WIDTH && ly < MAP_HEIGHT) {
+                this.landmarks.push({
+                    name: n.landmark.name,
+                    sprite: n.landmark.sprite,
+                    neighborhood: nKey,
+                    x: lx * TILE_SIZE,
+                    y: ly * TILE_SIZE,
+                    tileX: lx,
+                    tileY: ly
+                });
+            }
+        }
+
         this._createParks();
     }
 

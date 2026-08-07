@@ -992,7 +992,6 @@ def end_round():
     ))
     if cult_leaves_cumulative is not None:
         db.execute("UPDATE users SET cult_leaves_cumulative=? WHERE id=?", (int(cult_leaves_cumulative), user_data['user_id']))
-    db.execute("DELETE FROM inventory WHERE user_id=? AND item_name=?", (user_data['user_id'], 'Organizer'))
     db.execute("""
         INSERT INTO user_round_stats (
             user_id, round_number, trash_collected, money_earned, followers_gained,

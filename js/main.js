@@ -69,11 +69,26 @@ class GarbageTruckFollower {
     render(ctx, camera, spriteManager) {
         if (!camera.isVisible(this.x - 50, this.y - 50, 100, 100)) return;
         const screen = camera.worldToScreen(this.x, this.y);
-        const img = spriteManager.getCharacterImage('char_truck'); // original green truck
+
+        if (this.direction === 'left') {
+            this.lastFacingDir = 'left';
+        } else if (this.direction === 'right') {
+            this.lastFacingDir = 'right';
+        }
+
+        let img = spriteManager.getCharacterImage('char_truck'); // original green truck
+        if (window.duckyModeActive) {
+            const duckyId = (this.direction === 'left' || this.lastFacingDir === 'left') ? 'ducky_left' : 'ducky_right';
+            img = spriteManager.getCharacterImage(duckyId) || spriteManager.getImage(duckyId);
+        }
+
         if (img) {
             ctx.save();
             const scaledSize = 64;
-            if (this.direction === 'left') {
+            if (window.duckyModeActive) {
+                // ducky_left and ducky_right pre-oriented
+                ctx.drawImage(img, screen.x - scaledSize / 2, screen.y - scaledSize / 2, scaledSize, scaledSize);
+            } else if (this.direction === 'left') {
                 ctx.translate(screen.x, screen.y);
                 ctx.scale(-1, 1);
                 ctx.drawImage(img, -scaledSize / 2, -scaledSize / 2, scaledSize, scaledSize);
@@ -2314,6 +2329,21 @@ class Game {
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
         }
 
+        // Organizer 90s gameplay fee ($250 per organizer owned)
+        this.organizerFeeTimer = (this.organizerFeeTimer || 0) + dt;
+        if (this.organizerFeeTimer >= 90.0) {
+            this.organizerFeeTimer -= 90.0;
+            const ownedOrganizers = window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0;
+            if (ownedOrganizers > 0) {
+                const totalFee = ownedOrganizers * 250;
+                window.playerBalance = Math.max(0, (window.playerBalance || 0) - totalFee);
+                this.hud.showFollowerNotification(`💸 Paid $${totalFee.toLocaleString()} ($250/ea) for ${ownedOrganizers} Organizer(s)!`, false);
+                if (typeof window.updateStoreUI === 'function') {
+                    window.updateStoreUI();
+                }
+            }
+        }
+
         // Update Organizers and their followers' autonomous trash pickup
         if (this.organizers) {
             for (const org of this.organizers) {
@@ -2941,6 +2971,7 @@ class Game {
         this.pirateModeManager = new PirateModeManager();
         this.carManager.spawnCars(this.gameMap);
         // Retrieve and spawn organizers
+        this.organizerFeeTimer = 0;
         this.organizers = [];
         this.dragons = [];
         this.dragonMasterFollower = null;
@@ -4121,22 +4152,32 @@ class Game {
                 const totalTrash = this.trashCollectedInRound || 0;
                 let trophyLevel = 0; // 0 means silhouette (no trophy)
                 let catColor = '#4caf50'; // Default green for trash
+                let trophyColorName = '';
                 
                 if (totalTrash >= 2500) {
                     trophyLevel = 5; // Diamond
+                    trophyColorName = 'Diamond';
                 } else if (totalTrash >= 1750) {
                     trophyLevel = 4; // Platinum
+                    trophyColorName = 'Platinum';
                 } else if (totalTrash >= 1000) {
                     trophyLevel = 3; // Gold
+                    trophyColorName = 'Gold';
                 } else if (totalTrash >= 500) {
                     trophyLevel = 2; // Silver
+                    trophyColorName = 'Silver';
                 } else if (totalTrash >= 300) {
                     trophyLevel = 1; // Bronze
+                    trophyColorName = 'Bronze';
                 }
                 
                 if (trophyLevel > 0) {
                     if (typeof window.drawTrophy === 'function') {
                         window.drawTrophy(trophyCanvas, trophyLevel, catColor);
+                    }
+                    if (msgEl) {
+                        const currentMsg = msgEl.innerText || '';
+                        msgEl.innerText = `${currentMsg}\n\nYou earned a ${trophyColorName} trophy for the round! Although this doesn't go into the trophy case, you can take a snapshot for your gallery.`;
                     }
                 } else {
                     if (typeof window.drawSilhouetteTrophy === 'function') {
@@ -4318,6 +4359,41 @@ class Game {
                     if (gifEl) gifEl.style.display = 'block';
                     await this._endRoundAndReturnToStore();
                     this._restartGame();
+                }
+            });
+        }
+
+        // Setup Snapshot button listener
+        const btnSnapshot = document.getElementById('btn-defeat-snapshot');
+        if (btnSnapshot) {
+            const newSnapBtn = btnSnapshot.cloneNode(true);
+            btnSnapshot.parentNode.replaceChild(newSnapBtn, btnSnapshot);
+            newSnapBtn.addEventListener('click', () => {
+                const dataUrl = window.captureEndRoundSnapshot();
+                const snapshots = window.getGallerySnapshots();
+
+                const trashCount = document.getElementById('round-trash-count')?.innerText || '0';
+                const defeatMsg = document.getElementById('defeat-message')?.innerText || '';
+                const dateStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const newSnapshot = {
+                    dataUrl: dataUrl,
+                    timestamp: dateStr,
+                    trash: trashCount,
+                    message: defeatMsg
+                };
+
+                if (snapshots.length < 16) {
+                    snapshots.unshift(newSnapshot);
+                    window.saveGallerySnapshots(snapshots);
+                    newSnapBtn.innerText = 'SAVED! 📸';
+                    newSnapBtn.style.background = '#008855';
+                    setTimeout(() => {
+                        newSnapBtn.innerText = 'Snapshot 📸';
+                        newSnapBtn.style.background = '#00aa66';
+                    }, 2000);
+                } else {
+                    window.openReplaceSnapshotModal(newSnapshot);
                 }
             });
         }

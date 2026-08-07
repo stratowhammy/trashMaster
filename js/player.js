@@ -214,8 +214,16 @@ class Player {
         const screen = camera.worldToScreen(this.x, this.y);
         let drawSize = 64;
         
+        if (this.direction === 'left') {
+            this.lastFacingDir = 'left';
+        } else if (this.direction === 'right') {
+            this.lastFacingDir = 'right';
+        }
+
         let imgId = this.spriteId;
-        if (window.pirateMode) {
+        if (window.duckyModeActive) {
+            imgId = (this.direction === 'left' || this.lastFacingDir === 'left') ? 'ducky_left' : 'ducky_right';
+        } else if (window.pirateMode) {
             imgId = this.onFoot ? (this.spriteId || 'char1') : 'pirate_ship_blue';
         } else if (window.crimeMode) {
             imgId = 'black_cadillac';
@@ -223,14 +231,16 @@ class Player {
             imgId = 'black_suv';
         }
         
-        const img = (window.pirateMode && this.onFoot) ? spriteManager.getCharacterImage(imgId) : spriteManager.getImage(imgId);
+        const img = (window.duckyModeActive || (window.pirateMode && this.onFoot)) ? spriteManager.getCharacterImage(imgId) : spriteManager.getImage(imgId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
             let bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 1.5 : 0;
             ctx.save();
             ctx.translate(screen.x, screen.y + bobY);
             
-            if (window.pirateMode) {
+            if (window.duckyModeActive) {
+                // ducky_left and ducky_right pre-oriented
+            } else if (window.pirateMode) {
                 if (this.direction === 'left') {
                     ctx.scale(-1, 1);
                 }

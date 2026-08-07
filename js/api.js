@@ -57,7 +57,7 @@ function showScreen(screenId) {
     } else {
         document.getElementById('ui-layer').classList.remove('hidden');
         document.getElementById('gameCanvas').classList.add('hidden');
-        if (window.soundManager && (screenId === 'store-screen' || screenId === 'login-screen')) {
+        if (window.soundManager && (screenId === 'store-screen' || screenId === 'store-items-screen' || screenId === 'login-screen')) {
             window.soundManager.playTrack('store');
         }
     }
@@ -131,6 +131,24 @@ function initUI() {
     if (btnAdminLogout) btnAdminLogout.addEventListener('click', logout);
     if (btnStoreLogout) btnStoreLogout.addEventListener('click', logout);
 
+    // Open Shop / Discrete Store Page
+    const btnOpenShop = document.getElementById('btn-open-shop');
+    if (btnOpenShop) {
+        btnOpenShop.addEventListener('click', () => {
+            renderStore();
+            updateStoreUI();
+            showScreen('store-items-screen');
+        });
+    }
+
+    const btnBackToStoreMain = document.getElementById('btn-back-to-store-main');
+    if (btnBackToStoreMain) {
+        btnBackToStoreMain.addEventListener('click', () => {
+            updateStoreUI();
+            showScreen('store-screen');
+        });
+    }
+
     // Store Terminal Event Handler
     const terminalInput = document.getElementById('terminal-input');
     const terminalHistory = document.getElementById('terminal-history');
@@ -143,15 +161,24 @@ function initUI() {
                     if (terminalHistory) {
                         terminalHistory.innerHTML += `\n> ${cmd}`;
                         const cmdLower = cmd.toLowerCase();
-                        if (cmdLower === 'dragon ho!') {
+                        if (cmdLower === 'eggs') {
+                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc;">🥚 EXECUTABLE TERMINAL COMMANDS:</span>\n<span style="color: #ffff00;">- eggs</span> : List all executable terminal commands\n<span style="color: #ffff00;">- ducky</span> : Activate Rubber Ducky mode!\n<span style="color: #ffff00;">- dragon ho!</span> : Activate Dragon Ho! cheat\n<span style="color: #ffff00;">- chaos / chaos mode / chaos ho!</span> : Unlock Chaos Mode\n<span style="color: #ffff00;">- clear</span> : Clear terminal history\n<span style="color: #ffff00;">- help</span> : Display terminal command list`;
+                        } else if (cmdLower === 'ducky') {
+                            window.duckyModeActive = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #ffff00; text-shadow: 0 0 5px #ffff00;">🦆 QUACK! Ducky Mode Activated! Rubber Ducky power engaged!</span>`;
+                        } else if (cmdLower === 'dragon ho!') {
                             window.dragonHoCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #ffff00;">Dragon Ho! Activated!</span>`;
                         } else if (cmdLower === 'chaos' || cmdLower === 'chaos mode' || cmdLower === 'chaos ho!') {
                             window.chaosCheatActive = true;
                             updateModeToggles();
                             terminalHistory.innerHTML += `\n<span style="color: #ff0055; text-shadow: 0 0 3px #ff0055;">Chaos Mode Unlocked for this round! Check the toggle.</span>`;
+                        } else if (cmdLower === 'clear') {
+                            terminalHistory.innerHTML = 'Ready.';
+                        } else if (cmdLower === 'help' || cmdLower === 'commands') {
+                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc;">Type 'eggs' to view all executable terminal commands.</span>`;
                         } else {
-                            terminalHistory.innerHTML += `\n<span style="color: #ff0055;">Unknown command.</span>`;
+                            terminalHistory.innerHTML += `\n<span style="color: #ff0055;">Unknown command. Type 'eggs' for command list.</span>`;
                         }
                         terminalHistory.scrollTop = terminalHistory.scrollHeight;
                     }
@@ -168,18 +195,24 @@ function initUI() {
         const container = document.getElementById('instruction-slides-container');
         if (!container || !slide) return;
 
+        let iconHtml = "";
+        if (slide.icon) {
+            iconHtml = `<img src="${slide.icon}" style="width: 52px; height: 52px; image-rendering: pixelated; object-fit: contain; filter: drop-shadow(0 0 8px rgba(255,170,0,0.7)); margin-bottom: 10px;" />`;
+        }
+
         let controlsHtml = "";
         if (slide.controls && slide.controls.length > 0) {
             controlsHtml = `
-                <ul style="text-align: left; font-size: 8px; color: #00ffcc; line-height: 1.8; margin-top: 15px; padding-left: 15px; list-style-type: square; width: 100%; box-sizing: border-box;">
-                    ${slide.controls.map(ctrl => `<li style="margin-bottom: 8px;">${ctrl}</li>`).join('')}
+                <ul style="text-align: left; font-size: 7.5px; color: #00ffcc; line-height: 1.8; margin-top: 10px; padding-left: 10px; list-style-type: none; width: 100%; box-sizing: border-box;">
+                    ${slide.controls.map(ctrl => `<li style="margin-bottom: 6px; display: flex; align-items: baseline; gap: 4px;"><span style="color: #ffaa00;">▪</span> <div>${ctrl}</div></li>`).join('')}
                 </ul>
             `;
         }
 
         container.innerHTML = `
-            <h2 style="color: #ffaa00; font-size: 10px; margin-bottom: 15px; text-shadow: 2px 2px #000; letter-spacing: 1px;">${slide.title}</h2>
-            <p style="color: #ddd; font-size: 8px; line-height: 1.6; margin-bottom: 15px; text-align: justify; word-break: break-word;">${slide.desc}</p>
+            ${iconHtml}
+            <h2 style="color: #ffaa00; font-size: 10px; margin-bottom: 10px; text-shadow: 2px 2px #000; letter-spacing: 1px;">${slide.title}</h2>
+            <p style="color: #ddd; font-size: 7.5px; line-height: 1.5; margin-bottom: 10px; text-align: center; word-break: break-word;">${slide.desc}</p>
             ${controlsHtml}
         `;
 
@@ -235,123 +268,154 @@ function initUI() {
 
         // Welcome / Introduction
         activeSlides.push({
-            title: "WELCOME TO FILTHADELPHIA!",
-            desc: "Use the arrow keys to move. (WASD does not work)",
+            title: "WELCOME TO FILTHADELPHIA! 🗑️",
+            icon: "assets/sprites/trash_truck.png",
+            desc: "Clean up the streets of Filthadelphia! Use Arrow Keys to move your character or vehicle. (WASD does not move player)",
             controls: [
-                "When you're on your own, use Q to pick up trash.",
-                "When you've got followers, they'll pick up the trash, you lead!",
-                "If playing with a trash truck, find the brown tile on the minimap, this is the dump. Your truck is fast, but it fills up fast, press 'e' at the entrance to empty your load."
+                "<span class='key-pill'>Q</span> Pick up trash manually when walking alone on foot.",
+                "<span class='key-pill'>Followers</span> Recruited posse members pick up trash automatically as you lead!",
+                "<span class='key-pill'>E</span> Drive Bruno the Trash Truck to the Dump (brown tile on minimap) and press E at the entrance to unload!",
+                "<span class='key-pill'>Buildings</span> Posse size of 6+ followers required to enter map buildings."
             ]
         });
 
         if (window.fantasyMode) {
             activeSlides.push({
-                title: "FANTASY MODE",
+                title: "FANTASY MODE 🐲",
+                icon: "assets/sprites/dragon.png",
                 desc: "Welcome to a world of wonder! Posse members have a chance to be Dragon Masters, who can transform into giant Flying Dragons!",
                 controls: [
-                    "Incineration: Dragons incinerate trash using fire, earning money directly without clogging your inventory!",
-                    "Organizers: Dragons act as massive flying organizers that posse members will follow."
+                    "🔥 Incineration: Dragons incinerate trash using fire, earning cash directly without clogging inventory!",
+                    "👑 Organizers: Dragons act as massive flying organizers that attract and lead posse members."
                 ]
             });
         }
 
-        // Mode explanations
         if (window.pirateMode) {
             activeSlides.push({
-                title: "PIRATE MODE",
-                desc: "Sail in a Pirate Ship! Follow the 8-location Treasure Map, race against rival pirates, and claim the ultimate treasure!",
+                title: "PIRATE MODE 🏴‍☠️",
+                icon: "assets/sprites/pirate_ship.png",
+                desc: "Sail open waters in a Pirate Ship! Follow the 8-location Treasure Map, race rival pirates, and claim ultimate treasure!",
                 controls: [
-                    "Pirate Ship: Travel in a high-seas pirate ship.",
-                    "Cannons ('C' key): Press 'C' to fire cannons ahead. Stun rival pirates for 5s!",
-                    "Warning: Firing cannons at civilians turns them into Jolly Roger flags & alerts police!"
+                    "<span class='key-pill'>C</span> Fire Cannons ahead to stun rival pirate ships for 5 seconds!",
+                    "⚠️ Warning: Firing cannons at civilians turns them into Jolly Rogers & alerts police patrols!",
+                    "<span class='key-pill'>E</span> Disembark onto island shores on foot, or re-embark onto your anchored pirate ship!",
+                    "🌊 Edge of the Earth: Sailing off the bottom map boundary will plunge your ship off the edge of the Earth!"
                 ]
             });
         }
 
         if (window.crimeMode) {
             activeSlides.push({
-                title: "CRIME MODE",
-                desc: "You agreed to work with the mafia. Run mafia tasks from the store for massive payouts, but watch out for the law!",
+                title: "CRIME MODE 💼",
+                icon: "assets/sprites/black_cadillac.png",
+                desc: "Execute syndicate contracts with the Mafia for massive payouts, but watch out for law enforcement!",
                 controls: [
-                    "Police Patrols: 4 fast-moving police officers spawn at all corners of the map and actively hunt you down!",
-                    "Arrests: Slashes posse size by 75%, slashes 1 truck, and levies a scaling fine of $50,000 + $50,000 per subsequent arrest."
+                    "🚔 Police Patrols: 4 fast-moving police squad cars spawn at map corners to hunt you down!",
+                    "⚖️ Arrests: Slashes posse size by 75%, destroys 1 truck, and levies scaling fines ($50k + $50k per arrest).",
+                    "<span class='key-pill'>B</span> Bribe police officers when Price Fixing item is active."
                 ]
             });
         }
 
         if (window.fastFoodMode) {
             activeSlides.push({
-                title: "FAST FOOD MODE",
-                desc: "At the door of a fast food restaurant press 'e' to get munchies for your muchachos. When you feed your crew, they'll do more for you!",
+                title: "FAST FOOD MODE 🍔",
+                icon: "assets/sprites/fast_food.png",
+                desc: "Keep your muchachos fed and energized for maximum street performance!",
                 controls: [
-                    "Greasy food will fill you up, but it can also bring you down.",
-                    "Find the hospital and get healthcare for your posse or your next meal might be their last."
+                    "<span class='key-pill'>E</span> Press E at Fast Food restaurant doors to buy munchies and boost your posse's speed!",
+                    "🏥 Healthcare: Greasy food can cause ailments—visit the Hospital and press E for healthcare!"
                 ]
             });
         }
 
         if (window.politicsMode) {
             activeSlides.push({
-                title: "POLITICS MODE",
-                desc: "Campaign to win political office! Nominate yourself in the store, then shake hands with NPCs around the city.",
+                title: "POLITICS MODE 🏛️",
+                icon: "assets/sprites/philly_city_hall.png",
+                desc: "Campaign for political office! Nominate yourself in the store, then shake hands with NPCs around the city.",
                 controls: [
-                    "Votes: Shake hands with NPCs around the city to win their votes.",
-                    "Rival Candidate: A rival candidate is going around shaking hands; shake more than them to win the round!",
-                    "Mafia Votes Bribe: Accepting delivers votes, but police are instantly dispatched after you!"
+                    "🤝 Handshakes: Stand near street NPCs to shake hands and win campaign votes.",
+                    "🗳️ Rival Candidate: Out-campaign rival politicians roaming the streets before the round ends!",
+                    "💰 Mafia Bribe: Accepting Mafia vote bribes delivers instant votes, but dispatches police immediately!"
                 ]
             });
         }
 
         if (window.flowersMode) {
             activeSlides.push({
-                title: "FLOWERS MODE",
+                title: "FLOWERS MODE 🌸",
+                icon: "assets/sprites/flower.png",
                 desc: "Beautify Filthadelphia's local parks by planting flowers!",
                 controls: [
-                    "Key F: Plant flowers while standing in park zones.",
-                    "Fertilizer: Purchase from the store to plant flowers. Fully planted parks reward big money payouts!"
+                    "<span class='key-pill'>F</span> Press F while standing in park zones to plant Fertilizer (requires Fertilizer from store).",
+                    "🌷 Cash Payouts: Fully planted and bloomed parks reward big money payouts!"
                 ]
             });
         }
 
         if (window.cultMode) {
             activeSlides.push({
-                title: "THE CHURCH OF GRIMETOLOGY",
-                desc: "The Church of Grimetology is a charismatic-led cult dedicated to cleaning up trash. As its leader, you believe that raising $1,000,000 will summon a dragon (Burninator) to do your bidding. The path of Grimetology demands many sacrifices...",
+                title: "THE CHURCH OF GRIMETOLOGY 🕯️",
+                icon: "assets/sprites/cult_white_robe.png",
+                desc: "Lead a charismatic cult to purify Filthadelphia! Raise $1,000,000 to summon Burninator the Dragon.",
                 controls: [
-                    "Reunite Families: Interacting with separated members rolls 75% join / 25% leave chance.",
-                    "Happiness Bar: Keep followers happy. Proximity, reunions, and food boost happiness. If it hits 0, half of your posse leaves!",
-                    "Follower Multiplier: Clean round yields a 1.5x multiplier on followers gained!",
-                    "Summon the Dragon: Once cult mode is unlocked, 'Burninator' (the dragon) is added to the store for $1,000,000. It requires a 5-follower sacrifice every round."
+                    "❤️ Happiness: Keep followers happy (proximity, reunions, food). 0% happiness causes half your posse to leave!",
+                    "✨ Follower Multiplier: Clean rounds yield a 1.5x multiplier on followers gained!",
+                    "<span class='key-pill'>C</span> / <span class='key-pill'>L</span> On cult leaving events, press C to convince members to stay (-15% happiness) or L to let them leave.",
+                    "🐉 Burninator: Purchase Burninator in store for $1,000,000 (requires 5-follower sacrifice every round)."
                 ]
             });
         }
 
         if (window.builderMode) {
             activeSlides.push({
-                title: "BUILDER MODE",
-                desc: "Invest your hard-earned cash in real estate! Purchase buildings on the map, recruit tenants, and collect rent.",
+                title: "BUILDER MODE 🏗️",
+                icon: "assets/sprites/philly_art_museum.png",
+                desc: "Invest in Filthadelphia real estate! Purchase buildings, recruit tenants, and collect rent.",
                 controls: [
-                    "Buy Buildings: Stand near a building door and press E to purchase it. Ownership persists across rounds!",
-                    "Rent & Revenue: Stand near a street NPC and press A to offer them an apartment (50% chance). Earn $1,000 per tenant per round!",
-                    "Taxes: A property tax of $750 per building is assessed every 4 rounds. Don't go bankrupt, or your properties will be seized!"
+                    "<span class='key-pill'>E</span> Stand near building doors and press E to purchase real estate (ownership persists across rounds).",
+                    "<span class='key-pill'>A</span> Stand near street NPCs and press A to offer apartment tenancy (50% success, $1,000 rent/tenant/round, max 5 tenants).",
+                    "🏦 Property Tax: $750 tax per building assessed every 4 rounds. Avoid bankruptcy!"
                 ]
             });
         }
 
-        // Keys & Items Summary
+        const chaosToggle = document.getElementById('chaos-toggle');
+        if (window.chaosMode || (chaosToggle && chaosToggle.checked)) {
+            activeSlides.push({
+                title: "CHAOS MODE 💥",
+                icon: "assets/sprites/chaos_splash.jpg",
+                desc: "Experience extreme, unpredictable chaos with custom severity modifiers!",
+                controls: [
+                    "🙃 Level 5+ Inverted Controls: Arrow key movement is reversed (Up=Down, Left=Right)!",
+                    "💣 Hazards: Explosive trash piles, orbital strike lightning, and hyper-aggressive police!"
+                ]
+            });
+        }
+
+        // Keys & Keybindings Summary
         activeSlides.push({
-            title: "KEYS & KEYBINDINGS",
-            desc: "Press 'E' for Everything! Q to pick up trash.",
+            title: "KEYS & KEYBINDINGS 🗝️",
+            icon: "assets/sprites/magic_8_ball.png",
+            desc: "Complete reference of all control shortcuts in Trash Master:",
             controls: [
-                "E: Interact with anything (Dump, Fast Food joints, Hospital, NPCs, Cars, Mafia Don)",
-                "Q: Pick up trash (when alone on foot)",
-                "F: Plant Flower (Flowers Mode)",
-                "A: Offer apartment to street NPC (Builder Mode)",
-                "T: Use Borrowed Time (+20s to timer)",
-                "M: Use Mushrooms (Slow timer for 20s)",
-                "W: Use Wings (1.5x speed boost for 15s)",
-                "P: Use Protection (+5% posse win chance for 30s)",
-                "R: Use Parade Route (3x trash near route)"
+                "<div><span class='key-pill'>Arrow Keys</span> Move Player / Vehicle</div>",
+                "<div><span class='key-pill'>E</span> Interact (Dump, Fast Food, Hospital, NPCs, Cars, Doors)</div>",
+                "<div><span class='key-pill'>Q</span> Pick up trash on foot (when alone)</div>",
+                "<div><span class='key-pill'>U</span> Use Mushrooms (slows timer 50% for 20s)</div>",
+                "<div><span class='key-pill'>W</span> Use Wings (1.5x speed boost for 15s)</div>",
+                "<div><span class='key-pill'>T</span> Use Borrowed Time (+20s) / Plant Trash Bomb</div>",
+                "<div><span class='key-pill'>P</span> Use Protection (+5% posse win chance for 30s)</div>",
+                "<div><span class='key-pill'>Shift + P</span> Open Recruitment / Propaganda Posters</div>",
+                "<div><span class='key-pill'>R</span> Use Parade Route (spawns 3x trash)</div>",
+                "<div><span class='key-pill'>F</span> Plant Fertilizer / Toggle Flashlight</div>",
+                "<div><span class='key-pill'>A</span> Offer Apartment (Builder Mode)</div>",
+                "<div><span class='key-pill'>C</span> Pirate Cannons / Ranger Capture / Cult Stay</div>",
+                "<div><span class='key-pill'>L</span> Cult Leave | <span class='key-pill'>B</span> Bribe Police | <span class='key-pill'>Shift + B</span> Bottomless Pit</div>",
+                "<div><span class='key-pill'>G</span> Portal Gun | <span class='key-pill'>X</span> Harvest Trees</div>",
+                "<div><span class='key-pill'>M</span> Toggle Music | <span class='key-pill'>N</span> Toggle SFX | <span class='key-pill'>Esc</span> Pause / Menu</div>"
             ]
         });
 
@@ -399,12 +463,14 @@ function initUI() {
     if (btnViewTrophies) {
         btnViewTrophies.addEventListener('click', () => {
             renderTrophyRoom();
-            document.getElementById('trophy-dialog').classList.remove('hidden');
+            const dlg = document.getElementById('trophy-dialog');
+            if (dlg) dlg.classList.remove('hidden');
         });
     }
     if (btnTrophyClose) {
         btnTrophyClose.addEventListener('click', () => {
-            document.getElementById('trophy-dialog').classList.add('hidden');
+            const dlg = document.getElementById('trophy-dialog');
+            if (dlg) dlg.classList.add('hidden');
         });
     }
 
@@ -953,7 +1019,7 @@ const STORE_ITEMS = [
     { name: 'Magic 8-Ball', price: 1500, desc: 'Score multiplied randomly at end of round', sprite: 'magic_8_ball.png' },
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
-    { name: 'Organizer', price: 250, desc: 'Splits followers to collect trash simultaneously across the map. Costs $250/round.', sprite: 'organizer.png' },
+    { name: 'Organizer', price: 250, desc: 'Persistent item. Splits followers to collect trash across the map. Costs $250 per organizer every 90s of gameplay.', sprite: 'organizer.png' },
     { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' },
     { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'quinine.png' },
     { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'trashpickers.png' },
@@ -965,8 +1031,17 @@ function updateStoreUI() {
     const balEl = document.getElementById('store-balance');
     if (balEl) balEl.innerText = `$${playerBalance.toLocaleString()}`;
 
+    const shopBalEl = document.getElementById('shop-balance');
+    if (shopBalEl) shopBalEl.innerText = `$${playerBalance.toLocaleString()}`;
+
     const movEl = document.getElementById('store-movement-size');
     if (movEl) movEl.innerText = playerMovementSize.toLocaleString();
+
+    const shopMovEl = document.getElementById('shop-followers');
+    if (shopMovEl) shopMovEl.innerText = playerMovementSize.toLocaleString();
+
+    const intlEl = document.getElementById('store-international-followers');
+    if (intlEl) intlEl.innerText = (window.playerInternationalFollowers || 0).toLocaleString();
 
     const invEl = document.getElementById('store-inventory');
     if (invEl) {
@@ -981,6 +1056,10 @@ function updateStoreUI() {
                 }
             }
         }
+    }
+
+    if (typeof renderTrophyRoom === 'function') {
+        renderTrophyRoom();
     }
 }
 
@@ -1727,6 +1806,7 @@ function renderTrophyRoom() {
         wood.className = 'trophy-shelf-wood';
 
         const order = [2, 4, 5, 3, 1];
+        const metalColors = ['#cd7f32', '#d0d0d8', '#ffd700', '#e5e4e2', '#b9f2ff'];
         
         order.forEach(level => {
             const index = level - 1;
@@ -1755,34 +1835,26 @@ function renderTrophyRoom() {
             const slotLabel = document.createElement('div');
             slotLabel.style.fontSize = '6px';
             slotLabel.style.fontFamily = '"Press Start 2P", monospace';
-            slotLabel.style.color = unlocked ? '#ffaa00' : '#555';
+            slotLabel.style.color = metalColors[index] || '#ffaa00';
             slotLabel.style.marginTop = '4px';
             slotLabel.style.textAlign = 'center';
+            slotLabel.style.textShadow = '1px 1px #000';
             slotLabel.innerText = levelsList[index] || '';
             slot.appendChild(slotLabel);
 
             const tooltip = document.createElement('div');
             tooltip.className = 'trophy-tooltip';
             
-            if (unlocked) {
-                tooltip.innerHTML = `
-                    <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
-                    <div style="color: #00ff88; font-weight: bold;">UNLOCKED!</div>
-                `;
-            } else if (index === nextIndex) {
-                tooltip.innerHTML = `
-                    <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
-                    <div>LEVEL: ${levelsList[index]}</div>
-                    <div>REQ: ${cat.badge} ${threshold.toLocaleString()}</div>
-                    <div>YOURS: ${currentVal.toLocaleString()}</div>
-                    <div style="margin-top: 4px; color: #ff3333; font-weight: bold;">LOCKED (NEXT TARGET)</div>
-                `;
-            } else {
-                tooltip.innerHTML = `
-                    <div style="color: #888; font-weight: bold; font-size: 8px; margin-bottom: 4px;">???</div>
-                    <div style="color: #ff3333; font-weight: bold;">LOCKED</div>
-                `;
-            }
+            tooltip.innerHTML = `
+                <div style="color: #ffaa00; font-weight: bold; font-size: 8px; margin-bottom: 4px;">${name.toUpperCase()}</div>
+                <div style="color: ${metalColors[index]}; font-size: 7px; margin-bottom: 4px;">${levelsList[index]} TIER</div>
+                <div style="color: #fff; margin-bottom: 2px;">REQ: ${cat.badge} ${threshold.toLocaleString()}</div>
+                <div style="color: #aaa; margin-bottom: 4px;">YOURS: ${cat.badge} ${currentVal.toLocaleString()}</div>
+                ${unlocked 
+                    ? '<div style="color: #00ff88; font-weight: bold;">✓ UNLOCKED!</div>' 
+                    : `<div style="color: #ff3333; font-weight: bold;">LOCKED (${Math.max(0, threshold - currentVal).toLocaleString()} NEEDED)</div>`
+                }
+            `;
             slot.appendChild(tooltip);
             wood.appendChild(slot);
         });
@@ -1803,33 +1875,23 @@ function drawTrophy(canvas, level, categoryColor) {
     let metalColor = '#8c5a3c';
     let strokeColor = '#3e2417';
     let lightColor = '#b88663';
-    let labelName = 'BRONZE';
-    let labelColor = '#cd7f32';
     
     if (level === 2) {
         metalColor = '#a0a0a8';
         strokeColor = '#484850';
         lightColor = '#e0e0e8';
-        labelName = 'SILVER';
-        labelColor = '#d0d0d8';
     } else if (level === 3) {
         metalColor = '#e0a000';
         strokeColor = '#604000';
         lightColor = '#ffe060';
-        labelName = 'GOLD';
-        labelColor = '#ffd700';
     } else if (level === 4) {
         metalColor = '#00b8b8';
         strokeColor = '#004c4c';
         lightColor = '#80ffff';
-        labelName = 'PLATINUM';
-        labelColor = '#e5e4e2';
     } else if (level === 5) {
         metalColor = '#60a0ff';
         strokeColor = '#103080';
         lightColor = '#e0f0ff';
-        labelName = 'DIAMOND';
-        labelColor = '#b9f2ff';
     }
     
     const scale = w / 16;
@@ -1856,16 +1918,6 @@ function drawTrophy(canvas, level, categoryColor) {
     
     ctx.fillStyle = categoryColor || '#4caf50';
     ctx.fillRect(7 * scale, 3.5 * scale, 2 * scale, 2 * scale);
-
-    // Draw Trophy Tier Label
-    ctx.fillStyle = labelColor;
-    ctx.font = `bold ${Math.max(7, Math.floor(scale * 1.2))}px "Press Start 2P", monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.shadowColor = '#000000';
-    ctx.shadowBlur = 3;
-    ctx.fillText(labelName, w / 2, h - 2);
-    ctx.shadowBlur = 0;
 }
 
 function drawSilhouetteTrophy(canvas, level) {
@@ -1901,7 +1953,7 @@ window.buyBuilding = (buildingIdx, address, cost) => apiCall('/api/game/buy-buil
 window.addTenant = (buildingIdx) => apiCall('/api/game/add-tenant', 'POST', { building_idx: buildingIdx });
 
 // ── Performance Stats Graph Custom Renderer ──
-function drawStatsGraph(category) {
+function drawStatsGraph(category, hoveredTarget = null) {
     const canvas = document.getElementById('stats-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1923,6 +1975,8 @@ function drawStatsGraph(category) {
     const chartW = w - padLeft - padRight;
     const chartH = h - padTop - padBottom;
 
+    activeGraphElements = [];
+
     if (!statsHistory || statsHistory.length === 0) {
         ctx.fillStyle = '#888';
         ctx.textAlign = 'center';
@@ -1930,7 +1984,7 @@ function drawStatsGraph(category) {
         return;
     }
 
-    let keyRound, keyCum, titleRound, titleCum, colorRound, colorCum;
+    let keyRound, keyCum, titleRound, titleCum, colorRound, colorCum, suffix = '';
     if (category === 'trash') {
         keyRound = 'trash_collected';
         keyCum = 'cumulative_trash';
@@ -1938,6 +1992,7 @@ function drawStatsGraph(category) {
         titleCum = 'Total Trash';
         colorRound = '#4caf50'; // Green
         colorCum = '#00ffcc'; // Cyan
+        suffix = ' pcs';
     } else if (category === 'money') {
         keyRound = 'money_earned';
         keyCum = 'cumulative_money';
@@ -1945,13 +2000,7 @@ function drawStatsGraph(category) {
         titleCum = 'Total Earnings';
         colorRound = '#ffeb3b'; // Yellow
         colorCum = '#ffaa00'; // Orange
-    } else if (category === 'bank') {
-        keyRound = 'bank_balance';
-        keyCum = 'bank_balance';
-        titleRound = 'Round End Cash';
-        titleCum = 'Bank Account';
-        colorRound = '#00ff44'; // Lime green
-        colorCum = '#00ffff'; // Cyan
+        suffix = '';
     } else {
         keyRound = 'followers_gained';
         keyCum = 'cumulative_followers';
@@ -1959,13 +2008,16 @@ function drawStatsGraph(category) {
         titleCum = 'Total Followers';
         colorRound = '#2196f3'; // Blue
         colorCum = '#ffffff'; // White
+        suffix = '';
     }
+
+    const formatVal = (v) => category === 'money' ? `$${Math.round(v).toLocaleString()}` : `${Math.round(v).toLocaleString()}${suffix}`;
 
     let maxRound = 0;
     let maxCum = 0;
     statsHistory.forEach(r => {
-        if (r[keyRound] > maxRound) maxRound = r[keyRound];
-        if (r[keyCum] > maxCum) maxCum = r[keyCum];
+        if ((r[keyRound] || 0) > maxRound) maxRound = r[keyRound];
+        if ((r[keyCum] || 0) > maxCum) maxCum = r[keyCum];
     });
     
     if (maxRound === 0) maxRound = 10;
@@ -2012,13 +2064,35 @@ function drawStatsGraph(category) {
 
     // 1. Draw per-round bars
     statsHistory.forEach((r, idx) => {
-        const val = r[keyRound];
+        const val = r[keyRound] || 0;
         const barH = (val / maxRound) * chartH;
         const x = padLeft + idx * colW + (colW - barW) / 2;
         const y = padTop + chartH - barH;
 
-        ctx.fillStyle = colorRound;
+        const isHovered = hoveredTarget && hoveredTarget.type === 'bar' && hoveredTarget.roundNumber === r.round_number;
+
+        ctx.fillStyle = isHovered ? '#ffffff' : colorRound;
         ctx.fillRect(x, y, barW, barH);
+        if (isHovered) {
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x - 2, y - 2, barW + 4, barH + 4);
+        }
+
+        activeGraphElements.push({
+            type: 'bar',
+            roundNumber: r.round_number,
+            value: val,
+            formattedVal: formatVal(val),
+            x: x,
+            y: y,
+            w: barW,
+            h: barH,
+            columnLeft: padLeft + idx * colW,
+            columnRight: padLeft + (idx + 1) * colW,
+            label: titleRound,
+            color: colorRound
+        });
 
         // X-axis round labels
         ctx.fillStyle = '#888';
@@ -2035,7 +2109,7 @@ function drawStatsGraph(category) {
     ctx.beginPath();
     
     statsHistory.forEach((r, idx) => {
-        const val = r[keyCum];
+        const val = r[keyCum] || 0;
         const pointX = padLeft + idx * colW + colW / 2;
         const pointY = padTop + chartH - (val / maxCum) * chartH;
         
@@ -2048,18 +2122,31 @@ function drawStatsGraph(category) {
     ctx.stroke();
 
     // Draw points on the line
-    ctx.fillStyle = '#050805'; 
     statsHistory.forEach((r, idx) => {
-        const val = r[keyCum];
+        const val = r[keyCum] || 0;
         const pointX = padLeft + idx * colW + colW / 2;
         const pointY = padTop + chartH - (val / maxCum) * chartH;
-        
+        const isHovered = hoveredTarget && hoveredTarget.type === 'point' && hoveredTarget.roundNumber === r.round_number;
+
+        ctx.fillStyle = isHovered ? '#ffffff' : '#050805'; 
         ctx.beginPath();
-        ctx.arc(pointX, pointY, 4, 0, Math.PI * 2);
-        ctx.strokeStyle = colorCum;
-        ctx.lineWidth = 2;
+        ctx.arc(pointX, pointY, isHovered ? 6 : 4, 0, Math.PI * 2);
+        ctx.strokeStyle = isHovered ? '#ffaa00' : colorCum;
+        ctx.lineWidth = isHovered ? 3 : 2;
         ctx.fill();
         ctx.stroke();
+
+        activeGraphElements.push({
+            type: 'point',
+            roundNumber: r.round_number,
+            value: val,
+            formattedVal: formatVal(val),
+            x: pointX,
+            y: pointY,
+            radius: 8,
+            label: titleCum,
+            color: colorCum
+        });
     });
 
     // Draw Legend
@@ -2079,6 +2166,104 @@ function drawStatsGraph(category) {
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.fillText(titleCum, padLeft + 205, 14);
+
+    setupStatsGraphInteractivity();
+}
+
+let activeGraphElements = [];
+let currentHoveredGraphTarget = null;
+
+function setupStatsGraphInteractivity() {
+    const canvas = document.getElementById('stats-canvas');
+    const tooltip = document.getElementById('stats-tooltip');
+    const container = document.getElementById('stats-canvas-container');
+    if (!canvas || !tooltip || !container) return;
+
+    const handleMouseMove = (e) => {
+        if (!statsHistory || statsHistory.length === 0 || !activeGraphElements || activeGraphElements.length === 0) {
+            tooltip.style.display = 'none';
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+
+        let found = null;
+
+        // 1. Check points (circular radius)
+        for (const item of activeGraphElements) {
+            if (item.type === 'point') {
+                const dist = Math.hypot(mouseX - item.x, mouseY - item.y);
+                if (dist <= 10) {
+                    found = item;
+                    break;
+                }
+            }
+        }
+
+        // 2. Check bars
+        if (!found) {
+            for (const item of activeGraphElements) {
+                if (item.type === 'bar') {
+                    if (mouseX >= item.columnLeft && mouseX <= item.columnRight) {
+                        found = item;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (found) {
+            if (currentHoveredGraphTarget !== found) {
+                currentHoveredGraphTarget = found;
+                drawStatsGraph(activeStatsCategory, found);
+            }
+
+            tooltip.innerHTML = `
+                <div style="color: #ffaa00; font-size: 7px; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px;">ROUND ${found.roundNumber}</div>
+                <div style="color: ${found.color}; font-size: 7px;">${found.label}: <span style="color: #fff;">${found.formattedVal}</span></div>
+            `;
+
+            const containerRect = container.getBoundingClientRect();
+            let tooltipX = e.clientX - containerRect.left + 15;
+            let tooltipY = e.clientY - containerRect.top - 35;
+
+            if (tooltipX + 180 > containerRect.width) {
+                tooltipX = e.clientX - containerRect.left - 185;
+            }
+            if (tooltipY < 10) {
+                tooltipY = e.clientY - containerRect.top + 15;
+            }
+
+            tooltip.style.left = `${tooltipX}px`;
+            tooltip.style.top = `${tooltipY}px`;
+            tooltip.style.display = 'block';
+        } else {
+            if (currentHoveredGraphTarget !== null) {
+                currentHoveredGraphTarget = null;
+                drawStatsGraph(activeStatsCategory, null);
+            }
+            tooltip.style.display = 'none';
+        }
+    };
+
+    const handleMouseLeave = () => {
+        if (currentHoveredGraphTarget !== null) {
+            currentHoveredGraphTarget = null;
+            drawStatsGraph(activeStatsCategory, null);
+        }
+        if (tooltip) tooltip.style.display = 'none';
+    };
+
+    if (canvas._mouseMoveHandler) canvas.removeEventListener('mousemove', canvas._mouseMoveHandler);
+    if (canvas._mouseLeaveHandler) canvas.removeEventListener('mouseleave', canvas._mouseLeaveHandler);
+    canvas._mouseMoveHandler = handleMouseMove;
+    canvas._mouseLeaveHandler = handleMouseLeave;
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseleave', handleMouseLeave);
 }
 
 function updateStatsSummary(category) {
@@ -2102,11 +2287,6 @@ function updateStatsSummary(category) {
         labelRound = 'Round Earnings';
         labelCum = 'Total Earnings';
         suffix = '';
-    } else if (category === 'bank') {
-        keyRound = 'bank_balance';
-        labelRound = 'End Balance';
-        labelCum = 'Current Cash';
-        suffix = '';
     } else {
         keyRound = 'followers_gained';
         labelRound = 'Round Followers';
@@ -2116,14 +2296,15 @@ function updateStatsSummary(category) {
     let totalRoundVal = 0;
     let maxRoundVal = 0;
     statsHistory.forEach(r => {
-        totalRoundVal += r[keyRound];
-        if (r[keyRound] > maxRoundVal) maxRoundVal = r[keyRound];
+        const val = r[keyRound] || 0;
+        totalRoundVal += val;
+        if (val > maxRoundVal) maxRoundVal = val;
     });
     const avgRoundVal = totalRoundVal / n;
 
-    const finalCum = statsHistory[n - 1][category === 'trash' ? 'cumulative_trash' : (category === 'money' ? 'cumulative_money' : (category === 'bank' ? 'bank_balance' : 'cumulative_followers'))];
+    const finalCum = statsHistory[n - 1][category === 'trash' ? 'cumulative_trash' : (category === 'money' ? 'cumulative_money' : 'cumulative_followers')] || 0;
 
-    const format = (v) => (category === 'money' || category === 'bank') ? `$${Math.round(v).toLocaleString()}` : `${Math.round(v).toLocaleString()}${suffix}`;
+    const format = (v) => category === 'money' ? `$${Math.round(v).toLocaleString()}` : `${Math.round(v).toLocaleString()}${suffix}`;
 
     summaryEl.innerHTML = `
         <div>
@@ -2159,3 +2340,254 @@ function updateStatsTabStyles() {
         }
     });
 }
+
+// ============================================================
+// Snapshot Capture & 16-Slot Gallery Management
+// ============================================================
+
+window.captureEndRoundSnapshot = function() {
+    const trophyCanvas = document.getElementById('endRoundTrophyCanvas');
+    const artCanvas = document.getElementById('defeatArtCanvas');
+    const cansCanvas = document.getElementById('trashCansCountCanvas');
+    const roundTrashCount = document.getElementById('round-trash-count');
+    const defeatMessage = document.getElementById('defeat-message');
+
+    const cWidth = 520;
+    const cHeight = 320;
+    const canvas = document.createElement('canvas');
+    canvas.width = cWidth;
+    canvas.height = cHeight;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    ctx.fillStyle = '#1a0505';
+    ctx.fillRect(0, 0, cWidth, cHeight);
+
+    ctx.strokeStyle = '#441111';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, cWidth - 4, cHeight - 4);
+
+    const topY = 20;
+
+    // 1. Trophy Box (Top Left: 128x128)
+    const trophyX = 35;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(trophyX, topY, 128, 128);
+    if (trophyCanvas && trophyCanvas.style.display !== 'none') {
+        ctx.drawImage(trophyCanvas, trophyX, topY, 128, 128);
+    }
+    ctx.strokeStyle = '#ff3333';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(trophyX, topY, 128, 128);
+
+    // 2. Defeat/Scene Art Box (Top Right: 256x128)
+    const artX = 220;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(artX, topY, 256, 128);
+    if (artCanvas) {
+        ctx.drawImage(artCanvas, artX, topY, 256, 128);
+    }
+    ctx.strokeStyle = '#ff3333';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(artX, topY, 256, 128);
+
+    // 3. Trash Collected Section
+    const trashY = 168;
+    ctx.fillStyle = '#00ffcc';
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    const trashText = `Trash Collected: ${roundTrashCount ? roundTrashCount.innerText : '0'}`;
+    ctx.fillText(trashText, cWidth / 2, trashY);
+
+    if (cansCanvas) {
+        const canX = (cWidth - 320) / 2;
+        const canY = trashY + 10;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(canX, canY, 320, 40);
+        ctx.drawImage(cansCanvas, canX, canY, 320, 40);
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(canX, canY, 320, 40);
+    }
+
+    // 4. Message at bottom
+    const msgY = 248;
+    ctx.fillStyle = '#ff8888';
+    ctx.font = '9px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    const msg = defeatMessage ? defeatMessage.innerText : '';
+
+    const words = msg.split(' ');
+    let line = '';
+    let currY = msgY;
+    for (let i = 0; i < words.length; i++) {
+        let testLine = line + words[i] + ' ';
+        let metrics = ctx.measureText(testLine);
+        if (metrics.width > 440 && i > 0) {
+            ctx.fillText(line, cWidth / 2, currY);
+            line = words[i] + ' ';
+            currY += 15;
+        } else {
+            line = testLine;
+        }
+    }
+    ctx.fillText(line, cWidth / 2, currY);
+
+    return canvas.toDataURL('image/png');
+};
+
+window.getGallerySnapshots = function() {
+    try {
+        const data = localStorage.getItem('trashMasterGallery');
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        return [];
+    }
+};
+
+window.saveGallerySnapshots = function(array) {
+    try {
+        localStorage.setItem('trashMasterGallery', JSON.stringify(array));
+    } catch (e) {
+        console.error('Failed to save gallery to localStorage', e);
+    }
+};
+
+window.renderGalleryModal = function() {
+    const grid = document.getElementById('gallery-grid-container');
+    const countText = document.getElementById('gallery-count-text');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const snapshots = window.getGallerySnapshots();
+    if (countText) countText.innerText = `${snapshots.length} / 16 SLOTS USED`;
+
+    snapshots.forEach((snap, idx) => {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+        card.innerHTML = `
+            <img src="${snap.dataUrl}" class="gallery-card-thumb" />
+            <div class="gallery-card-date">${snap.timestamp || 'SNAPSHOT'}</div>
+            <div class="gallery-card-info">Trash: ${snap.trash || 0}</div>
+        `;
+        card.addEventListener('click', () => {
+            window.openSnapshotPreview(idx);
+        });
+        grid.appendChild(card);
+    });
+
+    for (let i = snapshots.length; i < 16; i++) {
+        const emptyCard = document.createElement('div');
+        emptyCard.className = 'gallery-card-empty';
+        emptyCard.innerText = `SLOT ${i + 1}\n[EMPTY]`;
+        grid.appendChild(emptyCard);
+    }
+};
+
+let currentPreviewIndex = -1;
+
+window.openSnapshotPreview = function(index) {
+    const snapshots = window.getGallerySnapshots();
+    if (index < 0 || index >= snapshots.length) return;
+
+    currentPreviewIndex = index;
+    const snap = snapshots[index];
+    const modal = document.getElementById('snapshot-preview-dialog');
+    const imgEl = document.getElementById('preview-img-element');
+    const downloadBtn = document.getElementById('btn-download-snapshot');
+
+    if (imgEl) imgEl.src = snap.dataUrl;
+    if (downloadBtn) {
+        downloadBtn.href = snap.dataUrl;
+        downloadBtn.download = `trashmaster_snapshot_${index + 1}.png`;
+    }
+
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.deleteCurrentSnapshot = function() {
+    if (currentPreviewIndex < 0) return;
+    const snapshots = window.getGallerySnapshots();
+    if (currentPreviewIndex < snapshots.length) {
+        snapshots.splice(currentPreviewIndex, 1);
+        window.saveGallerySnapshots(snapshots);
+        document.getElementById('snapshot-preview-dialog')?.classList.add('hidden');
+        window.renderGalleryModal();
+    }
+};
+
+window.openReplaceSnapshotModal = function(newSnapshot) {
+    const modal = document.getElementById('replace-snapshot-dialog');
+    const grid = document.getElementById('replace-grid-container');
+    if (!modal || !grid) return;
+
+    grid.innerHTML = '';
+    const snapshots = window.getGallerySnapshots();
+
+    snapshots.forEach((snap, idx) => {
+        const card = document.createElement('div');
+        card.className = 'replace-card-choice';
+        card.innerHTML = `
+            <img src="${snap.dataUrl}" class="gallery-card-thumb" />
+            <div class="gallery-card-date">#${idx + 1} - ${snap.timestamp}</div>
+            <div style="font-size: 5px; color: #ff5555; margin-top: 4px;">CLICK TO OVERWRITE</div>
+        `;
+        card.addEventListener('click', () => {
+            snapshots[idx] = newSnapshot;
+            window.saveGallerySnapshots(snapshots);
+            modal.classList.add('hidden');
+            const btnSnapshot = document.getElementById('btn-defeat-snapshot');
+            if (btnSnapshot) {
+                btnSnapshot.innerText = 'REPLACED! 📸';
+                btnSnapshot.style.background = '#008855';
+                setTimeout(() => {
+                    btnSnapshot.innerText = 'Snapshot 📸';
+                    btnSnapshot.style.background = '#00aa66';
+                }, 2000);
+            }
+        });
+        grid.appendChild(card);
+    });
+
+    modal.classList.remove('hidden');
+};
+
+// Event listeners for gallery dialogs
+document.addEventListener('DOMContentLoaded', () => {
+    const btnViewGallery = document.getElementById('btn-view-gallery');
+    const btnGalleryClose = document.getElementById('btn-gallery-close');
+    const btnReplaceCancel = document.getElementById('btn-replace-cancel');
+    const btnPreviewClose = document.getElementById('btn-preview-close');
+    const btnDeleteSnapshot = document.getElementById('btn-delete-snapshot');
+
+    if (btnViewGallery) {
+        btnViewGallery.addEventListener('click', () => {
+            window.renderGalleryModal();
+            document.getElementById('gallery-dialog')?.classList.remove('hidden');
+        });
+    }
+
+    if (btnGalleryClose) {
+        btnGalleryClose.addEventListener('click', () => {
+            document.getElementById('gallery-dialog')?.classList.add('hidden');
+        });
+    }
+
+    if (btnReplaceCancel) {
+        btnReplaceCancel.addEventListener('click', () => {
+            document.getElementById('replace-snapshot-dialog')?.classList.add('hidden');
+        });
+    }
+
+    if (btnPreviewClose) {
+        btnPreviewClose.addEventListener('click', () => {
+            document.getElementById('snapshot-preview-dialog')?.classList.add('hidden');
+        });
+    }
+
+    if (btnDeleteSnapshot) {
+        btnDeleteSnapshot.addEventListener('click', () => {
+            window.deleteCurrentSnapshot();
+        });
+    }
+});

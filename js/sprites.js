@@ -58,6 +58,8 @@ const SPRITE_CONFIG = {
         { id: 'philly_station', name: '30th Street Station', src: 'assets/sprites/philly_station.png' },
         { id: 'black_cadillac', name: 'Black Cadillac', src: 'assets/sprites/black_cadillac.png' },
         { id: 'black_suv', name: 'Black SUV', src: 'assets/sprites/black_suv.png' },
+        { id: 'ducky_left', name: 'Ducky Left', src: 'ducky-left.png' },
+        { id: 'ducky_right', name: 'Ducky Right', src: 'ducky-right.png' },
         { id: 'airport', name: 'Airport', src: 'assets/sprites/airport.png' },
         { id: 'airplane_icon', name: 'Airplane Icon', src: 'assets/sprites/airplane_icon.png' },
         { id: 'hospital_landmark', name: 'Hospital', src: 'assets/sprites/hospital.png' },

@@ -65,113 +65,155 @@
             </div>
         </div>
 
-        <!-- Store Screen -->
-        <div id="store-screen" class="screen hidden">
-            <h1>Trash Master Store</h1>
-            <div class="store-layout">
-                <div class="store-sidebar">
-                    <h2 id="store-balance">$0</h2>
-                    <div id="movement-size-container" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ffcc; margin: 10px 0 10px 0; line-height: 1.5;">
-                        Movement: <span id="store-movement-size">0</span> followers
+        <!-- Store Screen (Main Hub) -->
+        <div id="store-screen" class="screen hidden store-main-screen">
+            <header class="store-main-header">
+                <h1 class="store-title">Trash Master Hub</h1>
+                <div class="store-stats-badge">
+                    <div class="stat-item"><span class="stat-label">BALANCE:</span> <span id="store-balance" class="stat-value">$0</span></div>
+                    <div class="stat-item"><span class="stat-label">MOVEMENT:</span> <span id="store-movement-size" class="stat-value">0</span> followers</div>
+                    <div class="stat-item"><span class="stat-label">INTL:</span> <span id="store-international-followers" class="stat-value">0</span> followers</div>
+                </div>
+            </header>
+
+            <div class="store-dashboard-grid">
+                <!-- Column 1: Trophy Case Panel -->
+                <div class="store-dashboard-panel trophy-panel">
+                    <div class="panel-header">🏆 TROPHY CASE</div>
+                    <div id="trophy-case-shelves" class="trophy-shelves-container">
+                        <!-- Shelves populated dynamically -->
                     </div>
-                    <div id="international-followers-container" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ffaa00; margin: 0 0 20px 0; line-height: 1.5;">
-                        Intl Followers: <span id="store-international-followers">0</span>
-                    </div>
-                    <div id="store-inventory"></div>
-                    <div id="pirate-toggle-container" class="toggle-container" style="margin-bottom: 8px;">
-                        <label class="switch">
-                            <input type="checkbox" id="pirate-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ffcc00; margin-left: 8px; vertical-align: middle;">Pirate Mode</span>
-                    </div>
-                    <div id="crime-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="crime-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Crime Mode</span>
-                    </div>
-                    <div id="fastfood-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="fastfood-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Fast Food Mode</span>
-                    </div>
-                    <div id="politics-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="politics-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Politics Mode</span>
-                    </div>
-                    <div id="cult-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="cult-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Cult Mode</span>
-                    </div>
-                    <div id="dragon-toggle-container" class="toggle-container" style="margin-bottom: 12px; display: none;">
-                        <label class="switch">
-                            <input type="checkbox" id="dragon-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ff3333; margin-left: 8px; vertical-align: middle;">Burninator Mode</span>
-                    </div>
-                    <div id="builder-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="builder-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Builder Mode</span>
-                    </div>
-                    <div id="fantasy-toggle-container" class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="fantasy-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Fantasy Mode</span>
-                    </div>
-                    <div class="toggle-container" style="margin-bottom: 12px;">
-                        <label class="switch">
-                            <input type="checkbox" id="flowers-toggle">
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #fff; margin-left: 8px; vertical-align: middle;">Flowers Mode</span>
-                    </div>
-                    <div id="chaos-toggle-container" class="toggle-container" style="margin-bottom: 12px; display: none;">
-                        <label class="switch">
-                            <input type="checkbox" id="chaos-toggle">
-                            <span class="slider round" style="background-color: #ff0055;"></span>
-                        </label>
-                        <span class="toggle-label" style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #ff0055; margin-left: 8px; vertical-align: middle;">Chaos Mode 💥</span>
-                    </div>
-                    <div id="music-style-container" style="margin-bottom: 15px; text-align: left; background: rgba(0,0,0,0.5); padding: 8px; border: 2px solid #b55fe6; border-radius: 4px;">
-                        <div style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: #b55fe6; margin-bottom: 6px;">🎵 BGM SOUNDTRACK:</div>
-                        <select id="music-style-select" style="width: 100%; background: #111; border: 1px solid #b55fe6; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 6px; cursor: pointer; border-radius: 3px;">
+                </div>
+
+                <!-- Column 2: Inventory & Audio -->
+                <div class="store-dashboard-panel info-panel">
+                    <div class="panel-header">🎒 INVENTORY & AUDIO</div>
+                    <div id="store-inventory" class="inventory-box"></div>
+                    <div id="music-style-container" class="bgm-box">
+                        <div class="bgm-title">🎵 BGM SOUNDTRACK:</div>
+                        <select id="music-style-select" class="bgm-select">
                             <option value="game">Retro Arcade (110 BPM)</option>
                             <option value="dnb">Drum & Bass (160 BPM 🥁)</option>
                         </select>
                     </div>
-                    <button id="btn-start-game" class="btn play-btn">Play Game</button>
-                    <button id="btn-view-trophies" class="btn secondary" style="margin-bottom: 12px; background: #ffaa00; border: 2px solid #cc7700; color: #111; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Trophy Case</button>
-                    <button id="btn-view-stats" class="btn secondary" style="margin-bottom: 12px; background: #00aa66; border: 2px solid #007744; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Performance Stats</button>
-                    <button id="btn-store-view-inventory" class="btn secondary" style="margin-bottom: 12px; background: #b55fe6; border: 2px solid #9240c5; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; width: 100%; cursor: pointer;">Letter Inventory 🎒</button>
-                    <button id="btn-store-logout" class="btn secondary">Logout</button>
-                    
-                    <!-- Retro Store Terminal -->
-                    <div id="store-terminal" style="margin-top: 15px; background: #000; border: 2px solid #333; padding: 8px; font-family: monospace; font-size: 10px; color: #00ff00; border-radius: 4px; box-shadow: inset 0 0 5px #00ff00; text-align: left;">
-                        <div style="font-family: 'Press Start 2P', monospace; font-size: 6px; color: #888; margin-bottom: 6px;">STORE TERMINAL:</div>
-                        <div id="terminal-history" style="height: 50px; overflow-y: auto; margin-bottom: 4px; line-height: 1.2; font-family: monospace; font-size: 9px; white-space: pre-wrap;">Ready.</div>
-                        <input type="text" id="terminal-input" placeholder="Type command..." style="width: 100%; background: #000; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 9px; padding: 4px; box-sizing: border-box; outline: none;">
+                </div>
+
+                <!-- Column 3: Controls, Shop, Game Modes & Terminal -->
+                <div class="store-dashboard-panel actions-modes-panel">
+                    <div class="panel-header">⚡ CONTROLS & SHOP</div>
+                    <div class="action-buttons-grid">
+                        <button id="btn-start-game" class="btn play-btn highlight-btn">Play Game 🚀</button>
+                        <button id="btn-open-shop" class="btn shop-btn highlight-btn">Buy Store Items 🛒</button>
+                        <div class="secondary-btn-group">
+                            <button id="btn-view-stats" class="btn stats-btn">Stats 📊</button>
+                            <button id="btn-view-gallery" class="btn gallery-btn">Gallery 🖼️</button>
+                            <button id="btn-store-view-inventory" class="btn inventory-btn">Letters 🎒</button>
+                            <button id="btn-store-logout" class="btn logout-btn">Logout 🚪</button>
+                        </div>
+                    </div>
+
+                    <!-- Game Modes -->
+                    <div class="modes-section-container">
+                        <div class="subpanel-header">🎮 GAME MODES</div>
+                        <div class="game-modes-grid">
+                            <div id="pirate-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="pirate-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Pirate Mode</span>
+                            </div>
+                            <div id="crime-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="crime-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Crime Mode</span>
+                            </div>
+                            <div id="fastfood-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="fastfood-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Fast Food Mode</span>
+                            </div>
+                            <div id="politics-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="politics-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Politics Mode</span>
+                            </div>
+                            <div id="cult-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="cult-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Cult Mode</span>
+                            </div>
+                            <div id="dragon-toggle-container" class="toggle-container" style="display: none;">
+                                <label class="switch">
+                                    <input type="checkbox" id="dragon-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label" style="color: #ff3333;">Burninator Mode</span>
+                            </div>
+                            <div id="builder-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="builder-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Builder Mode</span>
+                            </div>
+                            <div id="fantasy-toggle-container" class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="fantasy-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Fantasy Mode</span>
+                            </div>
+                            <div class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="flowers-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="toggle-label">Flowers Mode</span>
+                            </div>
+                            <div id="chaos-toggle-container" class="toggle-container" style="display: none;">
+                                <label class="switch">
+                                    <input type="checkbox" id="chaos-toggle">
+                                    <span class="slider round" style="background-color: #ff0055;"></span>
+                                </label>
+                                <span class="toggle-label" style="color: #ff0055;">Chaos Mode 💥</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Store Terminal (Moved under Game Modes) -->
+                    <div class="terminal-section-container">
+                        <div class="subpanel-header">🖥️ STORE TERMINAL</div>
+                        <div id="store-terminal" class="store-terminal-box">
+                            <div class="terminal-header">COMMAND LINE INTERFACE:</div>
+                            <div id="terminal-history" class="terminal-history-box">Ready.</div>
+                            <input type="text" id="terminal-input" placeholder="Type command..." class="terminal-input-box">
+                        </div>
                     </div>
                 </div>
-                <div class="store-items">
-                    <!-- Items populated dynamically -->
-                </div>
+            </div>
         </div>
+
+        <!-- Store Items Screen (Discrete Page) -->
+        <div id="store-items-screen" class="screen hidden store-items-page">
+            <header class="store-items-header">
+                <button id="btn-back-to-store-main" class="btn secondary back-btn">⬅️ Back to Main Store</button>
+                <h1>Trash Master Shop 🛒</h1>
+                <div class="shop-balance-display">
+                    Balance: <span id="shop-balance">$0</span> | Followers: <span id="shop-followers">0</span>
+                </div>
+            </header>
+            <div class="store-items">
+                <!-- Items populated dynamically -->
+            </div>
         </div>
 
         <!-- Hires Dialog -->
@@ -197,20 +239,7 @@
             </div>
         </div>
 
-        <!-- Trophy Case Dialog -->
-        <div id="trophy-dialog" class="hidden" style="position: fixed; z-index: 1003; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
-            <div class="dialog-box" style="background: #181008; border: 6px solid #8b5a2b; padding: 25px; border-radius: 8px; text-align: center; width: 700px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(139, 90, 43, 0.6); position: relative;">
-                
-                <h2 style="color: #ffaa00; font-size: 16px; margin-bottom: 5px; text-shadow: 2px 2px #000;">THE TROPHY ROOM</h2>
-                <div style="font-size: 7px; color: #888; margin-bottom: 20px;">HIGHEST ACHIEVEMENTS DISPLAYED IN THE CENTER</div>
-                
-                <div id="trophy-case-shelves" style="display: flex; flex-direction: column; gap: 25px; background: #0c0804; padding: 15px; border: 4px solid #4a2e1b; border-radius: 6px; margin-bottom: 20px;">
-                    <!-- Shelves populated dynamically -->
-                </div>
-                
-                <button id="btn-trophy-close" class="btn" style="background: #8b5a2b; border: 3px solid #4a2e1b; color: #fff; padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">RETURN TO STORE</button>
-            </div>
-        </div>
+
 
         <!-- Performance Stats Dialog -->
         <div id="stats-dialog" class="hidden" style="position: fixed; z-index: 1003; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
@@ -222,12 +251,12 @@
                     <button class="btn stats-tab-btn" data-category="trash" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">TRASH</button>
                     <button class="btn stats-tab-btn" data-category="money" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">MONEY</button>
                     <button class="btn stats-tab-btn" data-category="followers" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">FOLLOWERS</button>
-                    <button class="btn stats-tab-btn" data-category="bank" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; cursor: pointer; background: #222; border: 2px solid #333; color: #aaa;">BANK</button>
                 </div>
                 
                 <!-- Graph Canvas -->
-                <div style="background: #050805; border: 3px solid #00ffcc; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
-                    <canvas id="stats-canvas" width="660" height="260" style="display: block; width: 100%; image-rendering: pixelated;"></canvas>
+                <div id="stats-canvas-container" style="background: #050805; border: 3px solid #00ffcc; padding: 15px; border-radius: 6px; margin-bottom: 20px; position: relative;">
+                    <canvas id="stats-canvas" width="660" height="260" style="display: block; width: 100%; image-rendering: pixelated; cursor: crosshair;"></canvas>
+                    <div id="stats-tooltip" style="display: none; position: absolute; background: rgba(0, 0, 0, 0.92); border: 2px solid #00ffcc; color: #fff; padding: 8px 12px; border-radius: 6px; font-family: 'Press Start 2P', monospace; font-size: 7px; pointer-events: none; z-index: 1010; box-shadow: 0 0 15px rgba(0,255,204,0.6); white-space: nowrap; text-align: left; line-height: 1.6;"></div>
                 </div>
                 
                 <!-- Stats Summary -->
@@ -260,7 +289,52 @@
                     <canvas id="trashCansCountCanvas" width="320" height="40" style="width: 320px; height: 40px; image-rendering: pixelated; display: block; background: #000; border: 2px solid #333; border-radius: 4px;"></canvas>
                 </div>
                 <p id="defeat-message" style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ff8888; text-align: center; max-width: 400px; line-height: 1.8; margin: 10px 0;"></p>
-                <button id="btn-defeat-return" class="btn play-btn" style="background: #ff3333; border: 2px solid #990000; box-shadow: 0 4px #660000; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Return to Store</button>
+                <div style="display: flex; gap: 15px; align-items: center; justify-content: center;">
+                    <button id="btn-defeat-snapshot" class="btn play-btn" style="background: #00aa66; border: 2px solid #007744; box-shadow: 0 4px #004422; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Snapshot 📸</button>
+                    <button id="btn-defeat-return" class="btn play-btn" style="background: #ff3333; border: 2px solid #990000; box-shadow: 0 4px #660000; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Return to Store</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Snapshot Gallery Dialog -->
+        <div id="gallery-dialog" class="hidden" style="position: fixed; z-index: 1003; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+            <div class="dialog-box" style="background: #0a0e1a; border: 6px solid #00ffcc; padding: 25px; border-radius: 8px; text-align: center; width: 750px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(0, 255, 204, 0.5); position: relative;">
+                <h2 style="color: #00ffcc; font-size: 14px; margin-bottom: 8px; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0,255,204,0.5);">SNAPSHOT GALLERY</h2>
+                <div id="gallery-count-text" style="font-size: 8px; color: #888; margin-bottom: 20px;">0 / 16 SLOTS USED</div>
+                
+                <div id="gallery-grid-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; background: #050810; padding: 15px; border: 3px solid #1a2a44; border-radius: 6px; margin-bottom: 20px; min-height: 240px;">
+                    <!-- Gallery cards populated dynamically -->
+                </div>
+                
+                <button id="btn-gallery-close" class="btn" style="background: #00aa66; border: 3px solid #007744; color: #fff; padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CLOSE GALLERY</button>
+            </div>
+        </div>
+
+        <!-- Discard & Replace Snapshot Selection Dialog -->
+        <div id="replace-snapshot-dialog" class="hidden" style="position: fixed; z-index: 1004; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+            <div class="dialog-box" style="background: #1a0808; border: 6px solid #ff3333; padding: 25px; border-radius: 8px; text-align: center; width: 780px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(255, 51, 51, 0.7); position: relative;">
+                <h2 style="color: #ff3333; font-size: 13px; margin-bottom: 8px; letter-spacing: 1px;">GALLERY FULL! (16/16)</h2>
+                <div style="font-size: 7px; color: #ffaaaa; margin-bottom: 20px; line-height: 1.6;">SELECT AN EXISTING SNAPSHOT TO DISCARD AND REPLACE WITH YOUR NEW SNAPSHOT</div>
+                
+                <div id="replace-grid-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #0c0404; padding: 15px; border: 3px solid #4a1b1b; border-radius: 6px; margin-bottom: 20px;">
+                    <!-- 16 snapshots choices -->
+                </div>
+                
+                <button id="btn-replace-cancel" class="btn secondary" style="padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CANCEL</button>
+            </div>
+        </div>
+
+        <!-- Fullscreen Preview Modal -->
+        <div id="snapshot-preview-dialog" class="hidden" style="position: fixed; z-index: 1005; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+            <div class="dialog-box" style="background: #0a0e1a; border: 4px solid #00ffcc; padding: 20px; border-radius: 8px; text-align: center; max-width: 600px; font-family: 'Press Start 2P', monospace; position: relative;">
+                <div id="preview-image-container" style="margin-bottom: 15px;">
+                    <img id="preview-img-element" style="width: 100%; border: 3px solid #334466; border-radius: 4px; display: block;" />
+                </div>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <a id="btn-download-snapshot" download="trashmaster_snapshot.png" class="btn" style="background: #00aa66; border: 2px solid #007744; color: #fff; padding: 8px 16px; font-size: 8px; text-decoration: none; display: inline-block;">DOWNLOAD 💾</a>
+                    <button id="btn-delete-snapshot" class="btn" style="background: #ff3333; border: 2px solid #990000; color: #fff; padding: 8px 16px; font-size: 8px; cursor: pointer;">DELETE 🗑️</button>
+                    <button id="btn-preview-close" class="btn secondary" style="padding: 8px 16px; font-size: 8px; cursor: pointer;">CLOSE</button>
+                </div>
             </div>
         </div>
     </div>
@@ -362,14 +436,14 @@
 
     <!-- Instructions / Mode Splash Dialog -->
     <div id="instructions-dialog" class="hidden" style="position: fixed; z-index: 1005; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
-        <div class="dialog-box" style="background: #111; border: 4px solid #ffaa00; padding: 25px; border-radius: 8px; text-align: center; width: 480px; max-width: 90%; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 25px rgba(255, 170, 0, 0.4); box-sizing: border-box;">
-            <div id="instruction-slides-container" style="min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <div class="dialog-box instruction-dialog-box" style="background: #111; border: 4px solid #ffaa00; padding: 25px; border-radius: 8px; text-align: center; width: 560px; max-width: 95%; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(255, 170, 0, 0.4); box-sizing: border-box;">
+            <div id="instruction-slides-container" style="min-height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                 <!-- Slides are populated dynamically -->
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px;">
-                <button id="btn-instruction-prev" class="btn secondary" style="padding: 8px 12px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; background: #333; border: 2px solid #555; color: #fff;">PREV</button>
-                <span id="instruction-page-indicator" style="font-size: 8px; color: #888; letter-spacing: 1px;">1 / 1</span>
-                <button id="btn-instruction-next" class="btn" style="background: #ffaa00; border: 2px solid #cc7700; color: #111; padding: 8px 12px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace;">NEXT</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                <button id="btn-instruction-prev" class="btn secondary" style="padding: 8px 14px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; background: #333; border: 2px solid #555; color: #fff; border-radius: 4px;">PREV</button>
+                <span id="instruction-page-indicator" style="font-size: 8px; color: #ffaa00; letter-spacing: 1px;">1 / 1</span>
+                <button id="btn-instruction-next" class="btn" style="background: #ffaa00; border: 2px solid #cc7700; color: #111; padding: 8px 14px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; border-radius: 4px;">NEXT</button>
             </div>
         </div>
     </div>

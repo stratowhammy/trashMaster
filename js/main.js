@@ -84,7 +84,7 @@ class GarbageTruckFollower {
 
         if (img) {
             ctx.save();
-            const scaledSize = 64;
+            const scaledSize = Math.round(TILE_SIZE * 0.8);
             if (window.duckyModeActive) {
                 // ducky_left and ducky_right pre-oriented
                 ctx.drawImage(img, screen.x - scaledSize / 2, screen.y - scaledSize / 2, scaledSize, scaledSize);

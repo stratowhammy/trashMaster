@@ -16,58 +16,34 @@ const TileType = {
     ROAD_RIGHT: 10,
 };
 
-const TILE_SIZE = 16;
+const TILE_SIZE = 32;
 const MAP_WIDTH = 200;
 const MAP_HEIGHT = 200;
 const MAP_PIXEL_W = MAP_WIDTH * TILE_SIZE;
 const MAP_PIXEL_H = MAP_HEIGHT * TILE_SIZE;
 
-// ── Wrapping helpers (used by all modules) ──
+// ── Boundary helpers (Infinite map disabled) ──
 function wrapTileX(x) {
-    if (window.pirateMode) return Math.max(0, Math.min(MAP_WIDTH - 1, Math.floor(x)));
-    return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
+    return Math.max(0, Math.min(MAP_WIDTH - 1, Math.floor(x)));
 }
 function wrapTileY(y) {
-    if (window.pirateMode) return Math.max(0, Math.min(MAP_HEIGHT - 1, Math.floor(y)));
-    return ((y % MAP_HEIGHT) + MAP_HEIGHT) % MAP_HEIGHT;
+    return Math.max(0, Math.min(MAP_HEIGHT - 1, Math.floor(y)));
 }
 function wrapWorldX(x) {
-    if (window.pirateMode) return Math.max(0, Math.min(MAP_PIXEL_W, x));
-    return ((x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+    return Math.max(0, Math.min(MAP_PIXEL_W, x));
 }
 function wrapWorldY(y) {
-    if (window.pirateMode) return Math.max(0, Math.min(MAP_PIXEL_H + 300, y));
-    return ((y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
+    return Math.max(0, Math.min(MAP_PIXEL_H, y));
 }
 
 function wrappedDistance(x1, y1, x2, y2) {
-    if (window.pirateMode) {
-        const dx = x1 - x2;
-        const dy = y1 - y2;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-    let dx = Math.abs(x1 - x2);
-    let dy = Math.abs(y1 - y2);
-    if (dx > MAP_PIXEL_W / 2) dx = MAP_PIXEL_W - dx;
-    if (dy > MAP_PIXEL_H / 2) dy = MAP_PIXEL_H - dy;
+    const dx = x1 - x2;
+    const dy = y1 - y2;
     return Math.sqrt(dx * dx + dy * dy);
 }
 
 function nearestWrap(entityX, entityY, camCenterX, camCenterY) {
-    if (window.pirateMode) {
-        return { x: entityX, y: entityY };
-    }
-    let dx = (entityX - camCenterX) % MAP_PIXEL_W;
-    if (dx > MAP_PIXEL_W / 2) dx -= MAP_PIXEL_W;
-    else if (dx < -MAP_PIXEL_W / 2) dx += MAP_PIXEL_W;
-    const x = camCenterX + dx;
-
-    let dy = (entityY - camCenterY) % MAP_PIXEL_H;
-    if (dy > MAP_PIXEL_H / 2) dy -= MAP_PIXEL_H;
-    else if (dy < -MAP_PIXEL_H / 2) dy += MAP_PIXEL_H;
-    const y = camCenterY + dy;
-
-    return { x, y };
+    return { x: entityX, y: entityY };
 }
 
 // Tile colors
@@ -507,9 +483,11 @@ class BaseMap {
                 const sx = worldTX * TILE_SIZE - camera.x;
                 const sy = worldTY * TILE_SIZE - camera.y;
 
-                if (window.pirateMode && worldTY >= MAP_HEIGHT) {
-                    ctx.fillStyle = '#000000';
+                if (worldTX < 0 || worldTX >= MAP_WIDTH || worldTY < 0 || worldTY >= MAP_HEIGHT) {
+                    ctx.fillStyle = '#111622';
                     ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = 'rgba(255, 68, 68, 0.15)';
+                    ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
                     continue;
                 }
 
@@ -530,41 +508,18 @@ class BaseMap {
             }
         }
 
-        // Render Southern Edge Black Border & Precipice Overlay in Pirate Mode
-        if (window.pirateMode) {
-            const southEdgeY = MAP_PIXEL_H - camera.y;
-            if (southEdgeY < camera.height) {
-                ctx.save();
-                // 1. Black space void below southern edge
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, Math.max(0, southEdgeY), camera.width, camera.height - Math.max(0, southEdgeY) + 500);
+        // Render Filthadelphia City Limit Boundaries
+        ctx.save();
+        const bLeft = 0 - camera.x;
+        const bTop = 0 - camera.y;
+        const bRight = MAP_PIXEL_W - camera.x;
+        const bBottom = MAP_PIXEL_H - camera.y;
 
-                // 2. Solid black border along southern edge
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 14;
-                ctx.beginPath();
-                ctx.moveTo(0, southEdgeY);
-                ctx.lineTo(camera.width, southEdgeY);
-                ctx.stroke();
-
-                // 3. Pulsing hazard line
-                const pulse = Math.sin(performance.now() / 120) * 0.4 + 0.6;
-                ctx.strokeStyle = `rgba(255, 68, 0, ${pulse})`;
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(0, southEdgeY - 2);
-                ctx.lineTo(camera.width, southEdgeY - 2);
-                ctx.stroke();
-
-                // 4. Southern edge warning label
-                ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
-                ctx.font = 'bold 10px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('⚠️ EDGE OF THE EARTH — DO NOT SAIL PAST! 🌊☠️', camera.width / 2, southEdgeY - 14);
-
-                ctx.restore();
-            }
-        }
+        const pulse = Math.sin(performance.now() / 150) * 0.3 + 0.7;
+        ctx.strokeStyle = `rgba(255, 50, 80, ${pulse})`;
+        ctx.lineWidth = 6;
+        ctx.strokeRect(bLeft, bTop, MAP_PIXEL_W, MAP_PIXEL_H);
+        ctx.restore();
     }
 
     openBuildingDoor(buildingId) {

@@ -16,12 +16,20 @@ class Camera {
         const desiredY = targetY - this.height / 2;
         this.x += (desiredX - this.x) * this.smoothing;
         this.y += (desiredY - this.y) * this.smoothing;
-        // No clamping — infinite scroll
+        
+        if (typeof MAP_PIXEL_W !== 'undefined') {
+            this.x = Math.max(0, Math.min(MAP_PIXEL_W - this.width, this.x));
+            this.y = Math.max(0, Math.min(MAP_PIXEL_H - this.height, this.y));
+        }
     }
 
     snapTo(targetX, targetY) {
         this.x = targetX - this.width / 2;
         this.y = targetY - this.height / 2;
+        if (typeof MAP_PIXEL_W !== 'undefined') {
+            this.x = Math.max(0, Math.min(MAP_PIXEL_W - this.width, this.x));
+            this.y = Math.max(0, Math.min(MAP_PIXEL_H - this.height, this.y));
+        }
     }
 
     resize(width, height) { this.width = width; this.height = height; }

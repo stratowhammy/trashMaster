@@ -109,6 +109,9 @@ class Player {
                 }
             }
 
+            newX = Math.max(16, Math.min(MAP_PIXEL_W - 16, newX));
+            newY = Math.max(16, Math.min(MAP_PIXEL_H - 16, newY));
+
             if (this._canMoveTo(newX, this.y, gameMap)) this.x = newX;
             if (this._canMoveTo(this.x, newY, gameMap)) this.y = newY;
         }
@@ -128,13 +131,13 @@ class Player {
 
             const wasOnFoot = this.onFoot;
             const isIslandLand = (curTile === TileType.SIDEWALK || curTile === TileType.BUILDING || curTile === TileType.BUILDING_DOOR);
-            this.onFoot = isIslandLand;
-
-            if (!wasOnFoot && this.onFoot) {
+            if (isIslandLand && !wasOnFoot) {
+                this.onFoot = true;
                 if (window.game && window.game.hud) {
                     window.game.hud.showFollowerNotification('⚓ DISEMBARKED ONTO ISLAND! Exploring on foot! 🏝️', true);
                 }
-            } else if (wasOnFoot && !this.onFoot) {
+            } else if (!isIslandLand && wasOnFoot) {
+                this.onFoot = false;
                 if (window.game && window.game.hud) {
                     window.game.hud.showFollowerNotification('⛵ EMBARKED ONTO PIRATE SHIP! Sailing open waters! 🌊', true);
                 }
@@ -143,9 +146,10 @@ class Player {
     }
 
     _canMoveTo(newX, newY, gameMap) {
-        if (window.pirateMode) return true; // Completely smooth & seamless island entry/exit
+        if (!gameMap) return true;
+        if (window.pirateMode) return true;
 
-        const hs = this.size / 2 - 12; // Inset collision bounds by 12px for smooth door/corridor entry
+        const hs = this.size / 2 - 4;
         const corners = [
             { x: newX - hs, y: newY - hs }, { x: newX + hs, y: newY - hs },
             { x: newX - hs, y: newY + hs }, { x: newX + hs, y: newY + hs },
@@ -162,9 +166,7 @@ class Player {
         const bldgB = gameMap.getBuildingAtTile(targetWX, targetWY);
         
         if (!bldgA && bldgB) {
-            // Trying to enter building B
             if (window.game && window.game.followerManager.getFollowerCount() < 6) {
-                // Throttle the notification to avoid spamming every frame
                 if (!this.lastEntryDenyTime || Date.now() - this.lastEntryDenyTime > 2000) {
                     window.game.hud.showFollowerNotification('You need a posse of 6+ to enter this building!', false);
                     this.lastEntryDenyTime = Date.now();
@@ -173,12 +175,10 @@ class Player {
             }
         }
 
-        // 1. Check center tile transition strictly!
         if (!gameMap.isWalkable(targetWX, targetWY, curTX, curTY, false)) {
             return false;
         }
 
-        // 2. Check corners transition leniently!
         for (const c of corners) {
             const targetTX = Math.floor(c.x / TILE_SIZE);
             const targetTY = Math.floor(c.y / TILE_SIZE);
@@ -194,7 +194,6 @@ class Player {
     getTileY() { return wrapTileY(Math.floor(this.y / TILE_SIZE)); }
 
     render(ctx, camera, spriteManager) {
-        // Render docked boat on shore if player is exploring island on foot
         if (window.pirateMode && this.onFoot && this.dockedBoat) {
             const bScreen = camera.worldToScreen(this.dockedBoat.x, this.dockedBoat.y);
             const boatImg = spriteManager.getImage('pirate_ship_blue') || spriteManager.getImage('pirate_ship');
@@ -212,7 +211,7 @@ class Player {
         }
 
         const screen = camera.worldToScreen(this.x, this.y);
-        let drawSize = 64;
+        let drawSize = Math.round(TILE_SIZE * 0.8);
         
         if (this.direction === 'left') {
             this.lastFacingDir = 'left';

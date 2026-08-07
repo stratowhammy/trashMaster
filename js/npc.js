@@ -70,7 +70,7 @@ class NPC {
 
     render(ctx, camera, spriteManager) {
         const screen = camera.worldToScreen(this.x, this.y);
-        const drawSize = 64;
+        const drawSize = Math.round(TILE_SIZE * 0.8);
 
         if (this.isDeadFlag) {
             ctx.save();

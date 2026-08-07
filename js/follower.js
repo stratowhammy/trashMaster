@@ -140,7 +140,7 @@ class Follower {
         }
 
         const screen = camera.worldToScreen(this.x, this.y);
-        const drawSize = 64;
+        const drawSize = Math.round(TILE_SIZE * 0.8);
 
         // ── Pirate Mode: draw posse member as pixel pirate when disembarked on foot ──
         if (window.pirateMode) {

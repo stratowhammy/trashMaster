@@ -141,10 +141,11 @@ button, .btn, input[type="button"], input[type="submit"] {
 }
 
 .store-title {
-    font-size: 1.45rem;
+    font-size: 1.05rem;
     margin-bottom: 0;
+    padding: 0.25rem 0.5rem;
     color: #00ff88;
-    text-shadow: 0 0 12px rgba(0, 255, 136, 0.5), 2px 2px #000;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5), 2px 2px #000;
     letter-spacing: 1px;
 }
 

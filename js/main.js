@@ -5108,7 +5108,7 @@ class Game {
                         if (!char.match(/^[A-Z]$/)) return;
 
                         if (char !== targetLetter) {
-                            statusEl.innerText = `Incorrect letter for this slot! Expected: ${targetLetter}`;
+                            statusEl.innerText = `Incorrect letter for this slot! Try another letter.`;
                             return;
                         }
 

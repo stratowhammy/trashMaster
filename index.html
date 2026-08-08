@@ -636,6 +636,20 @@
         </div>
     </div>
 
+    <!-- In-Round Messages Log Dialog -->
+    <div id="messages-log-dialog" class="hidden" style="position: fixed; z-index: 2005; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+        <div class="dialog-box" style="background: #09121a; border: 4px solid #00ffcc; padding: 25px; border-radius: 8px; text-align: center; width: 540px; max-height: 85vh; display: flex; flex-direction: column; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(0, 255, 204, 0.5); position: relative;">
+            <h2 style="color: #00ffcc; font-size: 13px; margin-bottom: 12px; letter-spacing: 1px; flex-shrink: 0;">💬 ROUND MESSAGES LOG</h2>
+            <div style="font-size: 7px; color: #aaa; margin-bottom: 15px; flex-shrink: 0;">ALL NOTIFICATIONS & MESSAGES DISPLAYED THIS ROUND</div>
+            
+            <div id="messages-log-list" style="background: #050a10; border: 2px solid #1a3344; border-radius: 6px; padding: 12px; overflow-y: auto; flex-grow: 1; min-height: 200px; max-height: 50vh; text-align: left; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <!-- Messages populated dynamically -->
+            </div>
+            
+            <button id="btn-messages-resume" class="btn" style="background: #00aa66; border: 2px solid #00ffaa; color: #fff; padding: 12px 24px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace; flex-shrink: 0; margin: 0 auto;">RESUME GAME</button>
+        </div>
+    </div>
+
     <!-- Audio & Sound Options Dialog -->
     <div id="sound-options-dialog" class="hidden" style="position: fixed; z-index: 1006; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
         <div class="dialog-box" style="background: #0d0914; border: 4px solid #b55fe6; padding: 25px; border-radius: 8px; text-align: center; width: 480px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 25px rgba(181, 95, 230, 0.6); position: relative;">

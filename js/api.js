@@ -847,6 +847,18 @@ function initUI() {
             document.getElementById('airport-dialog').classList.add('hidden');
         });
     }
+
+    // ── In-Round Messages Log Dialog Resume Button ──
+    const btnMessagesResume = document.getElementById('btn-messages-resume');
+    if (btnMessagesResume) {
+        btnMessagesResume.addEventListener('click', () => {
+            const dlg = document.getElementById('messages-log-dialog');
+            if (dlg) dlg.classList.add('hidden');
+            if (window.game && window.game.state === GameState.PAUSED) {
+                window.game.state = GameState.PLAYING;
+            }
+        });
+    }
     
     // ── Stranded Defeat Screen ──
     const btnStrandedReturn = document.getElementById('btn-stranded-return');

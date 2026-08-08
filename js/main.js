@@ -986,13 +986,21 @@ class Game {
 
         this.canvas.addEventListener('click', (e) => {
             this.canvas.focus();
+            const rect = this.canvas.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+            const clickY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+
+            if (this.state === GameState.PLAYING && this.hud && this.hud.messagesBtnBounds) {
+                const b = this.hud.messagesBtnBounds;
+                if (clickX >= b.x && clickX <= b.x + b.width && clickY >= b.y && clickY <= b.y + b.height) {
+                    this.openMessagesLogDialog();
+                    return;
+                }
+            }
+
             if (this.state === GameState.CHARACTER_SELECT) {
                 this._handleCharSelect(e);
             } else if (this.state === GameState.GAME_OVER) {
-                // Return to store handled in render button click
-                const rect = this.canvas.getBoundingClientRect();
-                const clickX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-                const clickY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
                 const centerX = this.canvas.width / 2;
                 const centerY = this.canvas.height / 2;
                 const btnW = 200;
@@ -1004,6 +1012,60 @@ class Game {
                 }
             }
         });
+    }
+
+    openMessagesLogDialog() {
+        if (this.state === GameState.PLAYING) {
+            this.state = GameState.PAUSED;
+            this.resetKeys();
+            if (window.soundManager) window.soundManager.playDialogAppearSFX();
+
+            const dlg = document.getElementById('messages-log-dialog');
+            const list = document.getElementById('messages-log-list');
+            if (list) {
+                list.innerHTML = '';
+                const msgs = (this.hud && this.hud.roundMessages) ? this.hud.roundMessages : [];
+                if (msgs.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.style.color = '#888';
+                    empty.style.fontSize = '8px';
+                    empty.style.textAlign = 'center';
+                    empty.style.padding = '30px 10px';
+                    empty.innerText = 'No messages displayed yet this round.';
+                    list.appendChild(empty);
+                } else {
+                    msgs.forEach((item, idx) => {
+                        const entry = document.createElement('div');
+                        entry.style.background = '#0d1824';
+                        entry.style.borderLeft = item.isPositive === false ? '3px solid #ff4444' : '3px solid #00ffcc';
+                        entry.style.padding = '8px 10px';
+                        entry.style.borderRadius = '4px';
+                        entry.style.display = 'flex';
+                        entry.style.justifyContent = 'space-between';
+                        entry.style.alignItems = 'center';
+                        entry.style.gap = '10px';
+
+                        const txt = document.createElement('span');
+                        txt.style.color = item.isPositive === false ? '#ff9999' : '#ffffff';
+                        txt.style.fontSize = '8px';
+                        txt.style.lineHeight = '1.5';
+                        txt.innerText = `${idx + 1}. ${item.text}`;
+
+                        const timeTag = document.createElement('span');
+                        timeTag.style.color = '#00ffcc';
+                        timeTag.style.fontSize = '7px';
+                        timeTag.style.whiteSpace = 'nowrap';
+                        timeTag.innerText = item.timeRemaining !== undefined ? `[${item.timeRemaining}s]` : '';
+
+                        entry.appendChild(txt);
+                        entry.appendChild(timeTag);
+                        list.appendChild(entry);
+                    });
+                    list.scrollTop = list.scrollHeight;
+                }
+            }
+            if (dlg) dlg.classList.remove('hidden');
+        }
     }
 
     _resizeCanvas() {

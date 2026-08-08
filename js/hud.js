@@ -18,6 +18,7 @@ class HUD {
         // New follower notification
         this.followerNotification = '';
         this.followerNotificationTimer = 0;
+        this.roundMessages = [];
     }
 
     reset() {
@@ -36,6 +37,7 @@ class HUD {
         this.trashInWindow = 0;
         this.isHighScore = false;
         this.leaderboard = [];
+        this.roundMessages = [];
     }
 
     updateScore(newScore) {
@@ -49,6 +51,17 @@ class HUD {
         this.followerNotification = text;
         this.followerNotificationTimer = 180; // ~3 seconds
         this.followerNotificationPositive = isPositive;
+
+        this.roundMessages = this.roundMessages || [];
+        const lastMsg = this.roundMessages[this.roundMessages.length - 1];
+        if (!lastMsg || lastMsg.text !== text || (Date.now() - (lastMsg.timeMs || 0)) > 800) {
+            this.roundMessages.push({
+                text: text,
+                isPositive: isPositive,
+                timeRemaining: Math.ceil(this.timeRemaining),
+                timeMs: Date.now()
+            });
+        }
     }
 
     update(deltaTime) {
@@ -127,6 +140,30 @@ class HUD {
             ctx.fillStyle = '#ff66b2';
             ctx.fillText(`Fertilizer: ${fert}`, timerX - 10, timerY + (window.fastFoodMode && susTimer > 0 ? 55 : 45));
         }
+
+        // ── Messages Icon Button (Directly Under Timer) ──
+        const msgBtnX = timerX - 140;
+        const msgBtnY = timerY - 10 + boxHeight + 6;
+        const msgBtnW = 150;
+        const msgBtnH = 30;
+
+        this.messagesBtnBounds = { x: msgBtnX, y: msgBtnY, width: msgBtnW, height: msgBtnH };
+
+        ctx.fillStyle = 'rgba(10, 15, 25, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(msgBtnX, msgBtnY, msgBtnW, msgBtnH, 6);
+        ctx.fill();
+        ctx.strokeStyle = '#00ffcc';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(msgBtnX, msgBtnY, msgBtnW, msgBtnH, 6);
+        ctx.stroke();
+
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = 'bold 8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        const msgCount = (this.roundMessages || []).length;
+        ctx.fillText(`💬 MESSAGES (${msgCount})`, msgBtnX + msgBtnW / 2, msgBtnY + 19);
 
         // ── Score Display (to the left of Timer) ──
         const scoreX = canvasWidth - 160;

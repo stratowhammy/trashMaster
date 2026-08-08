@@ -1043,6 +1043,7 @@ class Game {
         const dialog = document.getElementById('cult-leaving-dialog');
         const textEl = document.getElementById('cult-leaving-text');
         if (!dialog || !textEl) return;
+        if (window.soundManager) window.soundManager.playAngelicChoirSFX();
 
         // Stop time / game update loop
         const oldState = this.state;
@@ -1623,10 +1624,12 @@ class Game {
             } else if (itemName === 'Mushrooms') {
                 this.hud.timerSpeed = 0.5;
                 this.mushroomTimer = 20;
+                if (window.soundManager) window.soundManager.setTempoMultiplier(0.8);
                 this.hud.showFollowerNotification('Timer Slowed!', true);
             } else if (itemName === 'Wings') {
                 if (this.player) this.player.speedMultiplier = 1.5;
                 this.wingsTimer = 15;
+                if (window.soundManager) window.soundManager.setTempoMultiplier(1.2);
                 this.hud.showFollowerNotification('Super Speed!', true);
             }
         } catch (e) {
@@ -1799,6 +1802,7 @@ class Game {
             if (this.mushroomTimer <= 0) {
                 this.hud.timerSpeed = 1.0;
                 this.mushroomTimer = 0;
+                if (window.soundManager) window.soundManager.setTempoMultiplier(1.0);
             }
         }
         if (this.wingsTimer > 0) {
@@ -1811,6 +1815,7 @@ class Game {
                     this.player.athleteBaseMultiplier = 1.1;
                 }
                 this.wingsTimer = 0;
+                if (window.soundManager) window.soundManager.setTempoMultiplier(1.0);
             }
         }
         if (this.protectionTimer > 0) {
@@ -3330,6 +3335,7 @@ class Game {
 
     async _endRoundAndReturnToStore() {
         if (!window.apiCall) return; // Not logged in
+        if (window.soundManager) window.soundManager.playVictoriousEndSoundtrack();
         
         let earned = this.trashManager.totalPoints;
 
@@ -4109,6 +4115,7 @@ class Game {
     }
 
     async _showSplashGameOver(title, message, isPirateDefeat) {
+        if (window.soundManager) window.soundManager.playMelancholyEndSoundtrack();
         const hadTruck = title === "WASTED BY PIRATES" && message.includes("Bruno");
         
         if (isPirateDefeat) {
@@ -4463,6 +4470,7 @@ class Game {
     }
 
     async _triggerCarDefeat() {
+        if (window.soundManager) window.soundManager.playMelancholyEndSoundtrack();
         this.state = GameState.UI_OVERLAY;
         if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
 
@@ -4550,6 +4558,7 @@ class Game {
     }
 
     async _triggerArrestDefeat(isMafiaArrest = false) {
+        if (window.soundManager) window.soundManager.playMelancholyEndSoundtrack();
         this.state = GameState.UI_OVERLAY;
         if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
 
@@ -5705,6 +5714,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const btnFFYes = document.getElementById('btn-fast-food-yes');
     if (btnFFYes) btnFFYes.addEventListener('click', () => {
         document.getElementById('fast-food-dialog').classList.add('hidden');
+        if (window.soundManager) window.soundManager.playCashRegisterSFX();
         if (window.game) {
             window.game.state = GameState.PLAYING;
             const cost = window.currentFastFoodCost || 0;
@@ -5779,6 +5789,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const btnHospYes = document.getElementById('btn-hospital-yes');
     if (btnHospYes) btnHospYes.addEventListener('click', () => {
         document.getElementById('hospital-dialog').classList.add('hidden');
+        if (window.soundManager) window.soundManager.playCashRegisterSFX();
         if (window.game) {
             window.game.state = GameState.PLAYING;
             window.game.hasHealthInsurance = true;

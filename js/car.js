@@ -242,6 +242,7 @@ class CarManager {
                             game.hud.showFollowerNotification('Health Insurance saved a posse member from a car hit!', true);
                         } else {
                             game.followerManager.removeFollower();
+                            if (window.soundManager) window.soundManager.playSplatSFX();
                             game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
                         }
                         // Temporarily disable car to prevent multi-kills
@@ -249,6 +250,7 @@ class CarManager {
                         setTimeout(() => { car.active = true; }, 3000);
                     } else {
                         // Player dies!
+                        if (window.soundManager) window.soundManager.playSplatSFX();
                         game._triggerCarDefeat();
                         return;
                     }
@@ -266,6 +268,7 @@ class CarManager {
                             game.hud.showFollowerNotification('Health Insurance saved a posse member from a car hit!', true);
                         } else {
                             game.followerManager.removeFollowerAt(i);
+                            if (window.soundManager) window.soundManager.playSplatSFX();
                             game.hud.showFollowerNotification('A posse member was run over by a red car!', true);
                         }
                         // Temporarily disable car
@@ -284,6 +287,7 @@ class CarManager {
                     if (player.interactionTriggered) {
                         player.interactionTriggered = false; // consume
                         car.active = false;
+                        if (window.soundManager) window.soundManager.playDingSFX();
                         const newFollower = game.followerManager.addFollower(player.x, player.y);
                         const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
                         game.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);

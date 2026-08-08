@@ -231,6 +231,9 @@ function initUI() {
         if (indicator) {
             indicator.innerText = `${currentSlideIndex + 1} / ${activeSlides.length}`;
         }
+        if (slide && slide.title && slide.title.includes('GRIMETOLOGY') && window.soundManager) {
+            window.soundManager.playAngelicChoirSFX();
+        }
     };
 
     const showInstructionsDialog = () => {

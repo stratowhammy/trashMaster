@@ -125,7 +125,6 @@ class SoundManager {
 
     // ── Sound Effects ──
 
-    // 1. Button Click SFX
     playButtonClickSFX() {
         if (!this.isSFXEnabled('click')) return;
         if (!this.ctx) this._initAudio();
@@ -157,7 +156,6 @@ class SoundManager {
         osc2.stop(now + 0.035);
     }
 
-    // 2. 'Splat' Sound SFX (Posse member run over by red car)
     playSplatSFX() {
         if (!this.isSFXEnabled('splat')) return;
         if (!this.ctx) this._initAudio();
@@ -197,7 +195,6 @@ class SoundManager {
         noise.stop(now + 0.12);
     }
 
-    // 3. 'Ding' Sound SFX (Engaging a green car)
     playDingSFX() {
         if (!this.isSFXEnabled('ding')) return;
         if (!this.ctx) this._initAudio();
@@ -229,7 +226,6 @@ class SoundManager {
         osc2.stop(now + 0.35);
     }
 
-    // 4. Handshake Sound SFX (Shaking someone's hand)
     playHandshakeSFX() {
         if (!this.isSFXEnabled('handshake')) return;
         if (!this.ctx) this._initAudio();
@@ -251,7 +247,6 @@ class SoundManager {
         });
     }
 
-    // 5. Gunshot Sound SFX (Hitting 'K')
     playKillSFX() {
         if (!this.isSFXEnabled('gunshot')) return;
         if (!this.ctx) this._initAudio();
@@ -293,7 +288,6 @@ class SoundManager {
         sub.stop(now + 0.15);
     }
 
-    // 6. Cash Register Sound SFX ("Cha-Ching!" for Healthcare & Fast Food)
     playCashRegisterSFX() {
         if (!this.isSFXEnabled('cash')) return;
         if (!this.ctx) this._initAudio();
@@ -346,7 +340,6 @@ class SoundManager {
         noise.stop(now + 0.2);
     }
 
-    // 7. Angelic Choir SFX (Church of Grimetology dialogs)
     playAngelicChoirSFX() {
         if (!this.isSFXEnabled('choir')) return;
         if (!this.ctx) this._initAudio();
@@ -579,15 +572,23 @@ class SoundManager {
     }
 
     playTrack(trackName) {
-        if (this.sequenceInterval && this.currentTrack === (trackName || 'lofi')) {
+        const targetTrack = (trackName || 'lofi').toLowerCase();
+        if (this.sequenceInterval && this.currentTrack === targetTrack) {
             return;
         }
         this.stop();
 
         this._initAudio();
-        this.currentTrack = trackName || 'lofi';
+        this.currentTrack = targetTrack;
         this.currentStep = 0;
-        this.restartSequence();
+
+        if (this.currentTrack === 'cucaracha') {
+            this.playCucarachaSoundtrack();
+        } else if (this.currentTrack === 'dahgbad') {
+            this.playDahgbadSoundtrack();
+        } else {
+            this.restartSequence();
+        }
     }
 
     restartSequence() {
@@ -636,6 +637,140 @@ class SoundManager {
             }
             if (stepInBar % 2 === 0) {
                 this.playLofiHat(now, stepInBar % 4 !== 0);
+            }
+
+            this.currentStep++;
+        }, stepTime * 1000);
+    }
+
+    // ── Cucaracha Lo-Fi Latin Beat ──
+    playCucarachaSoundtrack() {
+        if (this.sequenceInterval) {
+            clearInterval(this.sequenceInterval);
+            this.sequenceInterval = null;
+        }
+
+        const bpm = 82;
+        const stepTime = (60 / bpm) / 4;
+
+        const chords = [
+            ['C4', 'E4', 'G4', 'B4'],
+            ['A3', 'C4', 'E4', 'G4'],
+            ['D3', 'F3', 'A3', 'C4'],
+            ['G3', 'B3', 'D4', 'F4']
+        ];
+        const bassNotes = ['C2', 'A2', 'D2', 'G2'];
+        const montunoPattern = ['E5', 'G5', 'C6', 'B5', 'A5', 'G5', 'F5', 'E5'];
+
+        this.sequenceInterval = setInterval(() => {
+            if (this.currentTrack !== 'cucaracha') return;
+            const now = this.ctx ? this.ctx.currentTime : 0;
+            const step = this.currentStep % 64;
+
+            const barIndex = Math.floor(step / 16);
+            const stepInBar = step % 16;
+
+            if ([0, 3, 6, 10, 12].includes(stepInBar)) {
+                this.playLofiChord(chords[barIndex], now, stepTime * 2.5);
+            }
+
+            if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
+                const bassNote = bassNotes[barIndex];
+                if (bassNote && this.NOTES[bassNote]) {
+                    this.playTone(this.NOTES[bassNote], 'sine', stepTime * 4, now, 0.3);
+                }
+            }
+
+            if (stepInBar % 2 === 1) {
+                const noteName = montunoPattern[(stepInBar + barIndex * 2) % montunoPattern.length];
+                if (noteName && this.NOTES[noteName]) {
+                    this.playTone(this.NOTES[noteName], 'triangle', stepTime * 1.5, now, 0.12);
+                }
+            }
+
+            if ([0, 6, 10].includes(stepInBar)) this.playLofiKick(now);
+            if ([3, 9, 12].includes(stepInBar)) this.playLofiSnare(now);
+            this.playLofiHat(now, stepInBar % 2 !== 0);
+
+            this.currentStep++;
+        }, stepTime * 1000);
+    }
+
+    // ── Dahgbad Lo-Fi Middle Eastern Beat ──
+    playDahgbadSoundtrack() {
+        if (this.sequenceInterval) {
+            clearInterval(this.sequenceInterval);
+            this.sequenceInterval = null;
+        }
+
+        const bpm = 74;
+        const stepTime = (60 / bpm) / 4;
+
+        const chords = [
+            ['D3', 'FS3', 'A3', 'C4'],
+            ['DS3', 'G3', 'AS3', 'DS4'],
+            ['C3', 'E3', 'G3', 'AS3'],
+            ['D3', 'FS3', 'A3', 'D4']
+        ];
+        const bassNotes = ['D2', 'DS2', 'C2', 'D2'];
+        const hijazScale = ['D4', 'DS4', 'FS4', 'G4', 'A4', 'AS4', 'C5', 'D5', 'DS5', 'FS5'];
+
+        this.sequenceInterval = setInterval(() => {
+            if (this.currentTrack !== 'dahgbad') return;
+            const now = this.ctx ? this.ctx.currentTime : 0;
+            const step = this.currentStep % 64;
+
+            const barIndex = Math.floor(step / 16);
+            const stepInBar = step % 16;
+
+            if (stepInBar === 0 || stepInBar === 8) {
+                this.playLofiChord(chords[barIndex], now, stepTime * 7.5);
+            }
+
+            if (stepInBar === 0 || stepInBar === 6 || stepInBar === 10) {
+                const bassNote = bassNotes[barIndex];
+                if (bassNote && this.NOTES[bassNote]) {
+                    this.playTone(this.NOTES[bassNote], 'sine', stepTime * 5, now, 0.32);
+                }
+                this.playLofiKick(now);
+            }
+
+            if (stepInBar === 4 || stepInBar === 12 || stepInBar === 14) {
+                this.playLofiSnare(now);
+            }
+            if (stepInBar % 2 === 0) {
+                this.playLofiHat(now, stepInBar % 4 !== 0);
+            }
+
+            if ([2, 5, 8, 11, 13].includes(stepInBar)) {
+                const noteIndex = (step + barIndex * 3) % hijazScale.length;
+                const noteName = hijazScale[noteIndex];
+                if (noteName && this.NOTES[noteName]) {
+                    const startFreq = this.NOTES[noteName];
+                    const endFreq = startFreq * (stepInBar % 3 === 0 ? 1.059 : 0.944);
+                    
+                    if (this.ctx && !this.isMuted) {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(startFreq, now);
+                        osc.frequency.exponentialRampToValueAtTime(endFreq, now + stepTime * 1.2);
+
+                        const filter = this.ctx.createBiquadFilter();
+                        filter.type = 'lowpass';
+                        filter.frequency.setValueAtTime(950, now);
+
+                        gain.gain.setValueAtTime(0.14, now);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + stepTime * 1.5);
+
+                        osc.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(this.masterGain);
+
+                        osc.start(now);
+                        osc.stop(now + stepTime * 1.5);
+                    }
+                }
             }
 
             this.currentStep++;
@@ -765,6 +900,13 @@ window.selectedMusicTrack = 'lofi';
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.soundManager) {
-        window.soundManager.playTrack('lofi');
+        const dest = (window.travelDestination || '').toLowerCase();
+        if (dest === 'cucaracha') {
+            window.soundManager.playTrack('cucaracha');
+        } else if (dest === 'dahgbad') {
+            window.soundManager.playTrack('dahgbad');
+        } else {
+            window.soundManager.playTrack('lofi');
+        }
     }
 });

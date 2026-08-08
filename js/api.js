@@ -730,18 +730,21 @@ function initUI() {
                         if (!isFilth) {
                             if (!window.travelDestination) {
                                 window.game.savedPhillyFollowers = [...window.game.followerManager.followers];
-                                window.game.followerManager.followers = [];
-                                if (window.game.organizers) {
+                            }
+                            // Player travels ALONE internationally
+                            window.game.followerManager.followers = [];
+                            window.game.currentTripIntlFollowers = 0;
+                            if (window.game.organizers) {
+                                if (!window.travelDestination) {
                                     window.game.savedOrganizerFollowers = window.game.organizers.map(org => [...org.followerManager.followers]);
-                                    window.game.organizers.forEach(org => org.followerManager.followers = []);
                                 }
-                            } else {
-                                window.game.followerManager.followers = [];
-                                if (window.game.organizers) {
-                                    window.game.organizers.forEach(org => org.followerManager.followers = []);
-                                }
+                                window.game.organizers.forEach(org => org.followerManager.followers = []);
                             }
                         } else {
+                            // Returned safely to Filthadelphia before round end — record trip international followers!
+                            window.game.internationalFollowersCollected = (window.game.internationalFollowersCollected || 0) + (window.game.currentTripIntlFollowers || 0);
+                            window.game.currentTripIntlFollowers = 0;
+
                             window.game.followerManager.followers = window.game.savedPhillyFollowers || [];
                             window.game.savedPhillyFollowers = null;
                             if (window.game.organizers && window.game.savedOrganizerFollowers) {
@@ -757,6 +760,18 @@ function initUI() {
 
                     window.travelDestination = isFilth ? null : destination;
                     document.getElementById('airport-dialog').classList.add('hidden');
+
+                    // Play new map soundtrack
+                    if (window.soundManager) {
+                        const destLower = destination.toLowerCase();
+                        if (destLower === 'cucaracha') {
+                            window.soundManager.playTrack('cucaracha');
+                        } else if (destLower === 'dahgbad') {
+                            window.soundManager.playTrack('dahgbad');
+                        } else {
+                            window.soundManager.playTrack('lofi');
+                        }
+                    }
                     
                     // Create a completely new map instance for the destination
                     // The GameMap constructor checks window.travelDestination and
@@ -806,7 +821,7 @@ function initUI() {
                             alert(`Welcome back to ${destination}! Garbage Truck is re-enabled if owned.`);
                         } else {
                             window.playerHasTruck = false; // Disable truck
-                            alert(`Welcome to ${destination}! Garbage Truck is disabled.`);
+                            alert(`Welcome to ${destination}! You are traveling alone.`);
                         }
                     }
                     updateStoreUI();

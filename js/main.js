@@ -2845,8 +2845,8 @@ class Game {
         this.followerManager = new FollowerManager();
         this.followerManager.initialize(spriteId);
         
-        // Add Truck base followers + Hired employees
-        const baseFollowers = (window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0);
+        // Add Truck base followers + Hired employees (Player travels alone when abroad)
+        const baseFollowers = window.travelDestination ? 0 : ((window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0));
         for(let i=0; i<baseFollowers; i++) {
             this.followerManager.addFollower(this.player.x, this.player.y);
         }
@@ -4855,7 +4855,7 @@ class Game {
 
         // Phase 1: Track international followers globally if not abroad, else track locally
         if (window.travelDestination) {
-            this.internationalFollowersCollected = (this.internationalFollowersCollected || 0) + 1;
+            this.currentTripIntlFollowers = (this.currentTripIntlFollowers || 0) + 1;
         } else {
             window.internationalFollowers = (window.internationalFollowers || 0) + 1;
         }

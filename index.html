@@ -85,13 +85,84 @@
                     </div>
                 </div>
 
-                <!-- Column 2: Inventory -->
+                <!-- Column 2: Game Modes -->
                 <div class="store-dashboard-panel info-panel">
-                    <div class="panel-header">🎒 INVENTORY</div>
-                    <div id="store-inventory" class="inventory-box"></div>
+                    <div class="panel-header">🎮 GAME MODES</div>
+                    <div class="game-modes-grid">
+                        <div id="pirate-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="pirate-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Pirate Mode</span>
+                        </div>
+                        <div id="crime-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="crime-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Crime Mode</span>
+                        </div>
+                        <div id="fastfood-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="fastfood-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Fast Food Mode</span>
+                        </div>
+                        <div id="politics-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="politics-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Politics Mode</span>
+                        </div>
+                        <div id="cult-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="cult-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Cult Mode</span>
+                        </div>
+                        <div id="dragon-toggle-container" class="toggle-container" style="display: none;">
+                            <label class="switch">
+                                <input type="checkbox" id="dragon-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label" style="color: #ff3333;">Burninator Mode</span>
+                        </div>
+                        <div id="builder-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="builder-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Builder Mode</span>
+                        </div>
+                        <div id="fantasy-toggle-container" class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="fantasy-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Fantasy Mode</span>
+                        </div>
+                        <div class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="flowers-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="toggle-label">Flowers Mode</span>
+                        </div>
+                        <div id="chaos-toggle-container" class="toggle-container" style="display: none;">
+                            <label class="switch">
+                                <input type="checkbox" id="chaos-toggle">
+                                <span class="slider round" style="background-color: #ff0055;"></span>
+                            </label>
+                            <span class="toggle-label" style="color: #ff0055;">Chaos Mode 💥</span>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Column 3: Controls, Shop, Game Modes & Terminal -->
+                <!-- Column 3: Controls, Shop, Inventory & Terminal -->
                 <div class="store-dashboard-panel actions-modes-panel">
                     <div class="panel-header">⚡ CONTROLS & SHOP</div>
                     <div class="action-buttons-grid">
@@ -106,84 +177,13 @@
                         </div>
                     </div>
 
-                    <!-- Game Modes -->
-                    <div class="modes-section-container">
-                        <div class="subpanel-header">🎮 GAME MODES</div>
-                        <div class="game-modes-grid">
-                            <div id="pirate-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="pirate-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Pirate Mode</span>
-                            </div>
-                            <div id="crime-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="crime-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Crime Mode</span>
-                            </div>
-                            <div id="fastfood-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="fastfood-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Fast Food Mode</span>
-                            </div>
-                            <div id="politics-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="politics-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Politics Mode</span>
-                            </div>
-                            <div id="cult-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="cult-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Cult Mode</span>
-                            </div>
-                            <div id="dragon-toggle-container" class="toggle-container" style="display: none;">
-                                <label class="switch">
-                                    <input type="checkbox" id="dragon-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label" style="color: #ff3333;">Burninator Mode</span>
-                            </div>
-                            <div id="builder-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="builder-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Builder Mode</span>
-                            </div>
-                            <div id="fantasy-toggle-container" class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="fantasy-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Fantasy Mode</span>
-                            </div>
-                            <div class="toggle-container">
-                                <label class="switch">
-                                    <input type="checkbox" id="flowers-toggle">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="toggle-label">Flowers Mode</span>
-                            </div>
-                            <div id="chaos-toggle-container" class="toggle-container" style="display: none;">
-                                <label class="switch">
-                                    <input type="checkbox" id="chaos-toggle">
-                                    <span class="slider round" style="background-color: #ff0055;"></span>
-                                </label>
-                                <span class="toggle-label" style="color: #ff0055;">Chaos Mode 💥</span>
-                            </div>
-                        </div>
+                    <!-- Inventory Section -->
+                    <div class="inventory-section-container" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 0;">
+                        <div class="subpanel-header">🎒 INVENTORY</div>
+                        <div id="store-inventory" class="inventory-box"></div>
                     </div>
 
-                    <!-- Store Terminal (Moved under Game Modes) -->
+                    <!-- Store Terminal -->
                     <div class="terminal-section-container">
                         <div class="subpanel-header">🖥️ STORE TERMINAL</div>
                         <div id="store-terminal" class="store-terminal-box">

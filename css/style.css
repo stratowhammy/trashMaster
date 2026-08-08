@@ -141,7 +141,7 @@ button, .btn, input[type="button"], input[type="submit"] {
 }
 
 .store-title {
-    font-size: 1.1rem;
+    font-size: 1.21rem;
     margin-bottom: 0;
     color: #00ff88;
     text-shadow: 2px 2px #000;
@@ -152,7 +152,7 @@ button, .btn, input[type="button"], input[type="submit"] {
     gap: 1rem;
     align-items: center;
     font-family: 'Press Start 2P', monospace;
-    font-size: 0.65rem;
+    font-size: 0.72rem;
 }
 
 .stat-item {

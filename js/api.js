@@ -542,7 +542,7 @@ function initUI() {
         btnToggleMusic.addEventListener('click', () => {
             if (window.soundManager) {
                 const muted = window.soundManager.toggleMusicMute();
-                btnToggleMusic.innerText = muted ? "Unmute Music 🎵" : "Mute Music 🎵";
+                btnToggleMusic.innerText = muted ? "Unmute Music" : "Mute Music";
                 btnToggleMusic.style.background = muted ? "#662222" : "#225544";
             }
         });

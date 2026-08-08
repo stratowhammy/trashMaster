@@ -267,6 +267,11 @@ class FollowerManager {
         const spriteId = this.availableSprites[index % this.availableSprites.length];
         const follower = new Follower(x, y, spriteId, index);
         this.followers.push(follower);
+
+        if (window.travelDestination && window.game) {
+            window.game.currentTripIntlFollowers = (window.game.currentTripIntlFollowers || 0) + 1;
+        }
+
         return follower;
     }
 

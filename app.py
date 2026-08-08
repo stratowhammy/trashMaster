@@ -529,22 +529,30 @@ def travel():
     
     destination = request.json.get('destination')
     cost = int(request.json.get('cost', 0))
+    intl_followers_collected = int(request.json.get('intl_followers_collected', 0))
     
     if not destination: return jsonify({'error': 'Invalid destination'}), 400
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT balance FROM users WHERE id=?", (user_data['user_id'],))
+    cursor.execute("SELECT balance, international_followers FROM users WHERE id=?", (user_data['user_id'],))
     user = cursor.fetchone()
     
     if user['balance'] < cost:
         return jsonify({'error': 'Insufficient funds'}), 400
         
     new_balance = user['balance'] - cost
-    db.execute("UPDATE users SET balance=?, travel_destination=? WHERE id=?", (new_balance, destination.lower(), user_data['user_id']))
+    new_intl_followers = (user['international_followers'] or 0) + intl_followers_collected
+    
+    db.execute("UPDATE users SET balance=?, travel_destination=?, international_followers=? WHERE id=?", 
+               (new_balance, destination.lower(), new_intl_followers, user_data['user_id']))
     db.commit()
     
-    return jsonify({'balance': new_balance, 'travel_destination': destination.lower()})
+    return jsonify({
+        'balance': new_balance, 
+        'travel_destination': destination.lower(),
+        'international_followers': new_intl_followers
+    })
     
 @app.route('/api/game/sell-truck', methods=['POST'])
 def sell_truck():

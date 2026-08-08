@@ -720,12 +720,30 @@ function initUI() {
             alert(`You need $${totalCost} to fly to ${destination}!`);
             return;
         }
+        const isFilth = destination.toLowerCase() === 'filthadelphia';
+        let intlFollowersGained = 0;
+
+        if (window.game && isFilth) {
+            let currentFollowersCount = 0;
+            if (window.game.followerManager && window.game.followerManager.followers) {
+                currentFollowersCount = window.game.followerManager.followers.length;
+            }
+            intlFollowersGained = Math.max(window.game.currentTripIntlFollowers || 0, currentFollowersCount);
+        }
+
         if (confirm(`Fly to ${destination} for $${totalCost}?`)) {
-            apiCall('/api/game/travel', 'POST', { destination: destination, cost: totalCost })
+            apiCall('/api/game/travel', 'POST', { 
+                destination: destination, 
+                cost: totalCost,
+                intl_followers_collected: intlFollowersGained
+            })
                 .then(data => {
                     window.playerBalance = data.balance;
-                    const isFilth = destination.toLowerCase() === 'filthadelphia';
-                    
+                    if (data.international_followers !== undefined) {
+                        window.internationalFollowers = data.international_followers;
+                        window.playerInternationalFollowers = data.international_followers;
+                    }
+
                     if (window.game) {
                         if (!isFilth) {
                             if (!window.travelDestination) {
@@ -741,9 +759,9 @@ function initUI() {
                                 window.game.organizers.forEach(org => org.followerManager.followers = []);
                             }
                         } else {
-                            // Returned safely to Filthadelphia before round end — record trip international followers!
-                            window.game.internationalFollowersCollected = (window.game.internationalFollowersCollected || 0) + (window.game.currentTripIntlFollowers || 0);
+                            // Returned safely to Filthadelphia before round end — recorded trip international followers!
                             window.game.currentTripIntlFollowers = 0;
+                            window.game.internationalFollowersCollected = 0;
 
                             window.game.followerManager.followers = window.game.savedPhillyFollowers || [];
                             window.game.savedPhillyFollowers = null;

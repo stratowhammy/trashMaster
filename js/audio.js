@@ -615,9 +615,73 @@ class SoundManager {
         this.currentTrack = null;
     }
 
-    playDialogAppearSFX() {}
-    playEngageSFX() {}
-    playRobSFX() {}
+    playTrashPickupSFX() {
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.05);
+    }
+
+    playDialogAppearSFX() {
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, now);
+        osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.06);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.06);
+    }
+
+    playEngageSFX() {
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.08);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.08);
+    }
+
+    playRobSFX() {
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.1);
+    }
 
     toggleMute() {
         this.isMuted = !this.isMuted;
@@ -633,7 +697,19 @@ class SoundManager {
     }
 }
 
-window.soundManager = new SoundManager();
+const rawSoundManager = new SoundManager();
+window.soundManager = new Proxy(rawSoundManager, {
+    get(target, prop) {
+        if (prop in target) {
+            return typeof target[prop] === 'function' ? target[prop].bind(target) : target[prop];
+        }
+        if (typeof prop === 'string' && prop.startsWith('play')) {
+            return () => {};
+        }
+        return target[prop];
+    }
+});
+
 window.selectedMusicTrack = 'lofi';
 
 document.addEventListener('DOMContentLoaded', () => {

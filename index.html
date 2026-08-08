@@ -85,17 +85,10 @@
                     </div>
                 </div>
 
-                <!-- Column 2: Inventory & Audio -->
+                <!-- Column 2: Inventory -->
                 <div class="store-dashboard-panel info-panel">
-                    <div class="panel-header">🎒 INVENTORY & AUDIO</div>
+                    <div class="panel-header">🎒 INVENTORY</div>
                     <div id="store-inventory" class="inventory-box"></div>
-                    <div id="music-style-container" class="bgm-box">
-                        <div class="bgm-title">🎵 BGM SOUNDTRACK:</div>
-                        <select id="music-style-select" class="bgm-select">
-                            <option value="game">Retro Arcade (110 BPM)</option>
-                            <option value="dnb">Drum & Bass (160 BPM 🥁)</option>
-                        </select>
-                    </div>
                 </div>
 
                 <!-- Column 3: Controls, Shop, Game Modes & Terminal -->
@@ -642,10 +635,9 @@
         </div>
     </div>
 
-    <!-- Audio Control & Pause Buttons (Bottom Right - Pause 10px Above Music Button) -->
+    <!-- Pause Button (Bottom Right) -->
     <div style="position: fixed; right: 20px; bottom: 20px; z-index: 1005; display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
         <button id="btn-pause" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #ffcc00; color: #ffcc00; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">⏸️ PAUSE</button>
-        <button id="btn-toggle-bgm" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; background: #b55fe6; border: 2px solid #9240c5; color: #fff; cursor: pointer; border-radius: 4px; box-shadow: 0 0 10px rgba(181, 95, 230, 0.4);">🎵 Music: ON (M)</button>
     </div>
 
     <!-- Game scripts loaded in dependency order -->

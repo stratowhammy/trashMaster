@@ -7,12 +7,30 @@ class SoundManager {
         this.ctx = null;
         this.masterGain = null;
         this.isMuted = false;
+        this.isMusicMuted = false;
+        this.sfxMuted = false;
+
         this.currentTrack = null;
         this.sequenceInterval = null;
         this.currentStep = 0;
         this.baseTempo = 72; // Base slow lo-fi BPM
         this.tempoMultiplier = 1.0; // Dynamic speed adjustment (0.8 for Mushroom, 1.2 for Wings)
+        
+        this.musicVolumePercent = 100;
         this.volume = 0.28;
+
+        // Individual SFX Toggles
+        this.sfxToggles = {
+            click: true,
+            trash: true,
+            splat: true,
+            ding: true,
+            handshake: true,
+            gunshot: true,
+            cash: true,
+            choir: true,
+            dialog: true
+        };
 
         this.NOTES = {
             'C2': 65.41, 'CS2': 69.30, 'D2': 73.42, 'DS2': 77.78, 'E2': 82.41, 'F2': 87.31, 'FS2': 92.50, 'G2': 98.00, 'GS2': 103.83, 'A2': 110.00, 'AS2': 116.54, 'B2': 123.47,
@@ -32,7 +50,7 @@ class SoundManager {
             if (AudioCtx) {
                 this.ctx = new AudioCtx();
                 this.masterGain = this.ctx.createGain();
-                this.masterGain.gain.value = this.isMuted ? 0 : this.volume;
+                this.masterGain.gain.value = (this.isMuted || this.isMusicMuted) ? 0 : this.volume;
                 this.masterGain.connect(this.ctx.destination);
             }
         }
@@ -62,6 +80,40 @@ class SoundManager {
         }, true);
     }
 
+    // ── Soundtrack Volume & Toggle Controls ──
+    setMusicVolume(percent) {
+        this.musicVolumePercent = Math.max(0, Math.min(100, percent));
+        this.volume = (this.musicVolumePercent / 100) * 0.28;
+        if (this.masterGain && this.ctx) {
+            this.masterGain.gain.setValueAtTime((this.isMuted || this.isMusicMuted) ? 0 : this.volume, this.ctx.currentTime);
+        }
+    }
+
+    toggleMusicMute() {
+        this.isMusicMuted = !this.isMusicMuted;
+        if (this.masterGain && this.ctx) {
+            this.masterGain.gain.setValueAtTime((this.isMuted || this.isMusicMuted) ? 0 : this.volume, this.ctx.currentTime);
+        }
+        return this.isMusicMuted;
+    }
+
+    // ── SFX Toggles Controls ──
+    setSFXToggle(key, enabled) {
+        this.sfxToggles[key] = !!enabled;
+    }
+
+    setAllSFXToggles(enabled) {
+        for (const k in this.sfxToggles) {
+            this.sfxToggles[k] = !!enabled;
+        }
+    }
+
+    isSFXEnabled(key) {
+        if (this.isMuted || this.sfxMuted) return false;
+        if (key && this.sfxToggles[key] === false) return false;
+        return true;
+    }
+
     // ── Dynamic Music Speed Adjustment ──
     setTempoMultiplier(multiplier = 1.0) {
         if (this.tempoMultiplier === multiplier) return;
@@ -75,8 +127,9 @@ class SoundManager {
 
     // 1. Button Click SFX
     playButtonClickSFX() {
+        if (!this.isSFXEnabled('click')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
 
         const now = this.ctx.currentTime;
         const osc1 = this.ctx.createOscillator();
@@ -106,11 +159,11 @@ class SoundManager {
 
     // 2. 'Splat' Sound SFX (Posse member run over by red car)
     playSplatSFX() {
+        if (!this.isSFXEnabled('splat')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
         const now = this.ctx.currentTime;
 
-        // Low squishy pitch drop
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine';
@@ -123,7 +176,6 @@ class SoundManager {
         osc.start(now);
         osc.stop(now + 0.18);
 
-        // Wet noise squelch
         const bufferSize = Math.floor(this.ctx.sampleRate * 0.12);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const output = buffer.getChannelData(0);
@@ -147,21 +199,22 @@ class SoundManager {
 
     // 3. 'Ding' Sound SFX (Engaging a green car)
     playDingSFX() {
+        if (!this.isSFXEnabled('ding')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
         const now = this.ctx.currentTime;
 
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(1318.51, now); // E6 bell pitch
+        osc.frequency.setValueAtTime(1318.51, now);
         gain.gain.setValueAtTime(0.35, now);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
 
         const osc2 = this.ctx.createOscillator();
         const gain2 = this.ctx.createGain();
         osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(2637.02, now); // E7 harmonic
+        osc2.frequency.setValueAtTime(2637.02, now);
         gain2.gain.setValueAtTime(0.15, now);
         gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
 
@@ -178,8 +231,9 @@ class SoundManager {
 
     // 4. Handshake Sound SFX (Shaking someone's hand)
     playHandshakeSFX() {
+        if (!this.isSFXEnabled('handshake')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
         const now = this.ctx.currentTime;
 
         [0, 0.08].forEach(offset => {
@@ -199,11 +253,11 @@ class SoundManager {
 
     // 5. Gunshot Sound SFX (Hitting 'K')
     playKillSFX() {
+        if (!this.isSFXEnabled('gunshot')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
         const now = this.ctx.currentTime;
 
-        // Explosive noise crack
         const bufferSize = Math.floor(this.ctx.sampleRate * 0.18);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const output = buffer.getChannelData(0);
@@ -226,7 +280,6 @@ class SoundManager {
         noise.start(now);
         noise.stop(now + 0.18);
 
-        // Low punch sub-boom
         const sub = this.ctx.createOscillator();
         const sGain = this.ctx.createGain();
         sub.type = 'sine';
@@ -242,8 +295,9 @@ class SoundManager {
 
     // 6. Cash Register Sound SFX ("Cha-Ching!" for Healthcare & Fast Food)
     playCashRegisterSFX() {
+        if (!this.isSFXEnabled('cash')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
         const now = this.ctx.currentTime;
 
         const chime1 = this.ctx.createOscillator();
@@ -294,8 +348,9 @@ class SoundManager {
 
     // 7. Angelic Choir SFX (Church of Grimetology dialogs)
     playAngelicChoirSFX() {
+        if (!this.isSFXEnabled('choir')) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
+        if (!this.ctx) return;
         const now = this.ctx.currentTime;
 
         const chord = [349.23, 440.00, 523.25, 698.46];
@@ -322,6 +377,78 @@ class SoundManager {
             osc.start(now);
             osc.stop(now + 1.6);
         });
+    }
+
+    playTrashPickupSFX() {
+        if (!this.isSFXEnabled('trash')) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.05);
+    }
+
+    playDialogAppearSFX() {
+        if (!this.isSFXEnabled('dialog')) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, now);
+        osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.06);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.06);
+    }
+
+    playEngageSFX() {
+        if (!this.isSFXEnabled('dialog')) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.08);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.08);
+    }
+
+    playRobSFX() {
+        if (!this.isSFXEnabled('dialog')) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.1);
     }
 
     playTone(freq, type = 'sine', duration = 0.2, startTime = 0, gainLevel = 0.15) {
@@ -453,7 +580,7 @@ class SoundManager {
 
     playTrack(trackName) {
         if (this.sequenceInterval && this.currentTrack === (trackName || 'lofi')) {
-            return; // Seamlessly keep playing uninterrupted across menu changes!
+            return;
         }
         this.stop();
 
@@ -470,7 +597,7 @@ class SoundManager {
         }
 
         const effectiveTempo = this.baseTempo * this.tempoMultiplier;
-        const stepTime = (60 / effectiveTempo) / 4; // 16th note step duration
+        const stepTime = (60 / effectiveTempo) / 4;
 
         const chords = [
             ['F3', 'A3', 'C4', 'E4'],
@@ -515,9 +642,6 @@ class SoundManager {
         }, stepTime * 1000);
     }
 
-    // ── End Screen Soundscapes ──
-
-    // Victorious End Screen: Upbeat Lo-Fi Track (90 BPM, C Major Joyful Progression)
     playVictoriousEndSoundtrack() {
         this.stop();
         this._initAudio();
@@ -528,10 +652,10 @@ class SoundManager {
         const stepTime = (60 / bpm) / 4;
 
         const chords = [
-            ['C4', 'E4', 'G4', 'B4'], // Cmaj7
-            ['F3', 'A3', 'C4', 'E4'], // Fmaj7
-            ['G3', 'B3', 'D4', 'F4'], // G7
-            ['C4', 'E4', 'G4', 'C5']  // C
+            ['C4', 'E4', 'G4', 'B4'],
+            ['F3', 'A3', 'C4', 'E4'],
+            ['G3', 'B3', 'D4', 'F4'],
+            ['C4', 'E4', 'G4', 'C5']
         ];
         const bassNotes = ['C2', 'F2', 'G2', 'C2'];
 
@@ -562,7 +686,6 @@ class SoundManager {
         }, stepTime * 1000);
     }
 
-    // Defeat / Police Caught End Screen: Melancholy Lo-Fi Track (56 BPM, Sad A Minor Progression)
     playMelancholyEndSoundtrack() {
         this.stop();
         this._initAudio();
@@ -573,10 +696,10 @@ class SoundManager {
         const stepTime = (60 / bpm) / 4;
 
         const chords = [
-            ['A3', 'C4', 'E4', 'G4'], // Am7
-            ['D3', 'F3', 'A3', 'C4'], // Dm7
-            ['E3', 'G3', 'B3', 'D4'], // Em7
-            ['A3', 'C4', 'E4', 'A4']  // Am
+            ['A3', 'C4', 'E4', 'G4'],
+            ['D3', 'F3', 'A3', 'C4'],
+            ['E3', 'G3', 'B3', 'D4'],
+            ['A3', 'C4', 'E4', 'A4']
         ];
         const bassNotes = ['A2', 'D2', 'E2', 'A2'];
 
@@ -615,85 +738,13 @@ class SoundManager {
         this.currentTrack = null;
     }
 
-    playTrashPickupSFX() {
-        if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(523.25, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.05);
-    }
-
-    playDialogAppearSFX() {
-        if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(659.25, now);
-        osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.06);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.06);
-    }
-
-    playEngageSFX() {
-        if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.08);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.08);
-    }
-
-    playRobSFX() {
-        if (!this.ctx) this._initAudio();
-        if (!this.ctx || this.isMuted) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-        osc.connect(gain);
-        gain.connect(this.masterGain);
-        osc.start(now);
-        osc.stop(now + 0.1);
-    }
-
     toggleMute() {
-        this.isMuted = !this.isMuted;
-        if (this.masterGain && this.ctx) {
-            this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.volume, this.ctx.currentTime);
-        }
-        return this.isMuted;
+        return this.toggleMusicMute();
     }
 
     toggleSFX() {
-        this.sfxMuted = true;
-        return true;
+        this.sfxMuted = !this.sfxMuted;
+        return this.sfxMuted;
     }
 }
 

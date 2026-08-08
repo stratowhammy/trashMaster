@@ -508,6 +508,87 @@ function initUI() {
         });
     }
 
+    // ── Sound & Audio Options Dialog Listeners ──
+    const btnAudioSettings = document.getElementById('btn-audio-settings');
+    const btnSoundMenu = document.getElementById('btn-sound-menu');
+    const dlgSoundOptions = document.getElementById('sound-options-dialog');
+    const btnSoundOptionsClose = document.getElementById('btn-sound-options-close');
+    const sliderMusicVolume = document.getElementById('slider-music-volume');
+    const musicVolumeText = document.getElementById('music-volume-text');
+    const btnToggleMusic = document.getElementById('btn-toggle-music');
+    const btnSfxAllOn = document.getElementById('btn-sfx-all-on');
+    const btnSfxAllOff = document.getElementById('btn-sfx-all-off');
+
+    const openSoundOptions = () => {
+        if (dlgSoundOptions) dlgSoundOptions.classList.remove('hidden');
+    };
+    const closeSoundOptions = () => {
+        if (dlgSoundOptions) dlgSoundOptions.classList.add('hidden');
+    };
+
+    if (btnAudioSettings) btnAudioSettings.addEventListener('click', openSoundOptions);
+    if (btnSoundMenu) btnSoundMenu.addEventListener('click', openSoundOptions);
+    if (btnSoundOptionsClose) btnSoundOptionsClose.addEventListener('click', closeSoundOptions);
+
+    if (sliderMusicVolume) {
+        sliderMusicVolume.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            if (musicVolumeText) musicVolumeText.innerText = `${val}%`;
+            if (window.soundManager) window.soundManager.setMusicVolume(val);
+        });
+    }
+
+    if (btnToggleMusic) {
+        btnToggleMusic.addEventListener('click', () => {
+            if (window.soundManager) {
+                const muted = window.soundManager.toggleMusicMute();
+                btnToggleMusic.innerText = muted ? "Unmute Music 🎵" : "Mute Music 🎵";
+                btnToggleMusic.style.background = muted ? "#662222" : "#225544";
+            }
+        });
+    }
+
+    const sfxCheckboxKeys = {
+        'sfx-click': 'click',
+        'sfx-trash': 'trash',
+        'sfx-splat': 'splat',
+        'sfx-ding': 'ding',
+        'sfx-handshake': 'handshake',
+        'sfx-gunshot': 'gunshot',
+        'sfx-cash': 'cash',
+        'sfx-choir': 'choir',
+        'sfx-dialog': 'dialog'
+    };
+
+    for (const [id, key] of Object.entries(sfxCheckboxKeys)) {
+        const chk = document.getElementById(id);
+        if (chk) {
+            chk.addEventListener('change', (e) => {
+                if (window.soundManager) window.soundManager.setSFXToggle(key, e.target.checked);
+            });
+        }
+    }
+
+    if (btnSfxAllOn) {
+        btnSfxAllOn.addEventListener('click', () => {
+            if (window.soundManager) window.soundManager.setAllSFXToggles(true);
+            for (const id of Object.keys(sfxCheckboxKeys)) {
+                const chk = document.getElementById(id);
+                if (chk) chk.checked = true;
+            }
+        });
+    }
+
+    if (btnSfxAllOff) {
+        btnSfxAllOff.addEventListener('click', () => {
+            if (window.soundManager) window.soundManager.setAllSFXToggles(false);
+            for (const id of Object.keys(sfxCheckboxKeys)) {
+                const chk = document.getElementById(id);
+                if (chk) chk.checked = false;
+            }
+        });
+    }
+
     // Tab buttons event listeners
     document.querySelectorAll('.stats-tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {

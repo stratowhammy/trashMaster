@@ -222,6 +222,9 @@ class SoundManager {
     }
 
     playTrack(trackName) {
+        if (this.sequenceInterval && this.currentTrack) {
+            return; // Seamlessly keep playing uninterrupted across menu changes!
+        }
         this.stop();
 
         this._initAudio();

@@ -22,6 +22,7 @@ const SPRITE_CONFIG = {
         { id: 'animal', name: 'Animal', src: 'assets/sprites/animal.png' },
         { id: 'cult_white_robe', name: 'Cult Robe', src: 'assets/sprites/cult_white_robe.png', color: '#ffffff' },
         { id: 'char_truck', name: 'Trash Truck', src: 'assets/sprites/trash_truck.png', color: '#00aa55' },
+        { id: 'char_trashmaster', name: 'Trash Master', src: 'assets/sprites/trashmaster.png', color: '#00aa55' },
         { id: 'char_npc', name: 'NPC', src: 'assets/sprites/npc.png', color: '#33aa55' },
         { id: 'char_pirate', name: 'Pirate', src: 'assets/sprites/pirate.png', color: '#aa3333' },
         { id: 'pirate_ship', name: 'Pirate Ship', src: 'assets/sprites/pirate_ship.png', color: '#8b4513' },
@@ -191,7 +192,41 @@ class SpriteManager {
         canvas.height = size;
         const ctx = canvas.getContext('2d');
 
-        if (sprite.id === 'char_dragon_master') {
+        if (sprite.id === 'char_trashmaster') {
+            // Draw 16-bit retro Trash Master trashman sprite
+            // Work boots
+            ctx.fillStyle = '#3a2010';
+            ctx.fillRect(20, 48, 10, 12);
+            ctx.fillRect(34, 48, 10, 12);
+
+            // Blue Overalls / Denim pants
+            ctx.fillStyle = '#1e3a8a';
+            ctx.fillRect(20, 36, 24, 14);
+
+            // High-visibility Orange Safety Vest
+            ctx.fillStyle = '#ea580c';
+            ctx.fillRect(18, 20, 28, 18);
+            // Reflective stripes
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(22, 22, 4, 14);
+            ctx.fillRect(38, 22, 4, 14);
+            ctx.fillRect(18, 30, 28, 4);
+
+            // Skin / Face
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(22, 10, 20, 12);
+
+            // Trash Master Green Cap
+            ctx.fillStyle = '#16a34a';
+            ctx.fillRect(18, 4, 28, 8);
+            ctx.fillRect(14, 10, 10, 3); // Cap brim
+
+            // Trash bag in left hand
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(6, 26, 14, 18);
+            ctx.fillStyle = '#374151';
+            ctx.fillRect(8, 24, 10, 4);
+        } else if (sprite.id === 'char_dragon_master') {
             // Draw a 16-bit retro style Dragon Master
             ctx.fillStyle = '#4a2c00'; // brown boots/pants
             ctx.fillRect(24, 48, 16, 12);

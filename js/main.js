@@ -2069,9 +2069,9 @@ class Game {
             }
         }
 
-        // Pirate/Frenzy/Politics/Flowers/Crime/Cult/Builder Mode updates
-        if (window.pirateMode || window.frenzyMode || window.flowersMode || window.politicsMode || window.elPresidenteElection || window.cultMode || window.crimeMode || window.builderMode) {
-            this.npcManager.update();
+        // NPC update logic across all maps & modes
+        if (this.npcManager) {
+            this.npcManager.update(this.gameMap);
         }
 
         // Rival Candidate update logic

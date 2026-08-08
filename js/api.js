@@ -837,10 +837,10 @@ function initUI() {
         btnTravelFilthadelphia.addEventListener('click', () => handleTravel('Filthadelphia', 800));
     }
     if (btnTravelDahgbad) {
-        btnTravelDahgbad.addEventListener('click', () => handleTravel('Dahgbad', 1000));
+        btnTravelDahgbad.addEventListener('click', () => handleTravel('Dahgbad', 1500));
     }
     if (btnTravelCucaracha) {
-        btnTravelCucaracha.addEventListener('click', () => handleTravel('Cucaracha', 500));
+        btnTravelCucaracha.addEventListener('click', () => handleTravel('Cucaracha', 750));
     }
     if (btnTravelCancel) {
         btnTravelCancel.addEventListener('click', () => {

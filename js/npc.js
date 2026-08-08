@@ -36,6 +36,50 @@ class NPC {
         this.animTimer = 0;
         this.shaken = false;
         this.isRedRivalOnly = false;
+        this.vx = 0;
+        this.vy = 0;
+        this.moveTimer = 0;
+    }
+
+    update(gameMap) {
+        if (!this.moveTimer) this.moveTimer = 0;
+        this.moveTimer--;
+        if (this.moveTimer <= 0 || (this.vx === 0 && this.vy === 0)) {
+            this.moveTimer = 50 + Math.floor(Math.random() * 90);
+            if (Math.random() < 0.3) {
+                this.vx = 0;
+                this.vy = 0;
+            } else {
+                const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
+                const spd = 0.6 + Math.random() * 0.6;
+                this.vx = Math.cos(angle) * spd;
+                this.vy = Math.sin(angle) * spd;
+                if (Math.abs(this.vx) > Math.abs(this.vy)) {
+                    this.direction = this.vx > 0 ? 'right' : 'left';
+                } else {
+                    this.direction = this.vy > 0 ? 'down' : 'up';
+                }
+            }
+        }
+
+        const nextX = this.x + this.vx;
+        const nextY = this.y + this.vy;
+
+        if (gameMap) {
+            const tileX = Math.floor(nextX / TILE_SIZE);
+            const tileY = Math.floor(nextY / TILE_SIZE);
+            if (typeof gameMap.isWalkable === 'function' ? gameMap.isWalkable(tileX, tileY) : true) {
+                this.x = nextX;
+                this.y = nextY;
+            } else {
+                this.vx = -this.vx;
+                this.vy = -this.vy;
+                this.moveTimer = 0;
+            }
+        } else {
+            this.x = nextX;
+            this.y = nextY;
+        }
     }
 
     isPlayerNear(playerX, playerY) {
@@ -194,18 +238,22 @@ class NPCManager {
         this.npcs = [];
         this.activeDialogue = null;
 
-        // Find all sidewalk tiles (excluding those adjacent to any building door)
+        // Find all walkable tiles (sidewalks, roads, crosswalks) across any map
         const sidewalks = [];
         for (let y = 0; y < MAP_HEIGHT; y++) {
             for (let x = 0; x < MAP_WIDTH; x++) {
-                if (gameMap.tiles[y][x] === TileType.SIDEWALK) {
+                const t = (gameMap && gameMap.getTile) ? gameMap.getTile(x, y) : (gameMap && gameMap.tiles && gameMap.tiles[y] ? gameMap.tiles[y][x] : null);
+                const isWalkable = (t === TileType.SIDEWALK || t === TileType.ROAD || t === TileType.CROSSWALK || (gameMap && typeof gameMap.isWalkable === 'function' && gameMap.isWalkable(x, y)));
+                if (isWalkable) {
                     let isNearDoor = false;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
-                            const nx = wrapTileX(x + dx);
-                            const ny = wrapTileY(y + dy);
-                            if (gameMap.tiles[ny][nx] === TileType.BUILDING_DOOR) {
-                                isNearDoor = true;
+                    if (gameMap && gameMap.tiles) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const nx = wrapTileX(x + dx);
+                                const ny = wrapTileY(y + dy);
+                                if (gameMap.tiles[ny] && gameMap.tiles[ny][nx] === TileType.BUILDING_DOOR) {
+                                    isNearDoor = true;
+                                }
                             }
                         }
                     }
@@ -372,7 +420,13 @@ class NPCManager {
         return null;
     }
 
-    update() {
+    update(gameMap) {
+        if (this.npcs) {
+            for (const npc of this.npcs) {
+                npc.update(gameMap);
+            }
+        }
+
         // Update dialogue timer
         if (this.activeDialogue) {
             this.activeDialogue.timer--;

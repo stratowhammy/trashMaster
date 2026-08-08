@@ -2865,7 +2865,13 @@ class Game {
                 clickY >= card.y && clickY <= card.y + card.h
             ) {
                 this.selectedCharIndex = i;
-                this._startGame(SPRITE_CONFIG.characters[i].id);
+                const chosen = SPRITE_CONFIG.characters[i].id;
+                window.chosenSprite = chosen;
+                window.playerChosenSprite = chosen;
+                if (window.apiCall) {
+                    window.apiCall('/api/game/set-chosen-sprite', 'POST', { sprite_id: chosen }).catch(() => {});
+                }
+                this._startGame(chosen);
                 break;
             }
         }
@@ -2873,9 +2879,12 @@ class Game {
 
     _startGame(spriteId) {
         if (window.gameLog) window.gameLog(`Game._startGame() called with spriteId: ${spriteId}`);
+        const effectiveSprite = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
+
         if (window.travelDestination) {
             window.playerHasTruck = false; // Disable truck abroad
         }
+
         this.gameMap = new GameMap();
         this.miniMap.buildStatic(this.gameMap);
         // Find a walkable spawn point — start on a road near center
@@ -2903,12 +2912,20 @@ class Game {
 
         console.log(`Spawning player at tile (${spawnX}, ${spawnY}), world (${spawnX * TILE_SIZE}, ${spawnY * TILE_SIZE}), tile type: ${this.gameMap.getTile(spawnX, spawnY)}`);
 
-        this.player = new Player(spawnX, spawnY, spriteId);
+        this.player = new Player(spawnX, spawnY, effectiveSprite);
         this.followerManager = new FollowerManager();
-        this.followerManager.initialize(spriteId);
+        this.followerManager.initialize(effectiveSprite);
         
-        // Add Truck base followers + Hired employees (Player travels alone when abroad)
-        const baseFollowers = window.travelDestination ? 0 : ((window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0));
+        // When player owns a Trash Truck and is NOT abroad, spawn Trash Truck as a follower following the player!
+        if (!window.travelDestination && window.playerHasTruck > 0) {
+            for (let t = 0; t < window.playerHasTruck; t++) {
+                const truckFollower = new Follower(this.player.x, this.player.y, 'char_truck', this.followerManager.followers.length);
+                this.followerManager.followers.unshift(truckFollower);
+            }
+        }
+
+        // Add Hired employees (Player travels alone when abroad)
+        const baseFollowers = window.travelDestination ? 0 : (window.employeesHired || 0);
         for(let i=0; i<baseFollowers; i++) {
             this.followerManager.addFollower(this.player.x, this.player.y);
         }

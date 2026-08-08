@@ -788,3 +788,31 @@ input:checked + .slider:before {
     box-shadow: 0 0 12px rgba(255, 0, 85, 0.6);
 }
 
+.sprite-options-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.sprite-option-btn {
+    padding: 14px 8px;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    border: 2px solid #555;
+    background: #1e1e2f;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.sprite-option-btn:hover {
+    border-color: #00ffcc;
+    background: #2b2b45;
+    color: #00ffcc;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);
+}
+

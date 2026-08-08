@@ -221,7 +221,7 @@ class Follower {
 
         // Follower number tag
         const charConfig = SPRITE_CONFIG.characters.find(c => c.id === this.spriteId);
-        const name = charConfig ? charConfig.name : `#${this.index + 1}`;
+        const name = (this.spriteId === 'char_truck') ? 'Trash Truck' : (charConfig ? charConfig.name : `#${this.index + 1}`);
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.textAlign = 'center';

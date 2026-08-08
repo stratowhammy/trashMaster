@@ -6,16 +6,9 @@ class Player {
     constructor(tileX, tileY, spriteId) {
         this.x = tileX * TILE_SIZE + TILE_SIZE / 2;
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
-        if (window.travelDestination) {
-            this.spriteId = 'char_trashmaster';
-            this.speed = 6;
-        } else if (window.playerHasTruck) {
-            this.spriteId = 'char_truck';
-            this.speed = 8;
-        } else {
-            this.spriteId = (spriteId === 'char_truck') ? 'char_trashmaster' : spriteId;
-            this.speed = 6;
-        }
+        const chosen = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
+        this.spriteId = chosen;
+        this.speed = (chosen === 'char4') ? 8 : 6;
         this.size = TILE_SIZE - 4;
         this.direction = 'down';
         this.moving = false;

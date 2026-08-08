@@ -139,6 +139,14 @@ def init_db():
             db.execute("ALTER TABLE users ADD COLUMN travel_destination TEXT DEFAULT 'filthadelphia'")
         except sqlite3.OperationalError:
             pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN chosen_sprite TEXT DEFAULT 'char2'")
+        except sqlite3.OperationalError:
+            pass
+            
+        # Ensure all existing users with NULL or empty chosen_sprite default to 'char2' ('student')
+        db.execute("UPDATE users SET chosen_sprite='char2' WHERE chosen_sprite IS NULL OR chosen_sprite=''")
+        db.commit()
             
         try:
             db.execute('''
@@ -249,9 +257,36 @@ def login():
             'token': token, 
             'role': user['role'], 
             'balance': user['balance'],
-            'has_truck': int(user['has_truck'])
+            'has_truck': int(user['has_truck']),
+            'chosen_sprite': user['chosen_sprite'] or 'char2'
         })
     return jsonify({'error': 'Invalid credentials'}), 401
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    chosen_sprite = data.get('chosen_sprite', 'char2')
+
+    if not username or not password:
+        return jsonify({'error': 'Username and password required'}), 400
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT id FROM users WHERE username=?", (username,))
+    if cursor.fetchone():
+        return jsonify({'error': 'Username already taken'}), 400
+
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    cursor.execute(
+        "INSERT INTO users (username, password_hash, role, chosen_sprite) VALUES (?, ?, 'player', ?)",
+        (username, hashed, chosen_sprite)
+    )
+    db.commit()
+
+    token = jwt.encode({'user_id': cursor.lastrowid, 'role': 'player', 'exp': datetime.utcnow() + timedelta(days=1)}, app.config['SECRET_KEY'], algorithm="HS256")
+    return jsonify({'token': token, 'role': 'player', 'chosen_sprite': chosen_sprite})
 
 @app.route('/api/auth/change-password', methods=['POST'])
 def change_password():
@@ -311,7 +346,8 @@ def sync_game():
                IFNULL(unlocked_cult, 0) AS unlocked_cult, IFNULL(unlocked_builder, 0) AS unlocked_builder,
                IFNULL(unlocked_fantasy, 0) AS unlocked_fantasy,
                IFNULL(cult_leaves_cumulative, 0) AS cult_leaves_cumulative,
-               IFNULL(happiness, 100.0) AS happiness
+               IFNULL(happiness, 100.0) AS happiness,
+               IFNULL(chosen_sprite, 'char2') AS chosen_sprite
         FROM users WHERE id=?
     """, (user_data['user_id'],))
     user = cursor.fetchone()
@@ -354,16 +390,28 @@ def sync_game():
         'politics_banned': int(user['politics_banned'] or 0),
         'happiness': float(user['happiness']),
         'cult_leaves_cumulative': int(user['cult_leaves_cumulative']),
+        'chosen_sprite': user['chosen_sprite'] or 'char2',
         'inventory': inventory,
         'stats': {
-            'max_single_trash': user['stat_max_single_trash'] or 0,
-            'cumulative_trash': user['stat_cumulative_trash'] or 0,
-            'max_single_money': user['stat_max_single_money'] or 0,
-            'cumulative_money': user['stat_cumulative_money'] or 0,
-            'max_single_followers': user['stat_max_single_followers'] or 0,
-            'total_followers': user['movement_size'] or 0
+            'stat_max_single_trash': user['stat_max_single_trash'] or 0,
+            'stat_cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'stat_max_single_money': user['stat_max_single_money'] or 0,
+            'stat_cumulative_money': user['stat_cumulative_money'] or 0,
+            'stat_max_single_followers': user['stat_max_single_followers'] or 0,
+            'total_rounds_played': user['total_rounds_played'] or 0
         }
     })
+
+@app.route('/api/game/set-chosen-sprite', methods=['POST'])
+def set_chosen_sprite():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    sprite_id = request.json.get('sprite_id', 'char2')
+    db = get_db()
+    db.execute("UPDATE users SET chosen_sprite=? WHERE id=?", (sprite_id, user_data['user_id']))
+    db.commit()
+    return jsonify({'success': True, 'chosen_sprite': sprite_id})
 
 @app.route('/api/game/buy', methods=['POST'])
 def buy_item():

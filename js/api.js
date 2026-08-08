@@ -104,6 +104,46 @@ function initUI() {
         });
     }
 
+    const btnRegisterAccount = document.getElementById('btn-register-account');
+    if (btnRegisterAccount) {
+        btnRegisterAccount.addEventListener('click', () => {
+            const user = document.getElementById('login-username').value;
+            const pass = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+            if (!user || !pass) {
+                errEl.innerText = "Please enter username and password first!";
+                return;
+            }
+            errEl.innerText = "";
+            document.getElementById('sprite-select-dialog').classList.remove('hidden');
+        });
+    }
+
+    const spriteBtns = document.querySelectorAll('.sprite-option-btn');
+    spriteBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const selectedSprite = btn.getAttribute('data-sprite') || 'char2';
+            const user = document.getElementById('login-username').value;
+            const pass = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+            document.getElementById('sprite-select-dialog').classList.add('hidden');
+
+            try {
+                const data = await apiCall('/api/auth/register', 'POST', { username: user, password: pass, chosen_sprite: selectedSprite });
+                authToken = data.token;
+                userRole = data.role;
+                localStorage.setItem('trashMasterToken', authToken);
+                localStorage.setItem('trashMasterRole', userRole);
+                errEl.innerText = '';
+                await refreshGameState();
+                renderStore();
+                showScreen('store-screen');
+            } catch (e) {
+                errEl.innerText = e.message;
+            }
+        });
+    });
+
     if (btnGenerate) {
         btnGenerate.addEventListener('click', async () => {
             const count = document.getElementById('admin-count').value;
@@ -1045,7 +1085,8 @@ async function refreshGameState() {
         playerCredits = data.credits !== undefined ? data.credits : 3;
         window.playerCredits = playerCredits;
         internationalFollowers = data.international_followers || 0;
-        window.internationalFollowers = internationalFollowers;
+        window.chosenSprite = data.chosen_sprite || 'char2';
+        window.playerChosenSprite = window.chosenSprite;
         window.playerUnlockedInternational = data.unlocked_international || 0;
         window.electionState = data.election_state || 'idle';
         window.roundsInState = data.rounds_in_state || 0;

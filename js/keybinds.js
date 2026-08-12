@@ -3,6 +3,7 @@
 // ============================================================
 
 const DEFAULT_KEYBINDS = {
+    // Movement & Basics
     moveUp: 'ArrowUp',
     moveDown: 'ArrowDown',
     moveLeft: 'ArrowLeft',
@@ -10,24 +11,52 @@ const DEFAULT_KEYBINDS = {
     pickupTrash: 'q',
     interact: 'e',
     harvestTree: 'x',
-    rangerCapture: 'c',
+
+    // Construction / Builder Mode
+    builderBuyCheckDoor: 'e',
+    builderOfferTenant: 'a',
+    builderBribeInspector: 'b',
+
+    // Pirate Mode
     pirateCannon: 'c',
+    pirateSeaDumpEngage: 'e',
+
+    // Ranger Mode
+    rangerCapture: 'c',
+    rangerDeliverZoo: 'e',
+
+    // Crime Mode
+    crimeIntimidate: 'i',
+    crimeRob: 'r',
+    crimeStealCar: 's',
+    crimeDumpTrash: 'd',
+    crimeKillDon: 'k',
+    policeBribe: 'b',
+
+    // Politics Mode
+    campaignSpeech: 'a',
+    politicsShakeHands: 's',
+    mayorBribe: 'b',
+    politicsIntimidate: 'i',
+
+    // Cult & Posters
+    posterPropaganda: 'g',
+    posterRecruitment: 't',
+    posterChurch: 'm',
+
+    // Consumables & Special Items
     useProtection: 'p',
     useTime: 't',
     useMushrooms: 'u',
     useWings: 'w',
     useSnacks: 'k',
     useFertilizer: 'f',
-    crimeIntimidate: 'i',
-    crimeRob: 'r',
-    crimeStealCar: 's',
-    crimeDumpTrash: 'd',
-    crimeKillDon: 'k',
-    posterPropaganda: 'g',
-    posterRecruitment: 't',
-    posterChurch: 'm',
-    mayorBribe: 'b',
-    campaignSpeech: 'a'
+    useBottomlessPit: 'B',
+    eatShroom: 'M',
+
+    // Audio Controls
+    toggleMusic: 'm',
+    toggleSFX: 'n'
 };
 
 const ACTION_CONFIG = [
@@ -40,9 +69,57 @@ const ACTION_CONFIG = [
             { id: 'moveRight', label: 'Move Right' },
             { id: 'pickupTrash', label: 'Pick Up Trash' },
             { id: 'interact', label: 'Interact / Enter Building / Deliver' },
-            { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' },
-            { id: 'rangerCapture', label: 'Ranger Capture Animal' },
-            { id: 'pirateCannon', label: 'Pirate Cannon / Disembark' }
+            { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' }
+        ]
+    },
+    {
+        category: '🏗️ CONSTRUCTION / BUILDER MODE',
+        actions: [
+            { id: 'builderBuyCheckDoor', label: 'Check Building / Buy Building Door' },
+            { id: 'builderOfferTenant', label: 'Offer Apartment / Recruit Tenant' },
+            { id: 'builderBribeInspector', label: 'Bribe Building Inspector' }
+        ]
+    },
+    {
+        category: '🏴‍☠️ PIRATE MODE',
+        actions: [
+            { id: 'pirateCannon', label: 'Fire Pirate Cannon / Disembark' },
+            { id: 'pirateSeaDumpEngage', label: 'Engage / Unload at Sea Dump Dock' }
+        ]
+    },
+    {
+        category: '🦁 RANGER & ANIMAL MODE',
+        actions: [
+            { id: 'rangerCapture', label: 'Ranger Capture Animal Node' },
+            { id: 'rangerDeliverZoo', label: 'Deliver Animals to ZOO' }
+        ]
+    },
+    {
+        category: '🕵️ CRIME MODE',
+        actions: [
+            { id: 'crimeIntimidate', label: 'Intimidate Rival / Citizen' },
+            { id: 'crimeRob', label: 'Rob Citizen / Don' },
+            { id: 'crimeStealCar', label: 'Steal Car' },
+            { id: 'crimeDumpTrash', label: 'Illegal Trash Dump' },
+            { id: 'crimeKillDon', label: 'Eliminate Target / Don' },
+            { id: 'policeBribe', label: 'Bribe Police Chief' }
+        ]
+    },
+    {
+        category: '🏛️ POLITICS & ELECTIONS',
+        actions: [
+            { id: 'campaignSpeech', label: 'Deliver Campaign Speech' },
+            { id: 'politicsShakeHands', label: 'Shake Hands with Voter' },
+            { id: 'mayorBribe', label: 'Bribe Mayor' },
+            { id: 'politicsIntimidate', label: 'Intimidate Voter' }
+        ]
+    },
+    {
+        category: '🧹 CULT MODE & POSTERS',
+        actions: [
+            { id: 'posterPropaganda', label: 'Post Propaganda Poster' },
+            { id: 'posterRecruitment', label: 'Post Recruitment Poster' },
+            { id: 'posterChurch', label: 'Post Church Poster' }
         ]
     },
     {
@@ -53,22 +130,16 @@ const ACTION_CONFIG = [
             { id: 'useMushrooms', label: 'Use Mushrooms' },
             { id: 'useWings', label: 'Use Wings' },
             { id: 'useSnacks', label: 'Use Snacks' },
-            { id: 'useFertilizer', label: 'Plant Fertilizer (Flowers)' }
+            { id: 'useFertilizer', label: 'Plant Fertilizer (Flowers)' },
+            { id: 'useBottomlessPit', label: 'Activate Bottomless Pit (Shift+B)' },
+            { id: 'eatShroom', label: 'Eat Mushroom (Shift+M)' }
         ]
     },
     {
-        category: '🕵️ CRIME, POLITICS & MODES',
+        category: '🎵 AUDIO CONTROLS',
         actions: [
-            { id: 'crimeIntimidate', label: 'Crime: Intimidate Rival' },
-            { id: 'crimeRob', label: 'Crime: Rob Citizen' },
-            { id: 'crimeStealCar', label: 'Crime: Steal Car' },
-            { id: 'crimeDumpTrash', label: 'Crime: Illegal Trash Dump' },
-            { id: 'crimeKillDon', label: 'Crime: Eliminate Target / Don' },
-            { id: 'posterPropaganda', label: 'Propaganda Poster' },
-            { id: 'posterRecruitment', label: 'Recruitment Poster' },
-            { id: 'posterChurch', label: 'Church Poster' },
-            { id: 'mayorBribe', label: 'Bribe Mayor' },
-            { id: 'campaignSpeech', label: 'Campaign Speech' }
+            { id: 'toggleMusic', label: 'Toggle Music Mute' },
+            { id: 'toggleSFX', label: 'Toggle SFX Mute' }
         ]
     }
 ];

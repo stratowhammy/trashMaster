@@ -45,14 +45,42 @@
         <div id="login-screen" class="screen">
             <h1>Trash Master</h1>
             <div class="panel">
-                <h2>Login / Create Account</h2>
+                <h2>Player Login</h2>
                 <input type="text" id="login-username" placeholder="Username">
                 <input type="password" id="login-password" placeholder="Password">
                 <div style="display: flex; gap: 10px; margin-top: 10px;">
                     <button id="btn-login" class="btn" style="flex: 1;">Login</button>
-                    <button id="btn-register-account" class="btn secondary" style="flex: 1;">Create Account</button>
+                    <button id="btn-goto-register" class="btn secondary" style="flex: 1;">Register Account</button>
                 </div>
                 <p id="login-error" class="error"></p>
+            </div>
+        </div>
+
+        <!-- Registration Screen -->
+        <div id="register-screen" class="screen hidden">
+            <h1>Trash Master</h1>
+            <div class="panel" style="max-width: 480px;">
+                <h2 style="color: #00ffcc;">Create New Account</h2>
+                <p style="font-size: 8px; color: #aaa; margin-bottom: 12px; line-height: 1.5;">Register a username and password to start playing. Your account keeps all inventory, achievements, stats, letter progress, and photo gallery snapshots!</p>
+                <input type="text" id="reg-username" placeholder="Choose Username" style="margin-bottom: 10px;">
+                <input type="password" id="reg-password" placeholder="Choose Password" style="margin-bottom: 10px;">
+                <input type="password" id="reg-confirm-password" placeholder="Confirm Password" style="margin-bottom: 15px;">
+                
+                <label style="font-size: 8px; color: #ffaa00; display: block; margin-bottom: 8px; text-align: left;">CHOOSE CHARACTER CLASS:</label>
+                <div class="sprite-options-grid" style="margin-bottom: 15px;">
+                    <button class="btn sprite-option-btn" data-sprite="char1">🌳 RANGER</button>
+                    <button class="btn sprite-option-btn active" data-sprite="char2">🎓 STUDENT</button>
+                    <button class="btn sprite-option-btn" data-sprite="char3">🧪 SCIENTIST</button>
+                    <button class="btn sprite-option-btn" data-sprite="char4">🏃 ATHLETE</button>
+                    <button class="btn sprite-option-btn" data-sprite="char5">🤖 ROBOT</button>
+                    <button class="btn sprite-option-btn" data-sprite="char6">⚡ SUPERHERO</button>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-do-register" class="btn" style="flex: 1; background: #00aa66; border-color: #007744;">Register & Play 🚀</button>
+                    <button id="btn-goto-login" class="btn secondary" style="flex: 1;">Back to Login</button>
+                </div>
+                <p id="register-error" class="error"></p>
             </div>
         </div>
 
@@ -340,11 +368,21 @@
 
         <!-- Fullscreen Preview Modal -->
         <div id="snapshot-preview-dialog" class="hidden" style="position: fixed; z-index: 1005; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
-            <div class="dialog-box" style="background: #0a0e1a; border: 4px solid #00ffcc; padding: 20px; border-radius: 8px; text-align: center; max-width: 600px; font-family: 'Press Start 2P', monospace; position: relative;">
-                <div id="preview-image-container" style="margin-bottom: 15px;">
+            <div class="dialog-box" style="background: #0a0e1a; border: 4px solid #00ffcc; padding: 20px; border-radius: 8px; text-align: center; max-width: 600px; font-family: 'Press Start 2P', monospace; position: relative; box-sizing: border-box;">
+                <div id="preview-image-container" style="margin-bottom: 12px;">
                     <img id="preview-img-element" style="width: 100%; border: 3px solid #334466; border-radius: 4px; display: block;" />
                 </div>
-                <div style="display: flex; gap: 15px; justify-content: center;">
+                
+                <!-- Custom Caption Input Section -->
+                <div style="margin: 12px 0; text-align: left;">
+                    <label style="color: #00ffcc; font-size: 8px; display: block; margin-bottom: 6px;">PICTURE CAPTION:</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="snapshot-caption-input" placeholder="Type a custom caption for this picture..." style="flex: 1; padding: 8px 10px; background: #111e30; border: 2px solid #00ffcc; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; border-radius: 4px;">
+                        <button id="btn-save-caption" class="btn" style="background: #0088aa; border: 2px solid #00ccff; color: #fff; padding: 8px 12px; font-size: 8px; cursor: pointer; white-space: nowrap;">SAVE ✍️</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 15px;">
                     <a id="btn-download-snapshot" download="trashmaster_snapshot.png" class="btn" style="background: #00aa66; border: 2px solid #007744; color: #fff; padding: 8px 16px; font-size: 8px; text-decoration: none; display: inline-block;">DOWNLOAD 💾</a>
                     <button id="btn-delete-snapshot" class="btn" style="background: #ff3333; border: 2px solid #990000; color: #fff; padding: 8px 16px; font-size: 8px; cursor: pointer;">DELETE 🗑️</button>
                     <button id="btn-preview-close" class="btn secondary" style="padding: 8px 16px; font-size: 8px; cursor: pointer;">CLOSE</button>

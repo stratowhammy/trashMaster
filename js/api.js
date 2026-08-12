@@ -90,8 +90,10 @@ function initUI() {
                 const data = await apiCall('/api/auth/login', 'POST', { username: user, password: pass });
                 authToken = data.token;
                 userRole = data.role;
+                window.currentUsername = user;
                 localStorage.setItem('trashMasterToken', authToken);
                 localStorage.setItem('trashMasterRole', userRole);
+                localStorage.setItem('trashMasterUsername', user);
                 errEl.innerText = '';
                 
                 if (userRole === 'admin') {
@@ -107,45 +109,67 @@ function initUI() {
         });
     }
 
-    const btnRegisterAccount = document.getElementById('btn-register-account');
-    if (btnRegisterAccount) {
-        btnRegisterAccount.addEventListener('click', () => {
-            const user = document.getElementById('login-username').value;
-            const pass = document.getElementById('login-password').value;
-            const errEl = document.getElementById('login-error');
-            if (!user || !pass) {
-                errEl.innerText = "Please enter username and password first!";
-                return;
-            }
-            errEl.innerText = "";
-            document.getElementById('sprite-select-dialog').classList.remove('hidden');
+    const btnGotoRegister = document.getElementById('btn-goto-register');
+    const btnGotoLogin = document.getElementById('btn-goto-login');
+    const btnDoRegister = document.getElementById('btn-do-register');
+
+    if (btnGotoRegister) {
+        btnGotoRegister.addEventListener('click', () => {
+            showScreen('register-screen');
         });
     }
 
-    const spriteBtns = document.querySelectorAll('.sprite-option-btn');
-    spriteBtns.forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const selectedSprite = btn.getAttribute('data-sprite') || 'char2';
-            const user = document.getElementById('login-username').value;
-            const pass = document.getElementById('login-password').value;
-            const errEl = document.getElementById('login-error');
-            document.getElementById('sprite-select-dialog').classList.add('hidden');
+    if (btnGotoLogin) {
+        btnGotoLogin.addEventListener('click', () => {
+            showScreen('login-screen');
+        });
+    }
+
+    // Register screen sprite options handler
+    const regSpriteBtns = document.querySelectorAll('#register-screen .sprite-option-btn');
+    regSpriteBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            regSpriteBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+
+    if (btnDoRegister) {
+        btnDoRegister.addEventListener('click', async () => {
+            const user = document.getElementById('reg-username').value.trim();
+            const pass = document.getElementById('reg-password').value;
+            const confirmPass = document.getElementById('reg-confirm-password').value;
+            const errEl = document.getElementById('register-error');
+
+            if (!user || !pass) {
+                if (errEl) errEl.innerText = "Please enter username and password!";
+                return;
+            }
+            if (pass !== confirmPass) {
+                if (errEl) errEl.innerText = "Passwords do not match!";
+                return;
+            }
+
+            const activeBtn = document.querySelector('#register-screen .sprite-option-btn.active') || document.querySelector('#register-screen .sprite-option-btn');
+            const selectedSprite = activeBtn ? activeBtn.getAttribute('data-sprite') : 'char2';
 
             try {
                 const data = await apiCall('/api/auth/register', 'POST', { username: user, password: pass, chosen_sprite: selectedSprite });
                 authToken = data.token;
                 userRole = data.role;
+                window.currentUsername = user;
                 localStorage.setItem('trashMasterToken', authToken);
                 localStorage.setItem('trashMasterRole', userRole);
-                errEl.innerText = '';
+                localStorage.setItem('trashMasterUsername', user);
+                if (errEl) errEl.innerText = '';
                 await refreshGameState();
                 renderStore();
                 showScreen('store-screen');
             } catch (e) {
-                errEl.innerText = e.message;
+                if (errEl) errEl.innerText = e.message;
             }
         });
-    });
+    }
 
     if (btnGenerate) {
         btnGenerate.addEventListener('click', async () => {
@@ -2667,7 +2691,9 @@ window.captureEndRoundSnapshot = function() {
 
 window.getGallerySnapshots = function() {
     try {
-        const data = localStorage.getItem('trashMasterGallery');
+        const username = window.currentUsername || localStorage.getItem('trashMasterUsername') || 'default';
+        const userKey = `trashMasterGallery_${username}`;
+        const data = localStorage.getItem(userKey) || localStorage.getItem('trashMasterGallery');
         return data ? JSON.parse(data) : [];
     } catch (e) {
         return [];
@@ -2676,6 +2702,9 @@ window.getGallerySnapshots = function() {
 
 window.saveGallerySnapshots = function(array) {
     try {
+        const username = window.currentUsername || localStorage.getItem('trashMasterUsername') || 'default';
+        const userKey = `trashMasterGallery_${username}`;
+        localStorage.setItem(userKey, JSON.stringify(array));
         localStorage.setItem('trashMasterGallery', JSON.stringify(array));
     } catch (e) {
         console.error('Failed to save gallery to localStorage', e);
@@ -2694,10 +2723,12 @@ window.renderGalleryModal = function() {
     snapshots.forEach((snap, idx) => {
         const card = document.createElement('div');
         card.className = 'gallery-card';
+        const captionText = snap.caption ? `"${snap.caption}"` : 'No caption';
         card.innerHTML = `
             <img src="${snap.dataUrl}" class="gallery-card-thumb" />
             <div class="gallery-card-date">${snap.timestamp || 'SNAPSHOT'}</div>
             <div class="gallery-card-info">Trash: ${snap.trash || 0}</div>
+            <div class="gallery-card-caption" style="font-size: 6px; color: #00ffcc; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; max-width: 100%; font-family: 'Press Start 2P', monospace;">${captionText}</div>
         `;
         card.addEventListener('click', () => {
             window.openSnapshotPreview(idx);
@@ -2724,8 +2755,10 @@ window.openSnapshotPreview = function(index) {
     const modal = document.getElementById('snapshot-preview-dialog');
     const imgEl = document.getElementById('preview-img-element');
     const downloadBtn = document.getElementById('btn-download-snapshot');
+    const captionInput = document.getElementById('snapshot-caption-input');
 
     if (imgEl) imgEl.src = snap.dataUrl;
+    if (captionInput) captionInput.value = snap.caption || '';
     if (downloadBtn) {
         downloadBtn.href = snap.dataUrl;
         downloadBtn.download = `trashmaster_snapshot_${index + 1}.png`;
@@ -2788,6 +2821,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnReplaceCancel = document.getElementById('btn-replace-cancel');
     const btnPreviewClose = document.getElementById('btn-preview-close');
     const btnDeleteSnapshot = document.getElementById('btn-delete-snapshot');
+    const btnSaveCaption = document.getElementById('btn-save-caption');
 
     if (btnViewGallery) {
         btnViewGallery.addEventListener('click', () => {
@@ -2817,6 +2851,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnDeleteSnapshot) {
         btnDeleteSnapshot.addEventListener('click', () => {
             window.deleteCurrentSnapshot();
+        });
+    }
+
+    if (btnSaveCaption) {
+        btnSaveCaption.addEventListener('click', () => {
+            if (currentPreviewIndex < 0) return;
+            const snapshots = window.getGallerySnapshots();
+            if (currentPreviewIndex < snapshots.length) {
+                const inputEl = document.getElementById('snapshot-caption-input');
+                const newCaption = inputEl ? inputEl.value.trim() : '';
+                snapshots[currentPreviewIndex].caption = newCaption;
+                window.saveGallerySnapshots(snapshots);
+                btnSaveCaption.innerText = 'SAVED! ✍️';
+                setTimeout(() => {
+                    btnSaveCaption.innerText = 'SAVE ✍️';
+                }, 1500);
+                window.renderGalleryModal();
+            }
         });
     }
 });

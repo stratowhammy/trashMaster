@@ -4524,13 +4524,15 @@ class Game {
 
                 const trashCount = document.getElementById('round-trash-count')?.innerText || '0';
                 const defeatMsg = document.getElementById('defeat-message')?.innerText || '';
+                const customCaption = document.getElementById('end-screen-caption-input')?.value.trim() || '';
                 const dateStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                 const newSnapshot = {
                     dataUrl: dataUrl,
                     timestamp: dateStr,
                     trash: trashCount,
-                    message: defeatMsg
+                    message: defeatMsg,
+                    caption: customCaption
                 };
 
                 if (snapshots.length < 16) {

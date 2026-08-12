@@ -2595,15 +2595,38 @@ function updateStatsTabStyles() {
 // Snapshot Capture & 16-Slot Gallery Management
 // ============================================================
 
+window.updateEndScreenCaptionPreview = function() {
+    const input = document.getElementById('end-screen-caption-input');
+    const sizeSelect = document.getElementById('end-screen-caption-size');
+    const colorSelect = document.getElementById('end-screen-caption-color');
+    const preview = document.getElementById('end-screen-caption-preview');
+
+    if (!preview) return;
+    const text = input ? input.value.trim() : '';
+    const size = sizeSelect ? sizeSelect.value : '10';
+    const color = colorSelect ? colorSelect.value : '#00ffcc';
+
+    preview.style.fontSize = `${size}px`;
+    preview.style.color = color;
+    preview.innerText = text ? `"${text}"` : '';
+};
+
 window.captureEndRoundSnapshot = function() {
     const trophyCanvas = document.getElementById('endRoundTrophyCanvas');
     const artCanvas = document.getElementById('defeatArtCanvas');
     const cansCanvas = document.getElementById('trashCansCountCanvas');
     const roundTrashCount = document.getElementById('round-trash-count');
     const defeatMessage = document.getElementById('defeat-message');
+    const captionInput = document.getElementById('end-screen-caption-input');
+    const sizeSelect = document.getElementById('end-screen-caption-size');
+    const colorSelect = document.getElementById('end-screen-caption-color');
+
+    const customCaptionText = captionInput ? captionInput.value.trim() : '';
+    const fontSize = sizeSelect ? parseInt(sizeSelect.value, 10) : 10;
+    const fontColor = colorSelect ? colorSelect.value : '#00ffcc';
 
     const cWidth = 520;
-    const cHeight = 320;
+    const cHeight = customCaptionText ? 360 : 320;
     const canvas = document.createElement('canvas');
     canvas.width = cWidth;
     canvas.height = cHeight;
@@ -2685,6 +2708,29 @@ window.captureEndRoundSnapshot = function() {
         }
     }
     ctx.fillText(line, cWidth / 2, currY);
+
+    // 5. Custom End Screen Caption rendered with chosen size and color!
+    if (customCaptionText) {
+        currY += 25;
+        ctx.fillStyle = fontColor;
+        ctx.font = `${fontSize}px "Press Start 2P", monospace`;
+        ctx.textAlign = 'center';
+
+        const captionWords = customCaptionText.split(' ');
+        let capLine = '';
+        for (let i = 0; i < captionWords.length; i++) {
+            let testLine = capLine + captionWords[i] + ' ';
+            let metrics = ctx.measureText(testLine);
+            if (metrics.width > 460 && i > 0) {
+                ctx.fillText(capLine, cWidth / 2, currY);
+                capLine = captionWords[i] + ' ';
+                currY += fontSize + 4;
+            } else {
+                capLine = testLine;
+            }
+        }
+        ctx.fillText(capLine, cWidth / 2, currY);
+    }
 
     return canvas.toDataURL('image/png');
 };
@@ -2871,4 +2917,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const endCapInput = document.getElementById('end-screen-caption-input');
+    const endCapSize = document.getElementById('end-screen-caption-size');
+    const endCapColor = document.getElementById('end-screen-caption-color');
+
+    if (endCapInput) endCapInput.addEventListener('input', window.updateEndScreenCaptionPreview);
+    if (endCapSize) endCapSize.addEventListener('change', window.updateEndScreenCaptionPreview);
+    if (endCapColor) endCapColor.addEventListener('change', window.updateEndScreenCaptionPreview);
 });

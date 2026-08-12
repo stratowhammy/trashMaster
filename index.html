@@ -331,6 +331,42 @@
                     <canvas id="trashCansCountCanvas" width="320" height="40" style="width: 320px; height: 40px; image-rendering: pixelated; display: block; background: #000; border: 2px solid #333; border-radius: 4px;"></canvas>
                 </div>
                 <p id="defeat-message" style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ff8888; text-align: center; max-width: 400px; line-height: 1.8; margin: 10px 0;"></p>
+
+                <!-- End Screen Caption Customizer -->
+                <div id="end-screen-caption-container" style="width: 100%; max-width: 440px; background: rgba(10, 20, 35, 0.85); border: 2px solid #00ccff; border-radius: 6px; padding: 12px; box-sizing: border-box; margin: 8px 0; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ccff; text-align: left;">✍️ SNAPSHOT CAPTION:</div>
+                    <input type="text" id="end-screen-caption-input" placeholder="Type custom caption for snapshot..." style="width: 100%; padding: 6px 8px; background: #080d1a; border: 1px solid #00aaff; color: #ffffff; font-family: 'Press Start 2P', monospace; font-size: 8px; border-radius: 4px; box-sizing: border-box;">
+                    
+                    <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: #ffaa00;">SIZE:</label>
+                            <select id="end-screen-caption-size" style="background: #080d1a; border: 1px solid #ffaa00; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 4px; border-radius: 4px; cursor: pointer;">
+                                <option value="8">8px</option>
+                                <option value="10" selected>10px</option>
+                                <option value="12">12px</option>
+                                <option value="14">14px</option>
+                                <option value="18">18px</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="font-family: 'Press Start 2P', monospace; font-size: 7px; color: #ffaa00;">COLOR:</label>
+                            <select id="end-screen-caption-color" style="background: #080d1a; border: 1px solid #ffaa00; color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 4px; border-radius: 4px; cursor: pointer;">
+                                <option value="#00ffcc" selected>Cyan</option>
+                                <option value="#ffd700">Gold</option>
+                                <option value="#ff0055">Pink</option>
+                                <option value="#ffffff">White</option>
+                                <option value="#00ff00">Green</option>
+                                <option value="#ffaa00">Orange</option>
+                                <option value="#ff3333">Red</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Live Caption Preview -->
+                    <div id="end-screen-caption-preview" style="font-family: 'Press Start 2P', monospace; font-size: 10px; color: #00ffcc; text-align: center; margin-top: 4px; line-height: 1.5; text-shadow: 1px 1px #000; min-height: 14px;"></div>
+                </div>
+
                 <div style="display: flex; gap: 15px; align-items: center; justify-content: center;">
                     <button id="btn-defeat-snapshot" class="btn play-btn" style="background: #00aa66; border: 2px solid #007744; box-shadow: 0 4px #004422; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Snapshot 📸</button>
                     <button id="btn-defeat-return" class="btn play-btn" style="background: #ff3333; border: 2px solid #990000; box-shadow: 0 4px #660000; padding: 10px 20px; font-family: 'Press Start 2P', monospace; font-size: 10px; color: #fff; cursor: pointer;">Return to Store</button>

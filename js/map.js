@@ -1530,7 +1530,7 @@ class GameMap extends BaseMap {
     }
 }
 
-class CustomMap extends GameMap {
+class CustomMap extends BaseMap {
     constructor(data) {
         super();
         this.theme = (data && data.theme) || 'custom';

@@ -970,54 +970,6 @@ class BaseMap {
     }
 }
 
-class CustomMap extends BaseMap {
-    constructor(data) {
-        super();
-        this.theme = (data && data.theme) || 'custom';
-        this.data = data;
-        this.loadData(data);
-    }
-
-    loadData(data) {
-        if (!data) return;
-        this.title = data.title || 'Custom Map';
-        this.restrictedMode = data.restricted_mode || 'all';
-
-        this.tiles = Array.from({ length: MAP_HEIGHT }, (_, y) =>
-            Array.from({ length: MAP_WIDTH }, (_, x) => {
-                if (data.tiles && data.tiles[y] && data.tiles[y][x] !== undefined) {
-                    return data.tiles[y][x];
-                }
-                return TileType.GRASS;
-            })
-        );
-
-        this.buildingMeta = Array.from({ length: MAP_HEIGHT }, (_, y) =>
-            Array.from({ length: MAP_WIDTH }, (_, x) => {
-                if (data.buildingMeta && data.buildingMeta[y] && data.buildingMeta[y][x] !== undefined) {
-                    return data.buildingMeta[y][x];
-                }
-                return -1;
-            })
-        );
-
-        this.roadDirections = Array.from({ length: MAP_HEIGHT }, () =>
-            Array.from({ length: MAP_WIDTH }, () => null)
-        );
-
-        this.buildings = data.buildings || [];
-        this.trees = data.trees || [];
-        this.objects = data.objects || [];
-        this.npcs = data.npcs || [];
-        this.openDoors = new Set(data.openDoors || []);
-        this.parkBlocks = data.parkBlocks || [];
-
-        if (!this.buildings || this.buildings.length === 0) {
-            this._catalogBuildings();
-        }
-    }
-}
-
 class GameMap extends BaseMap {
     constructor() {
         if (window.customMapData) {
@@ -1575,5 +1527,33 @@ class GameMap extends BaseMap {
         ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#3cb371';
         ctx.beginPath(); ctx.arc(x - 4, y - 8, 8, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+class CustomMap extends GameMap {
+    constructor(data) {
+        super();
+        this.theme = (data && data.theme) || 'custom';
+        this.data = data;
+        if (data) this.loadData(data);
+    }
+
+    loadData(data) {
+        if (!data) return;
+        this.title = data.title || 'Custom Map';
+        this.restrictedMode = data.restricted_mode || 'all';
+
+        if (data.tiles) this.tiles = data.tiles;
+        if (data.buildingMeta) this.buildingMeta = data.buildingMeta;
+        if (data.buildings) this.buildings = data.buildings;
+        if (data.trees) this.trees = data.trees;
+        if (data.objects) this.objects = data.objects;
+        if (data.npcs) this.npcs = data.npcs;
+        if (data.openDoors) this.openDoors = new Set(data.openDoors);
+        if (data.parkBlocks) this.parkBlocks = data.parkBlocks;
+
+        if (!this.buildings || this.buildings.length === 0) {
+            this._catalogBuildings();
+        }
     }
 }

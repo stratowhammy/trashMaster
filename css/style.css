@@ -816,3 +816,59 @@ input:checked + .slider:before {
     box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);
 }
 
+/* In-Gallery Image Editor Styles */
+.gallery-editor-btn {
+    padding: 6px 4px;
+    font-size: 6px;
+    font-family: 'Press Start 2P', monospace;
+    background: #111e30;
+    border: 1.5px solid #00aaff;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    text-align: center;
+}
+
+.gallery-editor-btn:hover {
+    background: #0055aa;
+    border-color: #00ffcc;
+    color: #00ffcc;
+    transform: translateY(-1px);
+}
+
+.gallery-editor-btn.active {
+    background: #00aaff;
+    border-color: #00ffcc;
+    color: #000;
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+}
+
+.sticker-stamp-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    background: #111e30;
+    border: 1px solid #334466;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.sticker-stamp-btn:hover {
+    transform: scale(1.15);
+    border-color: #00ffcc;
+    background: #1a2a44;
+}
+
+.sticker-stamp-btn.selected {
+    border: 2px solid #00ffcc;
+    background: #0055aa;
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
+}
+
+

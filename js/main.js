@@ -76,10 +76,14 @@ class GarbageTruckFollower {
             this.lastFacingDir = 'right';
         }
 
-        let img = spriteManager.getCharacterImage('char_truck'); // original green truck
+        let img = null;
         if (window.duckyModeActive) {
             const duckyId = (this.direction === 'left' || this.lastFacingDir === 'left') ? 'ducky_left' : 'ducky_right';
             img = spriteManager.getCharacterImage(duckyId) || spriteManager.getImage(duckyId);
+        } else if (window.pirateMode) {
+            img = spriteManager.getImage('trash_truck_boat') || spriteManager.getCharacterImage('char_truck');
+        } else {
+            img = spriteManager.getCharacterImage('char_truck'); // original green truck
         }
 
         if (img) {
@@ -1347,9 +1351,30 @@ class Game {
                 magicCount++;
                 totalEarned += 500;
             } else {
-                // 25% Chance: Deadly mushroom (triggers 6 police chase penalty next round)
+                // 25% Chance: Poison mushroom (triggers 90s police chase immediately)
                 deadlyCount++;
-                this.blackMarketPenaltyNextRound = true;
+                this.poisonPoliceChaseTimer = (this.poisonPoliceChaseTimer || 0) + 90.0;
+            }
+        }
+
+        if (deadlyCount > 0) {
+            this.blackMarketPenalized = true;
+            if (this.crimeManager) {
+                this.crimeManager.policeActive = true;
+                this.crimeManager.policeActiveTimer = this.poisonPoliceChaseTimer;
+                const station = this.gameMap ? this.gameMap.buildings[1] : null;
+                let sx = this.player ? this.player.x : 0;
+                let sy = this.player ? this.player.y : 0;
+                if (station && station.doorTiles && station.doorTiles.length > 0) {
+                    sx = station.doorTiles[0].x * TILE_SIZE;
+                    sy = station.doorTiles[0].y * TILE_SIZE;
+                }
+                while (this.crimeManager.police.length < 6) {
+                    this.crimeManager.police.push(new PoliceOfficer(sx, sy, true));
+                }
+            }
+            if (this.hud) {
+                this.hud.showFollowerNotification(`🚨 POISON MUSHROOM SOLD! Police chasing you for ${Math.ceil(this.poisonPoliceChaseTimer)}s! 🚨`, false);
             }
         }
 
@@ -1369,7 +1394,7 @@ class Game {
         if (normalCount > 0) logMsg += `${normalCount} Normal ($0) `;
         if (magicCount > 0) logMsg += `${magicCount} Magic (+$${magicCount * 500}) `;
         if (deadlyCount > 0) {
-            logMsg += `🚨 ${deadlyCount} DEADLY SHROOM! 6 POLICE WILL HUNT YOU NEXT ROUND! 🚨`;
+            logMsg += `🚨 ${deadlyCount} POISON SHROOM! POLICE ARE CHASING YOU FOR ${Math.ceil(this.poisonPoliceChaseTimer)}s! 🚨`;
         }
 
         if (window.soundManager) window.soundManager.playEngageSFX();
@@ -1900,12 +1925,33 @@ class Game {
                 if (window.soundManager) window.soundManager.setTempoMultiplier(1.0);
             }
         }
-        if (this.protectionTimer > 0) {
-            this.protectionTimer -= dt;
-            if (this.protectionTimer <= 0) {
-                this.protectionTimer = 0;
-                this.protectionBonus = 0;
-                this.hud.showFollowerNotification('Protection Expired!', false);
+        // Poison Mushroom Police Chase Timer update
+        if (this.poisonPoliceChaseTimer > 0) {
+            this.poisonPoliceChaseTimer -= dt;
+            if (this.poisonPoliceChaseTimer <= 0) {
+                this.poisonPoliceChaseTimer = 0;
+                this.blackMarketPenalized = false;
+                if (this.crimeManager) {
+                    this.crimeManager.policeActiveTimer = 0;
+                    this.crimeManager.policeActive = false;
+                }
+                this.hud.showFollowerNotification("🛡️ Police chase from poison mushroom ended! 🛡️", true);
+            } else {
+                this.blackMarketPenalized = true;
+                if (this.crimeManager) {
+                    this.crimeManager.policeActive = true;
+                    this.crimeManager.policeActiveTimer = this.poisonPoliceChaseTimer;
+                    const station = this.gameMap ? this.gameMap.buildings[1] : null;
+                    let sx = this.player ? this.player.x : 0;
+                    let sy = this.player ? this.player.y : 0;
+                    if (station && station.doorTiles && station.doorTiles.length > 0) {
+                        sx = station.doorTiles[0].x * TILE_SIZE;
+                        sy = station.doorTiles[0].y * TILE_SIZE;
+                    }
+                    while (this.crimeManager.police.length < 6) {
+                        this.crimeManager.police.push(new PoliceOfficer(sx, sy, true));
+                    }
+                }
             }
         }
 
@@ -2215,7 +2261,7 @@ class Game {
         }
 
         // Crime, Politics, Price Fixing, or Black Market Penalty updates
-        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized) && this.crimeManager) {
+        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized || (this.poisonPoliceChaseTimer > 0)) && this.crimeManager) {
             if (window.crimeMode) {
                 this.npcManager.update();
                 this.npcManager.checkInteraction(this.player.x, this.player.y);
@@ -2949,27 +2995,35 @@ class Game {
             window.playerInventory['Cannonballs'] = 20;
         }
 
-        // Check Black Market Deadly Mushroom Police Penalty
-        if (this.blackMarketPenaltyNextRound) {
+        // Check Poison Mushroom Police Chase Carryover
+        if (window.poisonPoliceChaseTimeRemaining > 0) {
+            this.poisonPoliceChaseTimer = window.poisonPoliceChaseTimeRemaining;
+            window.poisonPoliceChaseTimeRemaining = 0;
             this.blackMarketPenalized = true;
-            this.blackMarketPenaltyNextRound = false;
+            const remSecs = Math.ceil(this.poisonPoliceChaseTimer);
             setTimeout(() => {
-                this.hud.showFollowerNotification("🚨 WANTED BY POLICE! You sold deadly mushrooms! 6 Police Officers are chasing you for the entire round! 🚨", false);
+                if (this.hud) {
+                    this.hud.showFollowerNotification(`🚨 POLICE CHASE CONTINUES! ${remSecs}s remaining from poison mushroom! 🚨`, false);
+                }
             }, 1000);
 
             if (this.crimeManager) {
+                this.crimeManager.policeActive = true;
+                this.crimeManager.policeActiveTimer = this.poisonPoliceChaseTimer;
                 this.crimeManager.police = [];
+                const station = this.gameMap ? this.gameMap.buildings[1] : null;
+                let sx = this.player ? this.player.x : 0;
+                let sy = this.player ? this.player.y : 0;
+                if (station && station.doorTiles && station.doorTiles.length > 0) {
+                    sx = station.doorTiles[0].x * TILE_SIZE;
+                    sy = station.doorTiles[0].y * TILE_SIZE;
+                }
                 for (let i = 0; i < 6; i++) {
-                    const station = this.gameMap.buildings[1];
-                    let sx = this.player.x, sy = this.player.y;
-                    if (station && station.doorTiles && station.doorTiles.length > 0) {
-                        sx = station.doorTiles[0].x * TILE_SIZE;
-                        sy = station.doorTiles[0].y * TILE_SIZE;
-                    }
-                    this.crimeManager.police.push(new PoliceOfficer(sx, sy, false));
+                    this.crimeManager.police.push(new PoliceOfficer(sx, sy, true));
                 }
             }
         } else {
+            this.poisonPoliceChaseTimer = 0;
             this.blackMarketPenalized = false;
         }
         if (window.playerHasTruck > 1) {
@@ -4252,6 +4306,11 @@ class Game {
     }
 
     async _showSplashGameOver(title, message, isPirateDefeat) {
+        if (this.poisonPoliceChaseTimer > 0) {
+            window.poisonPoliceChaseTimeRemaining = this.poisonPoliceChaseTimer;
+        } else {
+            window.poisonPoliceChaseTimeRemaining = 0;
+        }
         if (window.soundManager) window.soundManager.playMelancholyEndSoundtrack();
         const hadTruck = title === "WASTED BY PIRATES" && message.includes("Bruno");
         
@@ -5825,6 +5884,38 @@ class GameOrganizer {
         const screen = camera.worldToScreen(this.x, this.y);
         if (!camera.isVisible(this.x - 32, this.y - 32, 64, 64)) return;
 
+        // ── Pirate Mode: render organizer as a boat (Captain / Cult Leader) ──
+        if (window.pirateMode && this.game.spriteManager) {
+            const isCult = !!window.cultMode;
+            const shipImg = isCult ? (this.game.spriteManager.getImage('cult_boat') || this.game.spriteManager.getImage('pirate_ship_blue'))
+                                   : (this.game.spriteManager.getImage('organizer_boat') || this.game.spriteManager.getImage('pirate_ship_blue'));
+            if (shipImg && (shipImg.complete || shipImg instanceof HTMLCanvasElement)) {
+                const drawSize = 72;
+                const bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
+                ctx.save();
+                if (this.direction === 'left') {
+                    ctx.translate(screen.x, screen.y + bobY);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(shipImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+                } else {
+                    ctx.drawImage(shipImg, screen.x - drawSize / 2, screen.y - drawSize / 2 + bobY, drawSize, drawSize);
+                }
+                ctx.restore();
+
+                // Captain / Cult Leader label above boat
+                ctx.save();
+                ctx.fillStyle = isCult ? '#ffffff' : '#fbbf24';
+                ctx.font = 'bold 7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                const orgLabel = isCult ? `CULT LEADER ${this.index + 1}` : `⚓ CAPTAIN ${this.index + 1}`;
+                ctx.fillText(orgLabel, screen.x, screen.y - 42 + bobY);
+                ctx.restore();
+
+                this.followerManager.render(ctx, camera, this.game.spriteManager);
+                return;
+            }
+        }
+
         if (window.cultMode) {
             const img = this.game.spriteManager.getCharacterImage('cult_white_robe');
             if (img && (img.complete || img instanceof HTMLCanvasElement)) {
@@ -5850,35 +5941,6 @@ class GameOrganizer {
                 ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 36);
                 ctx.restore();
                 
-                this.followerManager.render(ctx, camera, this.game.spriteManager);
-                return;
-            }
-        }
-
-        // ── Pirate Mode: render organizer as a pirate ship (Captain) ──
-        if (window.pirateMode && this.game.spriteManager) {
-            const shipImg = this.game.spriteManager.getImage('pirate_ship_blue') || this.game.spriteManager.getImage('pirate_ship');
-            if (shipImg && (shipImg.complete || shipImg instanceof HTMLCanvasElement)) {
-                const drawSize = 72;
-                const bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
-                ctx.save();
-                if (this.direction === 'left') {
-                    ctx.translate(screen.x, screen.y + bobY);
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(shipImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
-                } else {
-                    ctx.drawImage(shipImg, screen.x - drawSize / 2, screen.y - drawSize / 2 + bobY, drawSize, drawSize);
-                }
-                ctx.restore();
-
-                // Captain label above ship
-                ctx.save();
-                ctx.fillStyle = '#fbbf24';
-                ctx.font = 'bold 7px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(`⚓ CAPTAIN ${this.index + 1}`, screen.x, screen.y - 42 + bobY);
-                ctx.restore();
-
                 this.followerManager.render(ctx, camera, this.game.spriteManager);
                 return;
             }

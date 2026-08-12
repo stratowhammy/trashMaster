@@ -142,57 +142,58 @@ class Follower {
         const screen = camera.worldToScreen(this.x, this.y);
         const drawSize = 64;
 
-        // ── Pirate Mode: draw posse member as pixel pirate when disembarked on foot ──
+        // ── Pirate Mode: draw followers/posse members in their own boats in a chain ──
         if (window.pirateMode) {
-            if (window.game && window.game.player && !window.game.player.onFoot) {
-                return; // Followers are aboard the sailing ship with player
-            }
             ctx.save();
-            const bob = this.moving ? Math.sin(this.animTimer * 0.8) * 2 : 0;
-            const s = screen.x;
-            const t = screen.y + bob;
+            const bobY = Math.sin(Date.now() / 250 + (this.index * 1.2)) * 2;
+            const screenX = screen.x;
+            const screenY = screen.y + bobY;
 
-            // Legs
-            ctx.fillStyle = '#111';
-            ctx.fillRect(s - 8, t + 10, 7, 12);
-            ctx.fillRect(s + 1, t + 10, 7, 12);
+            let boatImg = null;
+            let label = `#${this.index + 1}`;
+            let labelColor = '#93c5fd';
 
-            // Boots
-            ctx.fillStyle = '#4a3000';
-            ctx.fillRect(s - 9, t + 19, 8, 5);
-            ctx.fillRect(s + 1, t + 19, 8, 5);
+            if (this.spriteId === 'char_truck') {
+                if (window.duckyModeActive) {
+                    const duckyId = (this.direction === 'left') ? 'ducky_left' : 'ducky_right';
+                    boatImg = spriteManager.getCharacterImage(duckyId) || spriteManager.getImage(duckyId);
+                } else {
+                    boatImg = spriteManager.getImage('trash_truck_boat') || spriteManager.getImage('npc_boat');
+                }
+                label = 'TRUCK BOAT';
+                labelColor = '#00ff88';
+            } else if (window.cultMode) {
+                boatImg = spriteManager.getImage('cult_boat') || spriteManager.getImage('npc_boat');
+                label = `CULTIST #${this.index + 1}`;
+                labelColor = '#ffffff';
+            } else if (this.spriteId === 'organizer' || this.isOrganizer) {
+                boatImg = spriteManager.getImage('organizer_boat') || spriteManager.getImage('npc_boat');
+                label = `ORG #${this.index + 1}`;
+                labelColor = '#fbbf24';
+            } else {
+                boatImg = spriteManager.getImage('follower_boat') || spriteManager.getImage('npc_boat');
+                labelColor = '#93c5fd';
+            }
 
-            // Body (black coat)
-            ctx.fillStyle = '#111';
-            ctx.fillRect(s - 12, t - 10, 24, 22);
+            if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
+                ctx.translate(screenX, screenY);
+                if (this.direction === 'left' && !window.duckyModeActive) {
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(boatImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+            } else {
+                ctx.fillStyle = (this.spriteId === 'char_truck') ? '#00aa55' : (window.cultMode ? '#ffffff' : '#1d4ed8');
+                ctx.beginPath();
+                ctx.ellipse(screenX, screenY + 10, 22, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
 
-            // Blue coat trim (player's crew)
-            ctx.fillStyle = '#1d4ed8';
-            ctx.fillRect(s - 12, t - 10, 3, 22);
-            ctx.fillRect(s + 9, t - 10, 3, 22);
-
-            // Head
-            ctx.fillStyle = '#f4c47a';
-            ctx.beginPath();
-            ctx.arc(s, t - 18, 9, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Blue bandana (player's crew colour)
-            ctx.fillStyle = '#3b82f6';
-            ctx.fillRect(s - 10, t - 26, 20, 7);
-            ctx.fillRect(s + 8, t - 21, 4, 4); // knot
-
-            // Eyes
-            ctx.fillStyle = '#111';
-            ctx.fillRect(s - 4, t - 20, 2, 2);
-            ctx.fillRect(s + 2, t - 20, 2, 2);
-
-            // Follower number label
-            ctx.fillStyle = '#93c5fd';
+            ctx.save();
+            ctx.fillStyle = labelColor;
             ctx.font = '7px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(`#${this.index + 1}`, s, t - 34);
-
+            ctx.fillText(label, screen.x, screen.y - 34 + bobY);
             ctx.restore();
             return;
         }

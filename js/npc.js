@@ -167,9 +167,20 @@ class NPC {
 
         if (isPirateSeaMap) {
             ctx.save();
-            const boatImg = spriteManager.getImage('npc_boat');
+            let boatImg = null;
+            if (window.duckyModeActive && (this.spriteId === 'char_truck' || this.spriteId === 'truck')) {
+                const duckyId = (this.direction === 'left') ? 'ducky_left' : 'ducky_right';
+                boatImg = spriteManager.getCharacterImage(duckyId) || spriteManager.getImage(duckyId);
+            } else {
+                boatImg = spriteManager.getImage('npc_boat');
+            }
+
             if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
-                ctx.drawImage(boatImg, screen.x - drawSize / 2, screen.y - drawSize / 2 + 6 + bobY, drawSize, drawSize);
+                ctx.translate(screen.x, screen.y + bobY);
+                if (this.direction === 'left' && !window.duckyModeActive) {
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(boatImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
             } else {
                 ctx.fillStyle = '#7a4216';
                 ctx.beginPath();
@@ -180,6 +191,7 @@ class NPC {
                 ctx.stroke();
             }
             ctx.restore();
+            return;
         }
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {

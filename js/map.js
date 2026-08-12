@@ -399,7 +399,7 @@ class BaseMap {
     }
 
     isWalkable(tileX, tileY, curTX, curTY, lenient = false) {
-        if (window.pirateMode) return true;
+        if (window.pirateMode || (window.cultMode && this.islandTiles && this.islandTiles.has(`${wrapTileX(tileX)},${wrapTileY(tileY)}`))) return true;
         if (tileX === undefined || tileY === undefined || isNaN(tileX) || isNaN(tileY)) return false;
         const wx = wrapTileX(tileX);
         const wy = wrapTileY(tileY);
@@ -674,6 +674,11 @@ class BaseMap {
             ctx.arc(sx + s * 0.4, sy + s * 0.4, 3, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        // Draw palm trees along beach shores of islands
+        if ((tx * 11 + ty * 17) % 5 === 0) {
+            this._drawPalmTree(ctx, sx + s * 0.5, sy + s * 0.5);
+        }
     }
 
     _drawIslandTile(ctx, sx, sy, tx, ty, s) {
@@ -684,7 +689,8 @@ class BaseMap {
         ctx.fillStyle = '#218376';
         ctx.fillRect(sx + 2, sy + 2, s - 4, s - 4);
 
-        if ((tx * 17 + ty * 5) % 9 === 0) {
+        // Draw palm trees on island tiles (ensuring every island has lush palm trees)
+        if ((tx * 7 + ty * 13) % 3 === 0 || (tx + ty) % 4 === 0) {
             this._drawPalmTree(ctx, sx + s / 2, sy + s / 2);
         }
     }
@@ -973,8 +979,12 @@ class GameMap extends BaseMap {
     }
 
     generate() {
+        if (!this.islandTiles) this.islandTiles = new Set();
         if (window.pirateMode) {
             this._generatePirateMap();
+            if (window.cultMode || window.fastFoodMode) {
+                this._ensureGooseFastFoodOnPirateIsland();
+            }
             return;
         }
 
@@ -1036,9 +1046,123 @@ class GameMap extends BaseMap {
             buildingIndex++;
         }
         this._createParks();
+
+        if (window.cultMode) {
+            this._generateCultModeIsland();
+        }
+    }
+
+    _generateCultModeIsland() {
+        if (!this.islandTiles) this.islandTiles = new Set();
+
+        const startX = 36;
+        const startY = 16;
+        const w = 9;
+        const h = 9;
+
+        // 1. Water Moat Ring (perimeter)
+        for (let y = startY; y < startY + h; y++) {
+            for (let x = startX; x < startX + w; x++) {
+                const wx = wrapTileX(x);
+                const wy = wrapTileY(y);
+                const isEdge = (x === startX || x === startX + w - 1 || y === startY || y === startY + h - 1);
+                if (isEdge) {
+                    this.tiles[wy][wx] = TileType.ROAD;
+                    this.islandTiles.add(`${wx},${wy}`);
+                }
+            }
+        }
+
+        // 2. Sandy Beach Perimeter (7x7)
+        for (let y = startY + 1; y < startY + h - 1; y++) {
+            for (let x = startX + 1; x < startX + w - 1; x++) {
+                const wx = wrapTileX(x);
+                const wy = wrapTileY(y);
+                const isBeachEdge = (x === startX + 1 || x === startX + w - 2 || y === startY + 1 || y === startY + h - 2);
+                if (isBeachEdge) {
+                    this.tiles[wy][wx] = TileType.SIDEWALK;
+                    this.islandTiles.add(`${wx},${wy}`);
+                }
+            }
+        }
+
+        // 3. Tropical Island Core Landmass (5x5)
+        for (let y = startY + 2; y < startY + h - 2; y++) {
+            for (let x = startX + 2; x < startX + w - 2; x++) {
+                const wx = wrapTileX(x);
+                const wy = wrapTileY(y);
+                this.tiles[wy][wx] = TileType.BUILDING;
+                this.islandTiles.add(`${wx},${wy}`);
+            }
+        }
+
+        // 4. Goose Fast Food Restaurant Building on Island (center 2x2)
+        const bldgTiles = [];
+        for (let y = startY + 3; y <= startY + 4; y++) {
+            for (let x = startX + 3; x <= startX + 4; x++) {
+                const wx = wrapTileX(x);
+                const wy = wrapTileY(y);
+                bldgTiles.push({ x: wx, y: wy });
+            }
+        }
+
+        const doorWX = wrapTileX(startX + 4);
+        const doorWY = wrapTileY(startY + 4);
+        this.tiles[doorWY][doorWX] = TileType.BUILDING_DOOR;
+
+        const gooseIslandBldg = {
+            id: 888,
+            address: 'GOOSE ISLAND FAST FOOD',
+            tiles: bldgTiles,
+            doorTiles: [{ x: doorWX, y: doorWY }],
+            type: 'fast_food',
+            x: (startX + 3) * TILE_SIZE,
+            y: (startY + 3) * TILE_SIZE,
+            width: 2 * TILE_SIZE,
+            height: 2 * TILE_SIZE
+        };
+
+        this.buildings.push(gooseIslandBldg);
+        this.openDoors.add(888);
+    }
+
+    _ensureGooseFastFoodOnPirateIsland() {
+        if (this.buildings.some(b => b.type === 'fast_food' && b.id === 887)) return;
+        const island = (this.pirateIslands && this.pirateIslands.length > 0) ? this.pirateIslands[0] : { startX: 6, startY: 6, w: 4, h: 4 };
+        const startX = island.startX;
+        const startY = island.startY;
+
+        const bldgTiles = [];
+        for (let y = startY; y <= startY + 1; y++) {
+            for (let x = startX; x <= startX + 1; x++) {
+                const wx = wrapTileX(x);
+                const wy = wrapTileY(y);
+                bldgTiles.push({ x: wx, y: wy });
+                this.tiles[wy][wx] = TileType.BUILDING;
+                if (this.islandTiles) this.islandTiles.add(`${wx},${wy}`);
+            }
+        }
+
+        const doorWX = wrapTileX(startX + 1);
+        const doorWY = wrapTileY(startY + 1);
+        this.tiles[doorWY][doorWX] = TileType.BUILDING_DOOR;
+        const gooseIslandBldg = {
+            id: 887,
+            address: 'GOOSE PIRATE ISLAND FAST FOOD',
+            tiles: bldgTiles,
+            doorTiles: [{ x: doorWX, y: doorWY }],
+            type: 'fast_food',
+            x: startX * TILE_SIZE,
+            y: startY * TILE_SIZE,
+            width: 2 * TILE_SIZE,
+            height: 2 * TILE_SIZE
+        };
+        this.buildings.push(gooseIslandBldg);
+        this.openDoors.add(887);
     }
 
     _generatePirateMap() {
+        if (!this.islandTiles) this.islandTiles = new Set();
         // Initialize 64x64 grid to ocean water (TileType.ROAD)
         this.tiles = Array.from({ length: MAP_HEIGHT }, () =>
             Array.from({ length: MAP_WIDTH }, () => TileType.ROAD)
@@ -1076,12 +1200,16 @@ class GameMap extends BaseMap {
                 const startX = Math.floor(cx - w / 2);
                 const startY = Math.floor(cy - h / 2);
 
+                if (!this.pirateIslands) this.pirateIslands = [];
+                this.pirateIslands.push({ startX, startY, w, h, cx, cy });
+
                 // 1. Shoreline perimeter (Sandy Beach / SIDEWALK)
                 for (let y = startY - 1; y <= startY + h; y++) {
                     for (let x = startX - 1; x <= startX + w; x++) {
                         const wx = wrapTileX(x);
                         const wy = wrapTileY(y);
                         this.tiles[wy][wx] = TileType.SIDEWALK;
+                        this.islandTiles.add(`${wx},${wy}`);
                     }
                 }
 
@@ -1092,6 +1220,7 @@ class GameMap extends BaseMap {
                         const wy = wrapTileY(y);
                         this.tiles[wy][wx] = TileType.BUILDING;
                         this.buildingMeta[wy][wx] = islandIndex % BUILDING_COLORS.length;
+                        this.islandTiles.add(`${wx},${wy}`);
                     }
                 }
 
@@ -1128,6 +1257,47 @@ class GameMap extends BaseMap {
 
     _drawTile(ctx, tile, sx, sy, tx, ty) {
         const s = TILE_SIZE;
+
+        if (this.islandTiles && this.islandTiles.has(`${tx},${ty}`) && !window.pirateMode) {
+            const bldg = this.getBuildingAtTile(tx, ty);
+            if (bldg && bldg.type === 'fast_food') {
+                if (tile === TileType.BUILDING_DOOR) {
+                    ctx.fillStyle = '#ffaa00';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('DOOR', sx + s/2, sy + s/2 + 3);
+                    return;
+                }
+                ctx.fillStyle = '#d97706';
+                ctx.fillRect(sx, sy, s, s);
+                ctx.strokeStyle = '#78350f';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+                return;
+            }
+            switch (tile) {
+                case TileType.ROAD:
+                case TileType.ROAD_UP:
+                case TileType.ROAD_DOWN:
+                case TileType.ROAD_LEFT:
+                case TileType.ROAD_RIGHT:
+                case TileType.CROSSWALK:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.SIDEWALK:
+                    this._drawBeachTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.BUILDING:
+                case TileType.BUILDING_DOOR:
+                    this._drawIslandTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                default:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+            }
+        }
 
         if (window.pirateMode) {
             if (ty === 0) {

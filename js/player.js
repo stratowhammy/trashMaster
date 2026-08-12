@@ -121,7 +121,9 @@ class Player {
     }
 
     _canMoveTo(newX, newY, gameMap) {
-        if (window.pirateMode) return true; // Completely smooth & seamless island entry/exit
+        const targetWX = wrapTileX(Math.floor(newX / TILE_SIZE));
+        const targetWY = wrapTileY(Math.floor(newY / TILE_SIZE));
+        if (window.pirateMode || (window.cultMode && gameMap && gameMap.islandTiles && gameMap.islandTiles.has(`${targetWX},${targetWY}`))) return true; // Completely smooth & seamless island entry/exit
 
         const hs = this.size / 2 - 12; // Inset collision bounds by 12px for smooth door/corridor entry
         const corners = [
@@ -133,8 +135,6 @@ class Player {
 
         const curWX = wrapTileX(this.getTileX());
         const curWY = wrapTileY(this.getTileY());
-        const targetWX = wrapTileX(Math.floor(newX / TILE_SIZE));
-        const targetWY = wrapTileY(Math.floor(newY / TILE_SIZE));
         
         const bldgA = gameMap.getBuildingAtTile(curWX, curWY);
         const bldgB = gameMap.getBuildingAtTile(targetWX, targetWY);

@@ -375,16 +375,114 @@
         </div>
 
         <!-- Snapshot Gallery Dialog -->
-        <div id="gallery-dialog" class="hidden" style="position: fixed; z-index: 1003; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
-            <div class="dialog-box" style="background: #0a0e1a; border: 6px solid #00ffcc; padding: 25px; border-radius: 8px; text-align: center; width: 750px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(0, 255, 204, 0.5); position: relative;">
-                <h2 style="color: #00ffcc; font-size: 14px; margin-bottom: 8px; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0,255,204,0.5);">SNAPSHOT GALLERY</h2>
-                <div id="gallery-count-text" style="font-size: 8px; color: #888; margin-bottom: 20px;">0 / 16 SLOTS USED</div>
+        <div id="gallery-dialog" class="hidden" style="position: fixed; z-index: 1003; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+            <div class="dialog-box" style="background: #0a0e1a; border: 6px solid #00ffcc; padding: 22px; border-radius: 8px; text-align: center; width: 840px; max-height: 92vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(0, 255, 204, 0.5); position: relative; box-sizing: border-box;">
                 
-                <div id="gallery-grid-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; background: #050810; padding: 15px; border: 3px solid #1a2a44; border-radius: 6px; margin-bottom: 20px; min-height: 240px;">
-                    <!-- Gallery cards populated dynamically -->
+                <h2 id="gallery-dialog-title" style="color: #00ffcc; font-size: 14px; margin-bottom: 6px; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0,255,204,0.5);">SNAPSHOT GALLERY</h2>
+                <div id="gallery-count-text" style="font-size: 8px; color: #888; margin-bottom: 16px;">0 / 16 SLOTS USED</div>
+                
+                <!-- 1. Grid View (Displays 16 Gallery Cards) -->
+                <div id="gallery-grid-view">
+                    <div id="gallery-grid-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; background: #050810; padding: 15px; border: 3px solid #1a2a44; border-radius: 6px; margin-bottom: 18px; min-height: 240px;">
+                        <!-- Gallery cards populated dynamically -->
+                    </div>
+                    <button id="btn-gallery-close" class="btn" style="background: #00aa66; border: 3px solid #007744; color: #fff; padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CLOSE GALLERY</button>
                 </div>
-                
-                <button id="btn-gallery-close" class="btn" style="background: #00aa66; border: 3px solid #007744; color: #fff; padding: 10px 20px; font-size: 9px; cursor: pointer; font-family: 'Press Start 2P', monospace;">CLOSE GALLERY</button>
+
+                <!-- 2. In-Gallery Image Editor View -->
+                <div id="gallery-editor-view" class="hidden" style="text-align: left;">
+                    <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                        
+                        <!-- Left: Interactive Editable Canvas -->
+                        <div style="flex: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #050810; border: 3px solid #1a2a44; padding: 12px; border-radius: 6px; position: relative;">
+                            <div style="width: 100%; height: 320px; display: flex; justify-content: center; align-items: center; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid #334466;">
+                                <canvas id="gallery-edit-canvas" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: crosshair;"></canvas>
+                            </div>
+                            <div id="editor-hint-text" style="font-size: 5.5px; color: #00ffcc; margin-top: 8px; text-align: center; line-height: 1.5;">💡 DRAG MOUSE TO DOODLE | CLICK STICKER EMOJI TO STAMP ON PHOTO</div>
+                        </div>
+
+                        <!-- Right: Editor Controls Sidebar -->
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; background: #080f1e; border: 2px solid #00aaff; padding: 12px; border-radius: 6px; max-height: 350px; overflow-y: auto;">
+                            
+                            <!-- Caption Input -->
+                            <div>
+                                <label style="color: #00ffcc; font-size: 7px; display: block; margin-bottom: 4px;">PICTURE CAPTION:</label>
+                                <input type="text" id="editor-caption-input" placeholder="Type custom picture caption..." style="width: 100%; padding: 6px 8px; background: #111e30; border: 1.5px solid #00ffcc; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; border-radius: 4px; box-sizing: border-box;">
+                            </div>
+
+                            <!-- Photo Filters -->
+                            <div>
+                                <label style="color: #00ffcc; font-size: 7px; display: block; margin-bottom: 4px;">PHOTO FILTERS:</label>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                                    <button class="gallery-editor-btn filter-btn active" data-filter="normal">Normal</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="vintage">Retro 🎞️</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="neon">Neon ⚡</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="sepia">Sepia 📜</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="bw">B&W 🎬</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="invert">Invert 👁️</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="vivid">Vivid 🌈</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="hicon">Hi-Con ⚡</button>
+                                    <button class="gallery-editor-btn filter-btn" data-filter="blur">Dream ☁️</button>
+                                </div>
+                            </div>
+
+                            <!-- Rotate & Flip -->
+                            <div>
+                                <label style="color: #00ffcc; font-size: 7px; display: block; margin-bottom: 4px;">ROTATE & FLIP:</label>
+                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;">
+                                    <button id="btn-editor-rotate-left" class="gallery-editor-btn">↺ 90° Left</button>
+                                    <button id="btn-editor-rotate-right" class="gallery-editor-btn">↻ 90° Right</button>
+                                    <button id="btn-editor-flip-h" class="gallery-editor-btn">⇄ Flip H</button>
+                                    <button id="btn-editor-flip-v" class="gallery-editor-btn">⇅ Flip V</button>
+                                </div>
+                            </div>
+
+                            <!-- Doodle Tool -->
+                            <div>
+                                <label style="color: #00ffcc; font-size: 7px; display: block; margin-bottom: 4px;">DOODLE / PAINT:</label>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <button id="btn-toggle-doodle" class="gallery-editor-btn" style="flex: 1;">Pen: OFF ✏️</button>
+                                    <input type="color" id="editor-doodle-color" value="#00ffcc" style="width: 26px; height: 26px; border: 1px solid #00ffcc; border-radius: 4px; cursor: pointer; background: transparent;">
+                                    <input type="range" id="editor-brush-size" min="2" max="20" value="4" title="Brush Size" style="width: 50px;">
+                                </div>
+                            </div>
+
+                            <!-- Sticker Stamps -->
+                            <div>
+                                <label style="color: #00ffcc; font-size: 7px; display: block; margin-bottom: 4px;">STICKER STAMPS:</label>
+                                <div id="editor-stickers-container" style="display: flex; gap: 4px; flex-wrap: wrap; background: #050810; padding: 5px; border: 1px solid #1a2a44; border-radius: 4px;">
+                                    <button class="sticker-stamp-btn" data-sticker="🏆">🏆</button>
+                                    <button class="sticker-stamp-btn" data-sticker="👑">👑</button>
+                                    <button class="sticker-stamp-btn" data-sticker="🏴‍☠️">🏴‍☠️</button>
+                                    <button class="sticker-stamp-btn" data-sticker="🍄">🍄</button>
+                                    <button class="sticker-stamp-btn" data-sticker="🦆">🦆</button>
+                                    <button class="sticker-stamp-btn" data-sticker="☠️">☠️</button>
+                                    <button class="sticker-stamp-btn" data-sticker="🗑️">🗑️</button>
+                                    <button class="sticker-stamp-btn" data-sticker="💎">💎</button>
+                                    <button class="sticker-stamp-btn" data-sticker="⚡">⚡</button>
+                                    <button class="sticker-stamp-btn" data-sticker="🚨">🚨</button>
+                                    <button class="sticker-stamp-btn" data-sticker="🔥">🔥</button>
+                                    <button class="sticker-stamp-btn" data-sticker="❤️">❤️</button>
+                                </div>
+                            </div>
+
+                            <!-- Reset Image Edits -->
+                            <button id="btn-editor-reset" class="gallery-editor-btn" style="background: #441111; border-color: #ff4444; margin-top: 4px; color: #ffaaaa;">Reset Edits ↺</button>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Action Buttons in Gallery Editor -->
+                    <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 2px solid #1a2a44; padding-top: 10px;">
+                        <button id="btn-editor-back" class="btn secondary" style="padding: 8px 12px; font-size: 8px; font-family: 'Press Start 2P', monospace; cursor: pointer;">⬅️ GALLERY GRID</button>
+                        
+                        <div style="display: flex; gap: 8px;">
+                            <a id="btn-editor-download" download="edited_snapshot.png" class="btn" style="background: #00aa66; border: 2px solid #007744; color: #fff; padding: 8px 12px; font-size: 8px; text-decoration: none; font-family: 'Press Start 2P', monospace; display: inline-block;">DOWNLOAD 💾</a>
+                            <button id="btn-editor-delete" class="btn" style="background: #ff3333; border: 2px solid #990000; color: #fff; padding: 8px 12px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace;">DELETE 🗑️</button>
+                            <button id="btn-editor-save" class="btn" style="background: #0088ff; border: 2px solid #0055cc; color: #fff; padding: 8px 16px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; text-shadow: 0 0 5px #00aaff;">SAVE EDITS 💾</button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 

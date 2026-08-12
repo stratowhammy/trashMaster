@@ -2757,10 +2757,29 @@ window.saveGallerySnapshots = function(array) {
     }
 };
 
+let currentGalleryEditorIndex = -1;
+let currentEditorBaseImg = null;
+let currentEditorFilter = 'normal';
+let currentEditorRotation = 0; // 0, 90, 180, 270
+let currentEditorFlipH = false;
+let currentEditorFlipV = false;
+let doodleModeActive = false;
+let selectedSticker = null;
+let doodleCanvasOverlay = null;
+
 window.renderGalleryModal = function() {
     const grid = document.getElementById('gallery-grid-container');
     const countText = document.getElementById('gallery-count-text');
+    const gridView = document.getElementById('gallery-grid-view');
+    const editorView = document.getElementById('gallery-editor-view');
+    const titleEl = document.getElementById('gallery-dialog-title');
+
     if (!grid) return;
+
+    // Show grid view by default
+    if (gridView) gridView.classList.remove('hidden');
+    if (editorView) editorView.classList.add('hidden');
+    if (titleEl) titleEl.innerText = 'SNAPSHOT GALLERY';
 
     grid.innerHTML = '';
     const snapshots = window.getGallerySnapshots();
@@ -2775,9 +2794,10 @@ window.renderGalleryModal = function() {
             <div class="gallery-card-date">${snap.timestamp || 'SNAPSHOT'}</div>
             <div class="gallery-card-info">Trash: ${snap.trash || 0}</div>
             <div class="gallery-card-caption" style="font-size: 6px; color: #00ffcc; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; max-width: 100%; font-family: 'Press Start 2P', monospace;">${captionText}</div>
+            <button class="gallery-editor-btn" style="margin-top: 6px; width: 100%; font-size: 6px; padding: 4px 0; background: #0088ff; border-color: #00aaff; color: #fff;">EDIT ✏️</button>
         `;
         card.addEventListener('click', () => {
-            window.openSnapshotPreview(idx);
+            window.openGalleryEditor(idx);
         });
         grid.appendChild(card);
     });
@@ -2790,36 +2810,128 @@ window.renderGalleryModal = function() {
     }
 };
 
-let currentPreviewIndex = -1;
-
 window.openSnapshotPreview = function(index) {
+    window.openGalleryEditor(index);
+};
+
+window.openGalleryEditor = function(index) {
     const snapshots = window.getGallerySnapshots();
     if (index < 0 || index >= snapshots.length) return;
 
-    currentPreviewIndex = index;
+    currentGalleryEditorIndex = index;
     const snap = snapshots[index];
-    const modal = document.getElementById('snapshot-preview-dialog');
-    const imgEl = document.getElementById('preview-img-element');
-    const downloadBtn = document.getElementById('btn-download-snapshot');
-    const captionInput = document.getElementById('snapshot-caption-input');
 
-    if (imgEl) imgEl.src = snap.dataUrl;
+    const gridView = document.getElementById('gallery-grid-view');
+    const editorView = document.getElementById('gallery-editor-view');
+    const titleEl = document.getElementById('gallery-dialog-title');
+    const captionInput = document.getElementById('editor-caption-input');
+
+    if (gridView) gridView.classList.add('hidden');
+    if (editorView) editorView.classList.remove('hidden');
+    if (titleEl) titleEl.innerText = `EDIT SNAPSHOT #${index + 1}`;
     if (captionInput) captionInput.value = snap.caption || '';
-    if (downloadBtn) {
-        downloadBtn.href = snap.dataUrl;
-        downloadBtn.download = `trashmaster_snapshot_${index + 1}.png`;
+
+    // Reset editor parameters
+    currentEditorFilter = 'normal';
+    currentEditorRotation = 0;
+    currentEditorFlipH = false;
+    currentEditorFlipV = false;
+    doodleModeActive = false;
+    selectedSticker = null;
+
+    // Filter buttons reset
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === 'normal');
+    });
+
+    const togglePenBtn = document.getElementById('btn-toggle-doodle');
+    if (togglePenBtn) {
+        togglePenBtn.innerText = 'Pen: OFF ✏️';
+        togglePenBtn.classList.remove('active');
     }
 
-    if (modal) modal.classList.remove('hidden');
+    document.querySelectorAll('.sticker-stamp-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+
+    // Load base image
+    const img = new Image();
+    img.onload = () => {
+        currentEditorBaseImg = img;
+        
+        // Create matching doodle canvas overlay
+        doodleCanvasOverlay = document.createElement('canvas');
+        doodleCanvasOverlay.width = img.width;
+        doodleCanvasOverlay.height = img.height;
+
+        window.renderGalleryEditCanvas();
+    };
+    img.src = snap.dataUrl;
+};
+
+window.renderGalleryEditCanvas = function() {
+    const canvas = document.getElementById('gallery-edit-canvas');
+    if (!canvas || !currentEditorBaseImg) return;
+
+    const ctx = canvas.getContext('2d');
+    const img = currentEditorBaseImg;
+
+    // Set dimensions based on rotation
+    const is90or270 = (currentEditorRotation % 180 !== 0);
+    canvas.width = is90or270 ? img.height : img.width;
+    canvas.height = is90or270 ? img.width : img.height;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+
+    // Filter presets
+    let filterString = 'none';
+    switch (currentEditorFilter) {
+        case 'vintage': filterString = 'sepia(60%) hue-rotate(-20deg) contrast(120%)'; break;
+        case 'neon': filterString = 'hue-rotate(180deg) saturate(220%) contrast(110%)'; break;
+        case 'sepia': filterString = 'sepia(100%)'; break;
+        case 'bw': filterString = 'grayscale(100%)'; break;
+        case 'invert': filterString = 'invert(100%)'; break;
+        case 'vivid': filterString = 'saturate(200%) contrast(120%)'; break;
+        case 'hicon': filterString = 'contrast(180%) brightness(110%)'; break;
+        case 'blur': filterString = 'blur(2px) saturate(140%)'; break;
+        default: filterString = 'none'; break;
+    }
+    if (typeof ctx.filter !== 'undefined') {
+        ctx.filter = filterString;
+    }
+
+    // Transform
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((currentEditorRotation * Math.PI) / 180);
+    ctx.scale(currentEditorFlipH ? -1 : 1, currentEditorFlipV ? -1 : 1);
+
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    ctx.restore();
+
+    // Render Doodle & Sticker overlay on top
+    if (doodleCanvasOverlay) {
+        ctx.save();
+        ctx.drawImage(doodleCanvasOverlay, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    }
+
+    // Update download button link
+    const downloadBtn = document.getElementById('btn-editor-download');
+    if (downloadBtn) {
+        downloadBtn.href = canvas.toDataURL('image/png');
+        downloadBtn.download = `trashmaster_snapshot_${currentGalleryEditorIndex + 1}.png`;
+    }
 };
 
 window.deleteCurrentSnapshot = function() {
-    if (currentPreviewIndex < 0) return;
+    if (currentGalleryEditorIndex < 0) return;
     const snapshots = window.getGallerySnapshots();
-    if (currentPreviewIndex < snapshots.length) {
-        snapshots.splice(currentPreviewIndex, 1);
+    if (currentGalleryEditorIndex < snapshots.length) {
+        snapshots.splice(currentGalleryEditorIndex, 1);
         window.saveGallerySnapshots(snapshots);
-        document.getElementById('snapshot-preview-dialog')?.classList.add('hidden');
+        currentGalleryEditorIndex = -1;
         window.renderGalleryModal();
     }
 };
@@ -2860,14 +2972,90 @@ window.openReplaceSnapshotModal = function(newSnapshot) {
     modal.classList.remove('hidden');
 };
 
-// Event listeners for gallery dialogs
+// Interactive Canvas Mouse & Touch setup for doodling and sticker stamping
+function setupGalleryCanvasInteractions() {
+    const canvas = document.getElementById('gallery-edit-canvas');
+    if (!canvas) return;
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function getCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
+    }
+
+    function onPointerDown(e) {
+        if (!doodleCanvasOverlay) return;
+        const coords = getCoords(e);
+
+        if (selectedSticker) {
+            // Stamp selected sticker on photo!
+            const octx = doodleCanvasOverlay.getContext('2d');
+            const fontSize = Math.round(doodleCanvasOverlay.height * 0.12);
+            octx.font = `${fontSize}px serif`;
+            octx.textAlign = 'center';
+            octx.textBaseline = 'middle';
+            octx.fillText(selectedSticker, coords.x, coords.y);
+            window.renderGalleryEditCanvas();
+            return;
+        }
+
+        if (doodleModeActive) {
+            isDrawing = true;
+            lastX = coords.x;
+            lastY = coords.y;
+        }
+    }
+
+    function onPointerMove(e) {
+        if (!isDrawing || !doodleCanvasOverlay || !doodleModeActive) return;
+        const coords = getCoords(e);
+        const octx = doodleCanvasOverlay.getContext('2d');
+        const color = document.getElementById('editor-doodle-color')?.value || '#00ffcc';
+        const size = parseInt(document.getElementById('editor-brush-size')?.value || '4', 10);
+
+        octx.strokeStyle = color;
+        octx.lineWidth = size * (doodleCanvasOverlay.width / 500);
+        octx.lineCap = 'round';
+        octx.lineJoin = 'round';
+        octx.beginPath();
+        octx.moveTo(lastX, lastY);
+        octx.lineTo(coords.x, coords.y);
+        octx.stroke();
+
+        lastX = coords.x;
+        lastY = coords.y;
+        window.renderGalleryEditCanvas();
+    }
+
+    function onPointerUp() {
+        isDrawing = false;
+    }
+
+    canvas.addEventListener('mousedown', onPointerDown);
+    canvas.addEventListener('mousemove', onPointerMove);
+    canvas.addEventListener('mouseup', onPointerUp);
+    canvas.addEventListener('mouseleave', onPointerUp);
+
+    canvas.addEventListener('touchstart', (e) => { onPointerDown(e); e.preventDefault(); });
+    canvas.addEventListener('touchmove', (e) => { onPointerMove(e); e.preventDefault(); });
+    canvas.addEventListener('touchend', onPointerUp);
+}
+
+// Event listeners for gallery & editor dialogs
 document.addEventListener('DOMContentLoaded', () => {
     const btnViewGallery = document.getElementById('btn-view-gallery');
     const btnGalleryClose = document.getElementById('btn-gallery-close');
     const btnReplaceCancel = document.getElementById('btn-replace-cancel');
-    const btnPreviewClose = document.getElementById('btn-preview-close');
-    const btnDeleteSnapshot = document.getElementById('btn-delete-snapshot');
-    const btnSaveCaption = document.getElementById('btn-save-caption');
 
     if (btnViewGallery) {
         btnViewGallery.addEventListener('click', () => {
@@ -2888,32 +3076,133 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (btnPreviewClose) {
-        btnPreviewClose.addEventListener('click', () => {
-            document.getElementById('snapshot-preview-dialog')?.classList.add('hidden');
+    // Setup Gallery Editor Controls
+    setupGalleryCanvasInteractions();
+
+    // Filters
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentEditorFilter = btn.dataset.filter || 'normal';
+            window.renderGalleryEditCanvas();
+        });
+    });
+
+    // Rotation & Flip
+    const btnRotL = document.getElementById('btn-editor-rotate-left');
+    const btnRotR = document.getElementById('btn-editor-rotate-right');
+    const btnFlipH = document.getElementById('btn-editor-flip-h');
+    const btnFlipV = document.getElementById('btn-editor-flip-v');
+
+    if (btnRotL) btnRotL.addEventListener('click', () => { currentEditorRotation = (currentEditorRotation + 270) % 360; window.renderGalleryEditCanvas(); });
+    if (btnRotR) btnRotR.addEventListener('click', () => { currentEditorRotation = (currentEditorRotation + 90) % 360; window.renderGalleryEditCanvas(); });
+    if (btnFlipH) btnFlipH.addEventListener('click', () => { currentEditorFlipH = !currentEditorFlipH; window.renderGalleryEditCanvas(); });
+    if (btnFlipV) btnFlipV.addEventListener('click', () => { currentEditorFlipV = !currentEditorFlipV; window.renderGalleryEditCanvas(); });
+
+    // Toggle Pen / Doodle mode
+    const btnTogglePen = document.getElementById('btn-toggle-doodle');
+    if (btnTogglePen) {
+        btnTogglePen.addEventListener('click', () => {
+            doodleModeActive = !doodleModeActive;
+            selectedSticker = null; // deselect sticker if pen enabled
+            document.querySelectorAll('.sticker-stamp-btn').forEach(b => b.classList.remove('selected'));
+            btnTogglePen.classList.toggle('active', doodleModeActive);
+            btnTogglePen.innerText = doodleModeActive ? 'Pen: ON ✏️' : 'Pen: OFF ✏️';
+            const hint = document.getElementById('editor-hint-text');
+            if (hint) hint.innerText = doodleModeActive ? '✏️ PEN ACTIVE: CLICK & DRAG ON CANVAS TO DRAW' : '💡 DRAG MOUSE TO DOODLE | CLICK STICKER EMOJI TO STAMP ON PHOTO';
         });
     }
 
-    if (btnDeleteSnapshot) {
-        btnDeleteSnapshot.addEventListener('click', () => {
-            window.deleteCurrentSnapshot();
+    // Sticker Stamp selection
+    document.querySelectorAll('.sticker-stamp-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sticker = btn.dataset.sticker;
+            if (selectedSticker === sticker) {
+                selectedSticker = null;
+                btn.classList.remove('selected');
+            } else {
+                selectedSticker = sticker;
+                doodleModeActive = false; // deselect pen if sticker selected
+                if (btnTogglePen) {
+                    btnTogglePen.classList.remove('active');
+                    btnTogglePen.innerText = 'Pen: OFF ✏️';
+                }
+                document.querySelectorAll('.sticker-stamp-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            }
+            const hint = document.getElementById('editor-hint-text');
+            if (hint) hint.innerText = selectedSticker ? `📌 STICKER "${selectedSticker}" SELECTED: CLICK ANYWHERE ON PHOTO TO STAMP!` : '💡 DRAG MOUSE TO DOODLE | CLICK STICKER EMOJI TO STAMP ON PHOTO';
+        });
+    });
+
+    // Reset Edits
+    const btnReset = document.getElementById('btn-editor-reset');
+    if (btnReset) {
+        btnReset.addEventListener('click', () => {
+            currentEditorFilter = 'normal';
+            currentEditorRotation = 0;
+            currentEditorFlipH = false;
+            currentEditorFlipV = false;
+            doodleModeActive = false;
+            selectedSticker = null;
+
+            if (doodleCanvasOverlay) {
+                const octx = doodleCanvasOverlay.getContext('2d');
+                octx.clearRect(0, 0, doodleCanvasOverlay.width, doodleCanvasOverlay.height);
+            }
+
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'normal'));
+            document.querySelectorAll('.sticker-stamp-btn').forEach(b => b.classList.remove('selected'));
+            if (btnTogglePen) {
+                btnTogglePen.classList.remove('active');
+                btnTogglePen.innerText = 'Pen: OFF ✏️';
+            }
+            window.renderGalleryEditCanvas();
         });
     }
 
-    if (btnSaveCaption) {
-        btnSaveCaption.addEventListener('click', () => {
-            if (currentPreviewIndex < 0) return;
+    // Back to Gallery Grid
+    const btnBack = document.getElementById('btn-editor-back');
+    if (btnBack) {
+        btnBack.addEventListener('click', () => {
+            window.renderGalleryModal();
+        });
+    }
+
+    // Delete Snapshot
+    const btnEditorDelete = document.getElementById('btn-editor-delete');
+    if (btnEditorDelete) {
+        btnEditorDelete.addEventListener('click', () => {
+            if (confirm('Are you sure you want to delete this snapshot from your gallery?')) {
+                window.deleteCurrentSnapshot();
+            }
+        });
+    }
+
+    // Save Edits
+    const btnEditorSave = document.getElementById('btn-editor-save');
+    if (btnEditorSave) {
+        btnEditorSave.addEventListener('click', () => {
+            if (currentGalleryEditorIndex < 0) return;
+            const canvas = document.getElementById('gallery-edit-canvas');
+            const captionInput = document.getElementById('editor-caption-input');
             const snapshots = window.getGallerySnapshots();
-            if (currentPreviewIndex < snapshots.length) {
-                const inputEl = document.getElementById('snapshot-caption-input');
-                const newCaption = inputEl ? inputEl.value.trim() : '';
-                snapshots[currentPreviewIndex].caption = newCaption;
+
+            if (canvas && currentGalleryEditorIndex < snapshots.length) {
+                const editedDataUrl = canvas.toDataURL('image/png');
+                snapshots[currentGalleryEditorIndex].dataUrl = editedDataUrl;
+                snapshots[currentGalleryEditorIndex].caption = captionInput ? captionInput.value.trim() : '';
+
                 window.saveGallerySnapshots(snapshots);
-                btnSaveCaption.innerText = 'SAVED! ✍️';
+
+                btnEditorSave.innerText = 'SAVED! 💾';
+                btnEditorSave.style.background = '#00aa55';
                 setTimeout(() => {
-                    btnSaveCaption.innerText = 'SAVE ✍️';
-                }, 1500);
-                window.renderGalleryModal();
+                    btnEditorSave.innerText = 'SAVE EDITS 💾';
+                    btnEditorSave.style.background = '#0088ff';
+                    window.renderGalleryModal();
+                }, 800);
             }
         });
     }
@@ -2926,3 +3215,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (endCapSize) endCapSize.addEventListener('change', window.updateEndScreenCaptionPreview);
     if (endCapColor) endCapColor.addEventListener('change', window.updateEndScreenCaptionPreview);
 });
+

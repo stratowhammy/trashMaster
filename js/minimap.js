@@ -38,7 +38,7 @@ class MiniMap {
                 const tile = gameMap.tiles[y][x];
                 let color = miniColors[tile] || '#333';
 
-                if (window.pirateMode) {
+                if (window.pirateMode || (gameMap && gameMap.islandTiles && gameMap.islandTiles.has(`${x},${y}`))) {
                     if (tile === TileType.SIDEWALK) {
                         color = '#e6ca65'; // Sandy Beach Gold
                     } else if (tile === TileType.BUILDING || tile === TileType.BUILDING_DOOR) {

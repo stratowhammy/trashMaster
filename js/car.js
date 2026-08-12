@@ -85,11 +85,19 @@ class Car {
         if (window.pirateMode) {
             ctx.save();
             ctx.translate(screen.x, screen.y);
-            let angle = Math.atan2(this.dir[0], -this.dir[1]);
-            ctx.rotate(angle);
 
             const isGreen = this.color === 'green';
-            const img = (window.game && window.game.spriteManager) ? (window.game.spriteManager.getImage('pirate_ship_blue') || window.game.spriteManager.getImage('pirate_ship')) : null;
+            const sm = window.game ? window.game.spriteManager : null;
+            let img = null;
+
+            if (window.duckyModeActive) {
+                const duckyId = (this.dir[0] < 0) ? 'ducky_left' : 'ducky_right';
+                img = sm ? (sm.getCharacterImage(duckyId) || sm.getImage(duckyId)) : null;
+            } else {
+                let angle = Math.atan2(this.dir[0], -this.dir[1]);
+                ctx.rotate(angle);
+                img = sm ? (sm.getImage('trash_truck_boat') || sm.getImage('pirate_ship_blue') || sm.getImage('pirate_ship')) : null;
+            }
 
             if (img && (img.complete || img instanceof HTMLCanvasElement)) {
                 ctx.drawImage(img, -28, -28, 56, 56);
@@ -121,9 +129,11 @@ class Car {
                 ctx.stroke();
             }
 
-            // Flag
-            ctx.fillStyle = isGreen ? '#00ff66' : '#ff3366';
-            ctx.fillRect(0, -16, 6, 4);
+            if (!window.duckyModeActive) {
+                // Flag
+                ctx.fillStyle = isGreen ? '#00ff66' : '#ff3366';
+                ctx.fillRect(0, -16, 6, 4);
+            }
 
             ctx.restore();
             return;

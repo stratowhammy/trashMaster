@@ -4459,10 +4459,16 @@ class Game {
         }
 
         // Setup Snapshot button listener
+        this._setupDefeatSnapshotButton();
+    }
+
+    _setupDefeatSnapshotButton() {
         const btnSnapshot = document.getElementById('btn-defeat-snapshot');
         if (btnSnapshot) {
             const newSnapBtn = btnSnapshot.cloneNode(true);
             btnSnapshot.parentNode.replaceChild(newSnapBtn, btnSnapshot);
+            newSnapBtn.innerText = 'Snapshot 📸';
+            newSnapBtn.style.background = '#00aa66';
             newSnapBtn.addEventListener('click', () => {
                 const dataUrl = window.captureEndRoundSnapshot();
                 const snapshots = window.getGallerySnapshots();
@@ -4765,6 +4771,9 @@ class Game {
                 ctx.stroke();
             }
         }
+
+        // Setup Snapshot button listener
+        this._setupDefeatSnapshotButton();
 
         // Setup the return button listener
         const btnReturn = document.getElementById('btn-defeat-return');

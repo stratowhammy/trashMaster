@@ -2590,7 +2590,10 @@ window.captureEndRoundSnapshot = function() {
     const artX = 220;
     ctx.fillStyle = '#000000';
     ctx.fillRect(artX, topY, 256, 128);
-    if (artCanvas) {
+    const gifEl = document.getElementById('defeat-gif');
+    if (gifEl && gifEl.style.display !== 'none' && gifEl.complete && gifEl.naturalWidth > 0) {
+        ctx.drawImage(gifEl, artX, topY, 256, 128);
+    } else if (artCanvas && artCanvas.style.display !== 'none') {
         ctx.drawImage(artCanvas, artX, topY, 256, 128);
     }
     ctx.strokeStyle = '#ff3333';

@@ -439,7 +439,8 @@ def buy_item():
         'portal gun': 1000,
         'trash bomb': 500,
         'bottomless pit': 750,
-        'snacks': 1000
+        'snacks': 1000,
+        'snack': 1000
     }
     
     canonical_names = {
@@ -462,7 +463,8 @@ def buy_item():
         'portal gun': 'Portal Gun',
         'trash bomb': 'Trash Bomb',
         'bottomless pit': 'Bottomless Pit',
-        'snacks': 'Snacks'
+        'snacks': 'Snacks',
+        'snack': 'Snacks'
     }
 
     key = raw_item_name.lower()

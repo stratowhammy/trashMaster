@@ -1186,9 +1186,10 @@ class Game {
         if (this.state !== GameState.PLAYING || !this.player) return;
 
         let maxToPick = Infinity;
-        // Capacity logic for all modes
+        // Capacity logic for all modes (100 base + 200 per truck owned)
         const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
-        const totalCap = window.pirateMode ? 100 : (window.playerHasTruck > 0 ? Math.max(0, window.playerHasTruck * 100 - animalPenalty) : 100);
+        const trucks = Math.max(0, window.playerHasTruck || 0);
+        const totalCap = window.pirateMode ? 100 : Math.max(0, 100 + (trucks * 200) - animalPenalty);
         const usedCap = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
         maxToPick = Math.max(0, totalCap - usedCap);
 
@@ -1244,7 +1245,8 @@ class Game {
         }
 
         const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
-        const totalCap = Math.max(100, (window.playerHasTruck > 0 ? window.playerHasTruck * 100 : 100) - animalPenalty);
+        const trucks = Math.max(0, window.playerHasTruck || 0);
+        const totalCap = window.pirateMode ? 100 : Math.max(0, 100 + (trucks * 200) - animalPenalty);
         const treesCarried = this.treesCarried || 0;
         const usedCap = (treesCarried * 100) + this.trashCollectedInTruck;
         const freeCap = totalCap - usedCap;
@@ -2384,29 +2386,32 @@ class Game {
         // Check trash pickup — followers automatically clean up trash
         const pickupRadius = TILE_SIZE * 0.7;
         let followerPicked = [];
+        const trucks = Math.max(0, window.playerHasTruck || 0);
+        const animalPenalty = (this.player && this.player.capturedAnimals) ? this.player.capturedAnimals.length * 10 : 0;
+        const totalCap = window.pirateMode ? 100 : Math.max(0, 100 + (trucks * 200) - animalPenalty);
+        const usedCap = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
+
         for (const follower of this.followerManager.followers) {
-            let maxToPick = Infinity;
-            if (window.playerHasTruck > 0) {
-                const maxCap = window.playerHasTruck * 100;
-                maxToPick = Math.max(0, maxCap - (this.trashCollectedInTruck + followerPicked.length));
-            }
+            const currentUsed = usedCap + followerPicked.length;
+            const maxToPick = Math.max(0, totalCap - currentUsed);
             if (maxToPick <= 0) {
-                if (window.playerHasTruck > 0 && (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000)) {
-                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
+                if (!this.lastCapacityNotificationTime || Date.now() - this.lastCapacityNotificationTime > 3000) {
+                    const msg = window.pirateMode ? "Ship hold full! Unload at the Sea Dump Dock [E]." : "Garbage container full! Unload at the Dump [E].";
+                    this.hud.showFollowerNotification(msg, false);
                     this.lastCapacityNotificationTime = Date.now();
                 }
-                break; // Stop loop since truck is completely full
+                break; // Stop loop since container is full
             }
             const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowersForValue(), maxToPick);
             followerPicked = followerPicked.concat(picked);
         }
 
         if (followerPicked.length > 0) {
-            if (window.playerHasTruck > 0) {
-                this.trashCollectedInTruck += followerPicked.length;
-                if (this.trashCollectedInTruck >= window.playerHasTruck * 100) {
-                    this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
-                }
+            this.trashCollectedInTruck += followerPicked.length;
+            const newUsed = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
+            if (newUsed >= totalCap) {
+                const msg = window.pirateMode ? "Ship hold full! Unload at the Sea Dump Dock [E]." : "Garbage container full! Unload at the Dump [E].";
+                this.hud.showFollowerNotification(msg, false);
             }
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += followerPicked.length;
@@ -2419,12 +2424,11 @@ class Game {
             for (const org of this.organizers) {
                 org.update(dt);
                 
-                let maxToPick = Infinity;
-                if (window.playerHasTruck > 0) {
-                    const animalPenalty = this.player.capturedAnimals ? this.player.capturedAnimals.length * 10 : 0;
-                    const maxCap = Math.max(0, window.playerHasTruck * 100 - animalPenalty);
-                    maxToPick = Math.max(0, maxCap - this.trashCollectedInTruck);
-                }
+                const orgTrucks = Math.max(0, window.playerHasTruck || 0);
+                const orgAnimalPenalty = (this.player && this.player.capturedAnimals) ? this.player.capturedAnimals.length * 10 : 0;
+                const orgTotalCap = window.pirateMode ? 100 : Math.max(0, 100 + (orgTrucks * 200) - orgAnimalPenalty);
+                const orgUsedCap = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
+                let maxToPick = Math.max(0, orgTotalCap - orgUsedCap);
                 
                 let orgFollowerPicked = [];
                 for (const follower of org.followerManager.followers) {
@@ -2433,17 +2437,15 @@ class Game {
                     }
                     const picked = this.trashManager.checkPickup(follower.x, follower.y, pickupRadius * 0.8, this.getRoundTotalFollowersForValue(), maxToPick);
                     orgFollowerPicked = orgFollowerPicked.concat(picked);
-                    if (window.playerHasTruck > 0) {
-                        maxToPick = Math.max(0, maxToPick - picked.length);
-                    }
+                    maxToPick = Math.max(0, maxToPick - picked.length);
                 }
                 
                 if (orgFollowerPicked.length > 0) {
-                    if (window.playerHasTruck > 0) {
-                        this.trashCollectedInTruck += orgFollowerPicked.length;
-                        if (this.trashCollectedInTruck >= window.playerHasTruck * 100) {
-                            this.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
-                        }
+                    this.trashCollectedInTruck += orgFollowerPicked.length;
+                    const newUsed = ((this.treesCarried || 0) * 100) + this.trashCollectedInTruck;
+                    if (newUsed >= orgTotalCap) {
+                        const msg = window.pirateMode ? "Ship hold full! Unload at the Sea Dump Dock [E]." : "Garbage container full! Unload at the Dump [E].";
+                        this.hud.showFollowerNotification(msg, false);
                     }
                     this.hud.updateScore(this.trashManager.totalPoints);
                     this.trashCollectedInWindow += orgFollowerPicked.length;
@@ -5636,14 +5638,11 @@ class GameOrganizer {
         if (this.collectTimer >= 2.0) {
             this.collectTimer -= 2.0;
             
-            let canPick = true;
-            if (window.playerHasTruck > 0) {
-                const animalPenalty = this.game.player.capturedAnimals ? this.game.player.capturedAnimals.length * 10 : 0;
-                const maxCap = Math.max(0, window.playerHasTruck * 100 - animalPenalty);
-                if (this.game.trashCollectedInTruck >= maxCap) {
-                    canPick = false;
-                }
-            }
+            const trucks = Math.max(0, window.playerHasTruck || 0);
+            const animalPenalty = (this.game.player && this.game.player.capturedAnimals) ? this.game.player.capturedAnimals.length * 10 : 0;
+            const totalCap = window.pirateMode ? 100 : Math.max(0, 100 + (trucks * 200) - animalPenalty);
+            const usedCap = ((this.game.treesCarried || 0) * 100) + this.game.trashCollectedInTruck;
+            let canPick = usedCap < totalCap;
             
             if (canPick) {
                 // Find nearest uncollected trash
@@ -5690,11 +5689,11 @@ class GameOrganizer {
                         color: color,
                     });
                     
-                    if (window.playerHasTruck > 0) {
-                        this.game.trashCollectedInTruck++;
-                        if (this.game.trashCollectedInTruck >= window.playerHasTruck * 100) {
-                            this.game.hud.showFollowerNotification("Garbage truck full! Unload at the Dump.", false);
-                        }
+                    this.game.trashCollectedInTruck++;
+                    const newUsed = ((this.game.treesCarried || 0) * 100) + this.game.trashCollectedInTruck;
+                    if (newUsed >= totalCap) {
+                        const msg = window.pirateMode ? "Ship hold full! Unload at the Sea Dump Dock [E]." : "Garbage container full! Unload at the Dump [E].";
+                        this.game.hud.showFollowerNotification(msg, false);
                     }
                     
                     this.game.trashCollectedInWindow++;

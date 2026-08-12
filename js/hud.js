@@ -364,11 +364,12 @@ class HUD {
             ctx.fillText(`ANIMALS: ${animalCount}  |  CARGO -${capacityReduction}`, barX + barW / 2, barY + barH / 2 + 1);
         }
 
-        // ── Trash Truck Capacity Bar (Bottom Center) ──
-        if (window.playerHasTruck > 0 && window.game) {
+        // ── Trash Container / Truck Capacity Bar (Bottom Center) ──
+        if (window.game) {
             const currentTrash = window.game.trashCollectedInTruck || 0;
             const animalPenalty = window.game.player ? (window.game.player.capturedAnimals || []).length * 10 : 0;
-            const totalCap = Math.max(0, (window.playerHasTruck * 100) - animalPenalty);
+            const trucks = Math.max(0, window.playerHasTruck || 0);
+            const totalCap = window.pirateMode ? 100 : Math.max(0, 100 + (trucks * 200) - animalPenalty);
             const treesCarried = window.game.treesCarried || 0;
             const treeUnits = treesCarried * 100;
             const trashUnits = currentTrash;
@@ -412,7 +413,8 @@ class HUD {
             ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`TRUCK: ${usedCap}/${totalCap}`, barX + barW / 2, barY + barH / 2 + 1);
+            const labelStr = trucks > 0 ? `TRUCK: ${usedCap}/${totalCap}` : `TRASH: ${usedCap}/${totalCap}`;
+            ctx.fillText(labelStr, barX + barW / 2, barY + barH / 2 + 1);
         }
 
         // ── Hunger Bar (Bottom Center) ──

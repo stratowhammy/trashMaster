@@ -3349,67 +3349,98 @@ class Game {
             }
         }
 
-        // Pick a random building to be the Zoo, ensure it's not hospital or police
+        // Ensure there is a zoo building on every map
         if (this.gameMap && this.gameMap.buildings && this.gameMap.buildings.length > 0) {
-            const validZoos = this.gameMap.buildings.filter(b => b.type === 'normal' || b.type === 'cult' || b.type === 'shop' || b.type === 'zoo');
-            if (validZoos.length > 0) {
-                this.zooBuilding = validZoos[Math.floor(Math.random() * validZoos.length)];
-                this.zooBuilding.type = 'zoo'; // ensure it's marked as zoo
+            this.zooBuilding = this.gameMap.buildings.find(b => b.type === 'zoo');
+            if (!this.zooBuilding) {
+                const candidate = this.gameMap.buildings.find(b => b.type === 'default' || b.type === 'normal') || this.gameMap.buildings[this.gameMap.buildings.length - 1];
+                if (candidate) {
+                    candidate.type = 'zoo';
+                    this.zooBuilding = candidate;
+                }
             }
         }
     }
 
-    // ── RANGER: Try to capture a nearby animal ──
+    // ── RANGER: Try to capture a nearby animal or deliver to Zoo ──
     _rangerTryCaptureAnimal() {
-        if (!this.player || !this.animalNodes) return;
+        if (!this.player) return;
         const px = this.player.x;
         const py = this.player.y;
-        const maxAnimals = window.playerHasTruck ? 99 : 1;
 
-        // Check if near Zoo building
-        if (this.zooBuilding && this.player.capturedAnimals && this.player.capturedAnimals.length > 0) {
-            const door = this.zooBuilding.doorTiles[0];
-            if (door) {
-                const dx = px - (door.x * TILE_SIZE + TILE_SIZE/2);
-                const dy = py - (door.y * TILE_SIZE + TILE_SIZE/2);
-                if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE * 2) {
-                    const count = this.player.capturedAnimals.length;
-                    const reward = 500 + (100 * count);
-                    this.trashManager.totalPoints += reward;
-                    this.hud.updateScore(this.trashManager.totalPoints);
-                    this.player.capturedAnimals = [];
-                    this.hud.showFollowerNotification(`Delivered ${count} animals to the Zoo! Earned $${reward}.`, true);
-                    return;
+        // Ensure zooBuilding is identified on current map
+        if (!this.zooBuilding && this.gameMap && this.gameMap.buildings && this.gameMap.buildings.length > 0) {
+            this.zooBuilding = this.gameMap.buildings.find(b => b.type === 'zoo');
+            if (!this.zooBuilding) {
+                const candidate = this.gameMap.buildings.find(b => b.type === 'default' || b.type === 'normal') || this.gameMap.buildings[this.gameMap.buildings.length - 1];
+                if (candidate) {
+                    candidate.type = 'zoo';
+                    this.zooBuilding = candidate;
                 }
             }
         }
 
-        for (let i = 0; i < this.animalNodes.length; i++) {
-            const node = this.animalNodes[i];
-            const dx = px - node.x;
-            const dy = py - node.y;
-            if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 1.2) {
-                if (this.player.capturedAnimals.length >= maxAnimals) {
-                    this.hud.showFollowerNotification(
-                        window.playerHasTruck
-                            ? 'Animal cargo full!'
-                            : '🦊 Can only hold 1 animal without a Garbage Truck!',
-                        false
-                    );
-                    return;
+        // Maximum animals user can carry at one time equals the number of Trash Trucks owned
+        const trucksCount = window.playerHasTruck || 0;
+        const maxAnimals = Math.max(0, trucksCount);
+
+        // 1. Check if near Zoo building for animal delivery
+        if (this.zooBuilding && this.player.capturedAnimals && this.player.capturedAnimals.length > 0) {
+            let targetX = this.zooBuilding.x + this.zooBuilding.width / 2;
+            let targetY = this.zooBuilding.y + this.zooBuilding.height / 2;
+            if (this.zooBuilding.doorTiles && this.zooBuilding.doorTiles.length > 0) {
+                targetX = this.zooBuilding.doorTiles[0].x * TILE_SIZE + TILE_SIZE / 2;
+                targetY = this.zooBuilding.doorTiles[0].y * TILE_SIZE + TILE_SIZE / 2;
+            }
+            const dx = px - targetX;
+            const dy = py - targetY;
+            if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 2.5) {
+                const count = this.player.capturedAnimals.length;
+                const reward = 500 * count; // $500 per animal delivered
+                this.trashManager.totalPoints += reward;
+                this.hud.updateScore(this.trashManager.totalPoints);
+                window.playerBalance = (window.playerBalance || 0) + reward;
+                if (typeof window.updateStoreUI === 'function') {
+                    window.updateStoreUI();
                 }
-                this.animalNodes.splice(i, 1);
-                this.player.capturedAnimals.push({ type: node.type });
-                const cargoReduction = this.player.capturedAnimals.length * 10;
-                this.hud.showFollowerNotification(
-                    `🦊 Captured a ${node.type}! Cargo capacity -10 (total -${cargoReduction}).`, true
-                );
+                this.player.capturedAnimals = [];
+                this.hud.showFollowerNotification(`🦁 Delivered ${count} animal(s) to the Zoo! Earned +$${reward.toLocaleString()} ($500/ea)!`, true);
+                if (window.soundManager && window.soundManager.playVictoriousEndSoundtrack) {
+                    window.soundManager.playVictoriousEndSoundtrack();
+                }
                 return;
             }
         }
-        
+
+        // 2. Try to capture a nearby animal node
+        if (this.animalNodes && this.animalNodes.length > 0) {
+            for (let i = 0; i < this.animalNodes.length; i++) {
+                const node = this.animalNodes[i];
+                const dx = px - node.x;
+                const dy = py - node.y;
+                if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 1.5) {
+                    if (maxAnimals <= 0) {
+                        this.hud.showFollowerNotification('🦊 You need a Trash Truck to transport animals! (0 Trash Trucks owned)', false);
+                        return;
+                    }
+                    if (this.player.capturedAnimals.length >= maxAnimals) {
+                        this.hud.showFollowerNotification(`🦊 Animal cargo full! (${this.player.capturedAnimals.length}/${maxAnimals} animals carried). Deliver them to the ZOO!`, false);
+                        return;
+                    }
+                    this.animalNodes.splice(i, 1);
+                    this.player.capturedAnimals.push({ type: node.type });
+                    this.hud.showFollowerNotification(`🦊 Captured a ${node.type}! (${this.player.capturedAnimals.length}/${maxAnimals} animals carried). Deliver to the ZOO [E]!`, true);
+                    return;
+                }
+            }
+        }
+
         if (this.zooBuilding) {
-            this.hud.showFollowerNotification('No animal nearby. Deliver captured animals to the ZOO.', false);
+            if (this.player.capturedAnimals && this.player.capturedAnimals.length > 0) {
+                this.hud.showFollowerNotification(`🦊 Carrying ${this.player.capturedAnimals.length}/${maxAnimals} animal(s). Stand near the ZOO door [E] to deliver!`, false);
+            } else {
+                this.hud.showFollowerNotification(`No animals nearby. Explore nature to capture animals! (Carrying capacity: ${maxAnimals} with ${trucksCount} Trash Truck(s))`, false);
+            }
         } else {
             this.hud.showFollowerNotification('No animal nearby to capture.', false);
         }
@@ -3688,6 +3719,21 @@ class Game {
                     ctx.font = 'bold 8px "Press Start 2P", monospace';
                     ctx.textAlign = 'center';
                     ctx.fillText('☠️ BLACK MARKET [E]', screen.x, screen.y - 70);
+                }
+            }
+
+            const zooBldg = this.gameMap.buildings.find(b => b.type === 'zoo');
+            if (zooBldg && zooBldg.doorTiles && zooBldg.doorTiles.length > 0) {
+                const door = zooBldg.doorTiles[0];
+                const cx = door.x * TILE_SIZE + TILE_SIZE / 2;
+                const cy = door.y * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    ctx.fillStyle = '#ffaa00';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🦁 ZOO [E]', screen.x, screen.y - 70);
                 }
             }
         }

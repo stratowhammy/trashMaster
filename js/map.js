@@ -894,6 +894,7 @@ class BaseMap {
             
             assignRandom('hospital', 1);
             assignRandom('airport', 1);
+            assignRandom('zoo', 1);
             assignRandom('fastfood', 8);
             
             for (let i = availableIds.length - 1; i > 0; i--) {
@@ -919,6 +920,9 @@ class BaseMap {
             if (availableIds.length > 0) {
                 this.buildings[availableIds.pop()].type = 'black_market';
             }
+            if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'zoo';
+            }
             for (let i = 0; i < 8; i++) {
                 if (availableIds.length > 0) {
                     this.buildings[availableIds.pop()].type = 'fast_food';
@@ -928,6 +932,18 @@ class BaseMap {
             // Guarantee a dump building exists on every map
             if (this.buildings.length > 0 && !this.buildings.some(b => b.type === 'dump')) {
                 this.buildings[this.buildings.length - 1].type = 'dump';
+            }
+
+            // Guarantee a zoo building exists on every map
+            if (this.buildings.length > 0 && !this.buildings.some(b => b.type === 'zoo')) {
+                const candidates = this.buildings.filter(b => b.type === 'default' || b.type === 'normal');
+                if (candidates.length > 0) {
+                    candidates[0].type = 'zoo';
+                } else if (this.buildings.length > 3) {
+                    this.buildings[this.buildings.length - 2].type = 'zoo';
+                } else {
+                    this.buildings[0].type = 'zoo';
+                }
             }
             // Guarantee a pulp_mill building exists on every map
             if (this.buildings.length > 1 && !this.buildings.some(b => b.type === 'pulp_mill')) {

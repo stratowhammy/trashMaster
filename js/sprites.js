@@ -37,6 +37,8 @@ const SPRITE_CONFIG = {
         { id: 'char_dragon_master', name: 'Dragon Master', src: 'assets/sprites/dragon_master.png', color: '#6d28d9' },
         { id: 'char_dragon', name: 'Dragon', src: 'assets/sprites/dragon.png', color: '#16a34a' },
         { id: 'dragon_fire', name: 'Dragon Fire', src: 'assets/sprites/dragon_fire.png', color: '#ea580c' },
+        { id: 'npc_boat', name: 'NPC Little Boat', src: 'assets/sprites/npc_boat.png', color: '#8b4513' },
+        { id: 'item_snacks', name: 'Snacks', src: 'assets/sprites/snacks.png', color: '#ff9900' },
         { id: 'item_protection', name: 'Protection', src: 'assets/sprites/protection.png', color: '#4488cc' },
         { id: 'item_flashlight', name: 'Flashlight', src: 'assets/sprites/flashlight.png' },
         { id: 'item_trashpickers', name: 'Trashpickers', src: 'assets/sprites/trashpickers.png' },

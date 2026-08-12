@@ -804,6 +804,8 @@ class PirateModeManager {
             this.offEarthTimer -= dt;
             if (this.offEarthTimer <= 0) {
                 this.sailedOffEarth = false;
+                const cultDialog = document.getElementById('cult-leaving-dialog');
+                if (cultDialog) cultDialog.classList.add('hidden');
                 if (typeof showScreen === 'function') {
                     showScreen('store-screen');
                 }

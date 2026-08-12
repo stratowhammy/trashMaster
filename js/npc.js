@@ -91,27 +91,52 @@ class NPC {
 
     interact() {
         this.interacted = true;
-        if (this.assignedLetter && !this.givenLetter) {
+
+        // NPC gives user a letter regardless
+        if (!this.givenLetter) {
             this.givenLetter = true;
+            if (!this.assignedLetter) {
+                const pool = (window.game && window.game.letterSpawnPool && window.game.letterSpawnPool.length > 0) ? window.game.letterSpawnPool : ['A','B','C','D','E','F','G','I','L','M','N','O','P','R','S','T','U','W','Y'];
+                this.assignedLetter = pool[Math.floor(Math.random() * pool.length)];
+            }
             if (window.game) {
                 window.game.collectedLetters = window.game.collectedLetters || {};
                 window.game.collectedLetters[this.assignedLetter] = (window.game.collectedLetters[this.assignedLetter] || 0) + 1;
-                window.game.hud.showFollowerNotification(`Collected letter '${this.assignedLetter}' from ${this.name}!`, true);
-                if (window.game.saveWordGameState) {
+                if (window.game.hud) {
+                    window.game.hud.showFollowerNotification("Collected letter '" + this.assignedLetter + "' from " + this.name + "!", true);
+                }
+                if (typeof window.game.saveWordGameState === "function") {
                     window.game.saveWordGameState();
                 }
             }
         }
+
+        // 10% chance that NPC will join your posse if engaged
+        if (!this.joinedPosse) {
+            if (Math.random() < 0.10) {
+                this.joinedPosse = true;
+                if (window.game && window.game.followerManager) {
+                    window.game.followerManager.addFollower(this.x, this.y);
+                    if (window.game.hud) {
+                        window.game.hud.followerCount = window.game.getRoundTotalFollowers ? window.game.getRoundTotalFollowers() : window.game.followerManager.followers.length;
+                        setTimeout(() => {
+                            window.game.hud.showFollowerNotification("🎉 " + this.name + " joined your posse! (+1 Follower)", true);
+                        }, 400);
+                    }
+                }
+            }
+        }
+
         return {
             lines: this.dialogueLines,
             isInformant: this.isInformant,
             buildingId: this.frenzyBuildingId,
             name: this.name,
             npcType: this.npcType,
-            targetParkId: this.targetParkId
+            targetParkId: this.targetParkId,
+            joinedPosse: this.joinedPosse
         };
     }
-
     render(ctx, camera, spriteManager) {
         const screen = camera.worldToScreen(this.x, this.y);
         const drawSize = 64;
@@ -137,7 +162,31 @@ class NPC {
         }
 
         const img = spriteManager.getCharacterImage(this.spriteId);
+        const isPirateSeaMap = !!window.pirateMode;
+        const bobY = isPirateSeaMap ? Math.sin(Date.now() / 250 + (this.x || 0)) * 2.5 : 0;
+
+        if (isPirateSeaMap) {
+            ctx.save();
+            const boatImg = spriteManager.getImage('npc_boat');
+            if (boatImg && (boatImg.complete || boatImg instanceof HTMLCanvasElement)) {
+                ctx.drawImage(boatImg, screen.x - drawSize / 2, screen.y - drawSize / 2 + 6 + bobY, drawSize, drawSize);
+            } else {
+                ctx.fillStyle = '#7a4216';
+                ctx.beginPath();
+                ctx.ellipse(screen.x, screen.y + 10 + bobY, 22, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#4a250a';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+            const charW = isPirateSeaMap ? drawSize * 0.75 : drawSize;
+            const charH = isPirateSeaMap ? drawSize * 0.75 : drawSize;
+            const charYOffset = isPirateSeaMap ? -4 + bobY : 0;
+
             if (this.isRedRivalOnly) {
                 let offscreen = NPC._tintCanvas;
                 if (!offscreen) {
@@ -154,15 +203,15 @@ class NPC {
                 octx.fillStyle = 'rgba(255, 0, 0, 0.6)';
                 octx.fillRect(0, 0, drawSize, drawSize);
                 octx.restore();
-                ctx.drawImage(offscreen, screen.x - drawSize / 2, screen.y - drawSize / 2);
+                ctx.drawImage(offscreen, screen.x - charW / 2, screen.y - charH / 2 + charYOffset, charW, charH);
             } else {
-                ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2, drawSize, drawSize);
+                ctx.drawImage(img, screen.x - charW / 2, screen.y - charH / 2 + charYOffset, charW, charH);
             }
         } else {
             // Fallback
             ctx.fillStyle = this.isRedRivalOnly ? '#ff3333' : '#4488cc';
             ctx.beginPath();
-            ctx.arc(screen.x, screen.y, this.size / 2, 0, Math.PI * 2);
+            ctx.arc(screen.x, screen.y + (isPirateSeaMap ? bobY : 0), this.size / 2, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -292,7 +341,7 @@ class NPCManager {
         const informantIndices = new Set();
         const flowerIndices = new Set();
 
-        let numNPCsToSpawn = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? Math.min(60, positions.length) : Math.min(10, positions.length);
+        let numNPCsToSpawn = (window.politicsMode || window.elPresidenteElection || window.builderMode || window.cultMode) ? Math.min(60, positions.length) : Math.min(25, positions.length);
         numNPCsToSpawn = Math.min(numNPCsToSpawn * npcMultiplier, positions.length);
 
         if (frenzyMode && buildings && buildings.length >= 5) {

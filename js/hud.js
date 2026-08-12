@@ -464,7 +464,8 @@ class HUD {
                 { name: 'Trash Bomb', icon: '💥', count: inv['Trash Bomb'] || 0 },
                 { name: 'Bottomless Pit', icon: '🕳️', count: inv['Bottomless Pit'] || 0 },
                 { name: 'Flashlight', icon: '🔦', count: inv['Flashlight'] || 0 },
-                { name: 'Borrowed Time', icon: '⏳', count: inv['Borrowed Time'] || 0 }
+                { name: 'Borrowed Time', icon: '⏳', count: inv['Borrowed Time'] || 0 },
+                { name: 'Snacks', icon: '🍿', count: inv['Snacks'] || 0 }
             ];
 
             if (window.flowersMode) {

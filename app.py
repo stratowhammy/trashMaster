@@ -429,7 +429,7 @@ def buy_item():
         'bruno the trash truck': 10000,
         'fertilizer': 100,
         'parade': 3000,
-        'organizer': 250,
+        'organizer': 1000,
         'quinine': 750,
         'trashpickers': 1000,
         'price fixing': 2000,
@@ -438,7 +438,8 @@ def buy_item():
         'cannonballs': 100,
         'portal gun': 1000,
         'trash bomb': 500,
-        'bottomless pit': 750
+        'bottomless pit': 750,
+        'snacks': 1000
     }
     
     canonical_names = {
@@ -460,7 +461,8 @@ def buy_item():
         'cannonballs': 'Cannonballs',
         'portal gun': 'Portal Gun',
         'trash bomb': 'Trash Bomb',
-        'bottomless pit': 'Bottomless Pit'
+        'bottomless pit': 'Bottomless Pit',
+        'snacks': 'Snacks'
     }
 
     key = raw_item_name.lower()
@@ -857,6 +859,24 @@ def end_round():
                 new_balance -= affordable * 1000
             else:
                 new_balance -= upkeep_needed
+        # Organizers per-round upkeep ($1,000 per organizer per round)
+        organizers_lost = 0
+        cursor.execute("SELECT quantity FROM inventory WHERE user_id=? AND item_name='Organizer'", (user_data['user_id'],))
+        org_row = cursor.fetchone()
+        org_count = org_row['quantity'] if org_row else 0
+        if org_count > 0 and not mafia_arrest and not politics_arrest:
+            org_upkeep = 1000 * org_count
+            if new_balance < org_upkeep:
+                affordable = max(0, new_balance // 1000)
+                organizers_lost = org_count - affordable
+                if affordable > 0:
+                    db.execute("UPDATE inventory SET quantity = ? WHERE user_id=? AND item_name='Organizer'", (affordable, user_data['user_id']))
+                else:
+                    db.execute("DELETE FROM inventory WHERE user_id=? AND item_name='Organizer'", (user_data['user_id'],))
+                new_balance -= affordable * 1000
+            else:
+                new_balance -= org_upkeep
+
         new_movement_size = (user['movement_size'] or 0) + followers
             
     if new_balance < 0: new_balance = 0
@@ -1077,7 +1097,8 @@ def end_round():
         'primary_won': primary_won,
         'primary_lost': primary_lost,
         'stranded': stranded,
-        'dragon_lost': dragon_lost
+        'dragon_lost': dragon_lost,
+        'organizers_lost': organizers_lost
     })
 
 @app.route('/api/game/buildings', methods=['GET'])

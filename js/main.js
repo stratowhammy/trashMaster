@@ -268,6 +268,7 @@ class Game {
 
                 // E or e key to interact with NPC or green cars, Dons or Chief
                 if (e.key === 'e' || e.key === 'E') {
+                    if (this.navigationTarget) { this._checkNavigationTargetEngaged(); }
                     if (window.soundManager) window.soundManager.playEngageSFX();
 
                     // Pirate Mode engage check
@@ -904,6 +905,7 @@ class Game {
                 if (e.key === 't' || e.key === 'T') this.useConsumable('Borrowed Time');
                 if (e.key === 'u' || e.key === 'U') this.useConsumable('Mushrooms');
                 if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
+                if (e.key === 'k' || e.key === 'K') this.useConsumable('Snacks');
                 if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
                     this.tryOpenPosterDialog();
                 } else if (e.key === 'p' || e.key === 'P') {
@@ -1693,6 +1695,11 @@ class Game {
                 this.wingsTimer = 15;
                 if (window.soundManager) window.soundManager.setTempoMultiplier(1.2);
                 this.hud.showFollowerNotification('Super Speed!', true);
+            } else if (itemName === 'Snacks') {
+                this.happiness = Math.min(100.0, (this.happiness || 100.0) + 5.0);
+                window.playerHappiness = this.happiness;
+                this.hungerTimer = Math.min(45.0, (this.hungerTimer || 45.0) + (45.0 * 0.05));
+                this.hud.showFollowerNotification('🍿 Ate a snack! +5% Happiness, -5% Hunger!', true);
             }
         } catch (e) {
             console.error("Consume error:", e);
@@ -2394,21 +2401,6 @@ class Game {
             this.trashCollectedInWindow += followerPicked.length;
             this.trashCollectedInRound = (this.trashCollectedInRound || 0) + followerPicked.length;
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
-        }
-
-        // Organizer 90s gameplay fee ($250 per organizer owned)
-        this.organizerFeeTimer = (this.organizerFeeTimer || 0) + dt;
-        if (this.organizerFeeTimer >= 90.0) {
-            this.organizerFeeTimer -= 90.0;
-            const ownedOrganizers = window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0;
-            if (ownedOrganizers > 0) {
-                const totalFee = ownedOrganizers * 250;
-                window.playerBalance = Math.max(0, (window.playerBalance || 0) - totalFee);
-                this.hud.showFollowerNotification(`💸 Paid $${totalFee.toLocaleString()} ($250/ea) for ${ownedOrganizers} Organizer(s)!`, false);
-                if (typeof window.updateStoreUI === 'function') {
-                    window.updateStoreUI();
-                }
-            }
         }
 
         // Update Organizers and their followers' autonomous trash pickup
@@ -3451,6 +3443,9 @@ class Game {
             if (result && result.dragon_lost) {
                 alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
             }
+            if (result && result.organizers_lost > 0) {
+                alert(`💸 You could not pay the $1,000/ea round upkeep for your Organizers! You lost ${result.organizers_lost} Organizer(s).`);
+            }
             window.employeesHired = 0;
             // Reset Trashpickers & Chaos Mode at round end
             this.doubleTrashPickup = false;
@@ -3467,6 +3462,8 @@ class Game {
         } catch(e) {
             console.error("End round sync failed:", e);
         }
+        const cultDialog = document.getElementById('cult-leaving-dialog');
+        if (cultDialog) cultDialog.classList.add('hidden');
         window.showScreen('store-screen');
         this.state = GameState.UI_OVERLAY;
     }
@@ -4113,6 +4110,7 @@ class Game {
         }
 
         // Render mini-map
+        this.renderNavigationArrow(ctx, w, h);
         this.miniMap.render(ctx, w, h, this.camera, this.player, this.followerManager, this.trashManager.items, this.gameMap);
 
         // Debug overlay: show player position and key state
@@ -5371,6 +5369,169 @@ class Game {
             }
         }
     }
+
+    _checkNavigationTargetEngaged() {
+        if (!this.navigationTarget || !this.player || !this.gameMap) return;
+        const targetType = this.navigationTarget.toLowerCase().trim();
+        const bldg = this.gameMap.buildings.find(b => {
+            if (!b || !b.type) return false;
+            const bt = b.type.toLowerCase();
+            if (targetType === 'pulp mill' || targetType === 'pulp_mill') {
+                return bt === 'pulp_mill' || bt === 'pulp mill';
+            }
+            return bt === targetType;
+        });
+
+        if (bldg) {
+            let targetX = bldg.x + bldg.width / 2;
+            let targetY = bldg.y + bldg.height / 2;
+            if (bldg.doorTiles && bldg.doorTiles.length > 0) {
+                targetX = bldg.doorTiles[0].x * TILE_SIZE + TILE_SIZE / 2;
+                targetY = bldg.doorTiles[0].y * TILE_SIZE + TILE_SIZE / 2;
+            }
+
+            const px = typeof wrapWorldX === 'function' ? wrapWorldX(this.player.x) : this.player.x;
+            const py = typeof wrapWorldY === 'function' ? wrapWorldY(this.player.y) : this.player.y;
+            const dist = Math.hypot(px - targetX, py - targetY);
+
+            let isAtTarget = dist < TILE_SIZE * 3.5;
+            if (!isAtTarget) {
+                if (px >= bldg.x - TILE_SIZE && px <= bldg.x + bldg.width + TILE_SIZE &&
+                    py >= bldg.y - TILE_SIZE && py <= bldg.y + bldg.height + TILE_SIZE) {
+                    isAtTarget = true;
+                }
+            }
+
+            if (isAtTarget) {
+                const locName = this.navigationTarget.toUpperCase();
+                this.navigationTarget = null;
+                if (this.hud) {
+                    this.hud.showFollowerNotification("🎯 Engaged " + locName + "! Navigation complete.", true);
+                }
+            }
+        }
+    }
+
+    renderNavigationArrow(ctx, canvasWidth, canvasHeight) {
+        if (!this.navigationTarget || !this.player || !this.gameMap) return;
+
+        const targetType = this.navigationTarget.toLowerCase().trim();
+        let bldg = this.gameMap.buildings.find(b => {
+            if (!b || !b.type) return false;
+            const bt = b.type.toLowerCase();
+            if (targetType === 'pulp mill' || targetType === 'pulp_mill') {
+                return bt === 'pulp_mill' || bt === 'pulp mill';
+            }
+            return bt === targetType;
+        });
+
+        if (!bldg) return;
+
+        let targetX = bldg.x + bldg.width / 2;
+        let targetY = bldg.y + bldg.height / 2;
+        if (bldg.doorTiles && bldg.doorTiles.length > 0) {
+            targetX = bldg.doorTiles[0].x * TILE_SIZE + TILE_SIZE / 2;
+            targetY = bldg.doorTiles[0].y * TILE_SIZE + TILE_SIZE / 2;
+        }
+
+        const px = this.player.x;
+        const py = this.player.y;
+        const dx = targetX - px;
+        const dy = targetY - py;
+        const dist = Math.round(Math.hypot(dx, dy));
+        const angle = Math.atan2(dy, dx);
+
+        ctx.save();
+
+        // 1. HUD Banner at Top Center
+        const bannerW = 280;
+        const bannerH = 34;
+        const bannerX = (canvasWidth - bannerW) / 2;
+        const bannerY = 15;
+
+        ctx.fillStyle = 'rgba(10, 20, 30, 0.9)';
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 6);
+        } else {
+            ctx.rect(bannerX, bannerY, bannerW, bannerH);
+        }
+        ctx.fill();
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const displayName = this.navigationTarget.toUpperCase();
+        ctx.fillText("📍 NAV: " + displayName + " (" + dist + "m)", bannerX + bannerW / 2 + 10, bannerY + bannerH / 2);
+
+        // Mini rotating arrow inside banner
+        ctx.save();
+        ctx.translate(bannerX + 22, bannerY + bannerH / 2);
+        ctx.rotate(angle);
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.moveTo(10, 0);
+        ctx.lineTo(-6, -6);
+        ctx.lineTo(-2, 0);
+        ctx.lineTo(-6, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // 2. Large Directional Arrow Around Player
+        const playerScreen = this.camera ? this.camera.worldToScreen(px, py) : { x: canvasWidth / 2, y: canvasHeight / 2 };
+        const radius = 60;
+        const arrowX = playerScreen.x + Math.cos(angle) * radius;
+        const arrowY = playerScreen.y + Math.sin(angle) * radius;
+
+        const pulse = Math.sin(Date.now() / 150) * 3;
+
+        ctx.save();
+        ctx.translate(arrowX, arrowY);
+        ctx.rotate(angle);
+
+        ctx.shadowColor = '#ffcc00';
+        ctx.shadowBlur = 10;
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.moveTo(14 + pulse, 0);
+        ctx.lineTo(-10, -10);
+        ctx.lineTo(-4, 0);
+        ctx.lineTo(-10, 10);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+
+        // 3. If target building is visible on screen, render beacon arrow right over the building/door
+        if (this.camera && this.camera.isVisible(targetX - 32, targetY - 32, 64, 64)) {
+            const targetScreen = this.camera.worldToScreen(targetX, targetY);
+            const bob = Math.sin(Date.now() / 200) * 8;
+            
+            ctx.save();
+            ctx.fillStyle = '#00ffcc';
+            ctx.shadowColor = '#00ffcc';
+            ctx.shadowBlur = 12;
+            ctx.font = 'bold 20px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('⬇', targetScreen.x, targetScreen.y - 35 + bob);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.fillText(displayName, targetScreen.x, targetScreen.y - 50 + bob);
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
 }
 
 class GameOrganizer {
@@ -6131,4 +6292,8 @@ class GameDragon {
         ctx.fillText("🐲 DRAGON", screen.x, screen.y - 78);
         this.followerManager.render(ctx, camera, this.game.spriteManager);
     }
+
+
+
 }
+

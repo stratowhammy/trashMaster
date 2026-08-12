@@ -47,6 +47,9 @@ function showScreen(screenId) {
         }
     }
     
+    const cultDialog = document.getElementById('cult-leaving-dialog');
+    if (cultDialog) cultDialog.classList.add('hidden');
+
     if (screenId === 'game-layer') {
         document.getElementById('ui-layer').classList.add('hidden');
         document.getElementById('gameCanvas').classList.remove('hidden');
@@ -764,11 +767,11 @@ function initUI() {
         let intlFollowersGained = 0;
 
         if (window.game && isFilth) {
-            let currentFollowersCount = 0;
-            if (window.game.followerManager && window.game.followerManager.followers) {
-                currentFollowersCount = window.game.followerManager.followers.length;
-            }
-            intlFollowersGained = Math.max(window.game.currentTripIntlFollowers || 0, currentFollowersCount);
+            // Only count person-followers, not truck followers (char_truck)
+            const personFollowers = window.game.followerManager && window.game.followerManager.followers
+                ? window.game.followerManager.followers.filter(f => f.spriteId !== 'char_truck').length
+                : 0;
+            intlFollowersGained = Math.max(window.game.currentTripIntlFollowers || 0, personFollowers);
         }
 
         if (confirm(`Fly to ${destination} for $${totalCost}?`)) {
@@ -788,10 +791,15 @@ function initUI() {
                         if (!isFilth) {
                             if (!window.travelDestination) {
                                 window.game.savedPhillyFollowers = [...window.game.followerManager.followers];
+                                // Save and clear trash truck chain so no trucks follow player abroad
+                                window.game.savedTruckChain = window.game.truckChain ? [...window.game.truckChain] : [];
                             }
-                            // Player travels ALONE internationally
+                            // Player travels ALONE internationally — no followers, no trucks
                             window.game.followerManager.followers = [];
                             window.game.currentTripIntlFollowers = 0;
+                            if (window.game.truckChain) {
+                                window.game.truckChain = [];
+                            }
                             if (window.game.organizers) {
                                 if (!window.travelDestination) {
                                     window.game.savedOrganizerFollowers = window.game.organizers.map(org => [...org.followerManager.followers]);
@@ -799,12 +807,20 @@ function initUI() {
                                 window.game.organizers.forEach(org => org.followerManager.followers = []);
                             }
                         } else {
-                            // Returned safely to Filthadelphia before round end — recorded trip international followers!
+                            // Returned safely to Filthadelphia — record international followers gained!
                             window.game.currentTripIntlFollowers = 0;
                             window.game.internationalFollowersCollected = 0;
 
+                            // Restore Philly followers
                             window.game.followerManager.followers = window.game.savedPhillyFollowers || [];
                             window.game.savedPhillyFollowers = null;
+
+                            // Restore trash truck chain
+                            if (window.game.savedTruckChain) {
+                                window.game.truckChain = window.game.savedTruckChain;
+                                window.game.savedTruckChain = null;
+                            }
+
                             if (window.game.organizers && window.game.savedOrganizerFollowers) {
                                 window.game.organizers.forEach((org, idx) => {
                                     if (window.game.savedOrganizerFollowers[idx]) {
@@ -910,6 +926,25 @@ function initUI() {
     const btnMessagesResume = document.getElementById('btn-messages-resume');
     if (btnMessagesResume) {
         btnMessagesResume.addEventListener('click', () => {
+            const dlg = document.getElementById('messages-log-dialog');
+            if (dlg) dlg.classList.add('hidden');
+            if (window.game && window.game.state === GameState.PAUSED) {
+                window.game.state = GameState.PLAYING;
+            }
+        });
+    }
+
+    const btnNavGo = document.getElementById('btn-nav-go');
+    if (btnNavGo) {
+        btnNavGo.addEventListener('click', () => {
+            const select = document.getElementById('nav-location-select');
+            const targetLoc = select ? select.value : 'airport';
+            if (window.game) {
+                window.game.navigationTarget = targetLoc;
+                if (window.game.hud) {
+                    window.game.hud.showFollowerNotification(`📍 Navigation set to ${targetLoc.toUpperCase()}! Follow arrow.`, true);
+                }
+            }
             const dlg = document.getElementById('messages-log-dialog');
             if (dlg) dlg.classList.add('hidden');
             if (window.game && window.game.state === GameState.PAUSED) {
@@ -1189,7 +1224,8 @@ const STORE_ITEMS = [
     { name: 'Magic 8-Ball', price: 1500, desc: 'Score multiplied randomly at end of round', sprite: 'magic_8_ball.png' },
     { name: 'Bruno The Trash Truck', price: 10000, desc: '+2 perm posse, $1000 upkeep', sprite: 'trash_truck.png' },
     { name: 'Fertilizer', price: 100, desc: 'Plant flowers in parks (Flowers Mode)', sprite: 'fertilizer.png' },
-    { name: 'Organizer', price: 250, desc: 'Persistent item. Splits followers to collect trash across the map. Costs $250 per organizer every 90s of gameplay.', sprite: 'organizer.png' },
+    { name: 'Organizer', price: 1000, desc: 'Persistent item. Splits followers to collect trash across the map. Costs $1,000 per organizer per round.', sprite: 'organizer.png' },
+    { name: 'Snacks', price: 1000, desc: 'A tasty treat! Increases happiness by 5% and decreases hunger by 5%. (Key K)', sprite: 'snacks.png' },
     { name: 'Parade', price: 3000, desc: '3x trash near parade route (Key R)', sprite: 'parade.png' },
     { name: 'Quinine', price: 750, desc: 'Auto-consumed when you become sick. Instantly cures sick status.', sprite: 'quinine.png' },
     { name: 'Trashpickers', price: 1000, desc: 'Doubles trash pickup for 1 round. Equips each new recruit for $20.', sprite: 'trashpickers.png' },

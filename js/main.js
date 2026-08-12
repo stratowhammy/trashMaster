@@ -2939,6 +2939,7 @@ class Game {
         this.truckChain = [];
         this.trashCollectedInTruck = 0;
         this.trashCollectedInRound = 0;
+        this.treesCarried = 0;
         this.activePortals = null;
         this.bottomlessPits = [];
         this.posters = [];

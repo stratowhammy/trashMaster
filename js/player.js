@@ -29,37 +29,19 @@ class Player {
     }
 
     handleKeyDown(e) {
-        let key = e.key;
-        if (window.chaosMode && window.chaosLevel >= 5) {
-            if (key === 'ArrowUp') key = 'ArrowDown';
-            else if (key === 'ArrowDown') key = 'ArrowUp';
-            else if (key === 'ArrowLeft') key = 'ArrowRight';
-            else if (key === 'ArrowRight') key = 'ArrowLeft';
-        }
-        switch (key) {
-            case 'ArrowUp': this.keys.up = true; break;
-            case 'ArrowDown': this.keys.down = true; break;
-            case 'ArrowLeft': this.keys.left = true; break;
-            case 'ArrowRight': this.keys.right = true; break;
-            case 'k': case 'K': this.keys.k = true; break;
-        }
+        if (!e || !e.key) return;
+        if (window.isKey(e, 'moveUp')) this.keys.up = true;
+        if (window.isKey(e, 'moveDown')) this.keys.down = true;
+        if (window.isKey(e, 'moveLeft')) this.keys.left = true;
+        if (window.isKey(e, 'moveRight')) this.keys.right = true;
     }
 
     handleKeyUp(e) {
-        let key = e.key;
-        if (window.chaosMode && window.chaosLevel >= 5) {
-            if (key === 'ArrowUp') key = 'ArrowDown';
-            else if (key === 'ArrowDown') key = 'ArrowUp';
-            else if (key === 'ArrowLeft') key = 'ArrowRight';
-            else if (key === 'ArrowRight') key = 'ArrowLeft';
-        }
-        switch (key) {
-            case 'ArrowUp': this.keys.up = false; break;
-            case 'ArrowDown': this.keys.down = false; break;
-            case 'ArrowLeft': this.keys.left = false; break;
-            case 'ArrowRight': this.keys.right = false; break;
-            case 'k': case 'K': this.keys.k = false; break;
-        }
+        if (!e || !e.key) return;
+        if (window.isKey(e, 'moveUp')) this.keys.up = false;
+        if (window.isKey(e, 'moveDown')) this.keys.down = false;
+        if (window.isKey(e, 'moveLeft')) this.keys.left = false;
+        if (window.isKey(e, 'moveRight')) this.keys.right = false;
     }
 
     update(gameMap, dt) {

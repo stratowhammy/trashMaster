@@ -257,17 +257,17 @@ class Game {
                 this.player.handleKeyDown(e);
 
                 // Q or q key to pick up trash
-                if (e.key === 'q' || e.key === 'Q') {
+                if (window.isKey(e, 'pickupTrash') || e.key === 'q' || e.key === 'Q') {
                     this.pickupTrash();
                 }
 
                 // C or c key to fire cannons in Pirate Mode
-                if ((e.key === 'c' || e.key === 'C') && window.pirateMode && this.pirateModeManager) {
+                if ((window.isKey(e, 'pirateCannon') || e.key === 'c' || e.key === 'C') && window.pirateMode && this.pirateModeManager) {
                     this.pirateModeManager.firePlayerCannon(this);
                 }
 
                 // E or e key to interact with NPC or green cars, Dons or Chief
-                if (e.key === 'e' || e.key === 'E') {
+                if (window.isKey(e, 'interact') || e.key === 'e' || e.key === 'E') {
                     if (this.navigationTarget) { this._checkNavigationTargetEngaged(); }
                     if (window.soundManager) window.soundManager.playEngageSFX();
 
@@ -598,7 +598,7 @@ class Game {
                 }
 
                 // A or a key: Builder mode — offer apartment to nearby NPC
-                if (e.key === 'a' || e.key === 'A') {
+                if (window.isKey(e, 'campaignSpeech') || e.key === 'a' || e.key === 'A') {
                     if (window.builderMode && this.totalVacancies > 0) {
                         const nearNPC = this.npcManager.checkInteraction(this.player.x, this.player.y);
                         if (nearNPC && nearNPC.npcType !== 'child' && nearNPC.npcType !== 'parent' && nearNPC.npcType !== 'cult_family') {
@@ -623,7 +623,7 @@ class Game {
                 }
 
                 // F or f key: Flashlight toggle or plant fertilizer
-                if (e.key === 'f' || e.key === 'F') {
+                if (window.isKey(e, 'useFertilizer') || e.key === 'f' || e.key === 'F') {
                     const hasFlashlight = (window.playerInventory && window.playerInventory['Flashlight'] > 0);
                     if (this.nightTimeTimer > 0 || hasFlashlight) {
                         if (hasFlashlight) {
@@ -678,7 +678,7 @@ class Game {
                 }
 
                 // K or k to kill NPC
-                if (e.key === 'k' || e.key === 'K') {
+                if (window.isKey(e, 'crimeKillDon') || e.key === 'k' || e.key === 'K') {
                     if (window.soundManager) window.soundManager.playKillSFX();
                     if (window.crimeMode) {
                         // Check if near a Don first
@@ -743,7 +743,7 @@ class Game {
                 }
 
                 // I or i to intimidate NPC or Don
-                if (e.key === 'i' || e.key === 'I') {
+                if (window.isKey(e, 'crimeIntimidate') || e.key === 'i' || e.key === 'I') {
                     if (window.crimeMode) {
                         if (window.elPresidenteElection) {
                             const npc = this.npcManager.checkInteraction(this.player.x, this.player.y);
@@ -796,7 +796,7 @@ class Game {
                 }
 
                 // R or r to rob NPC
-                if (e.key === 'r' || e.key === 'R') {
+                if (window.isKey(e, 'crimeRob') || e.key === 'r' || e.key === 'R') {
                     if (window.soundManager) window.soundManager.playRobSFX();
                     if (window.crimeMode) {
                         // Check Don rob first
@@ -845,7 +845,7 @@ class Game {
                 }
 
                 // S or s to steal car (Crime) or shake hands (Politics)
-                if (e.key === 's' || e.key === 'S') {
+                if (window.isKey(e, 'crimeStealCar') || e.key === 's' || e.key === 'S') {
                     if (window.soundManager) window.soundManager.playHandshakeSFX();
                     let targetCar = null;
                     if (window.crimeMode) {
@@ -902,13 +902,13 @@ class Game {
                 }
 
                 // Hotkeys for Consumables & Audio Controls
-                if (e.key === 't' || e.key === 'T') this.useConsumable('Borrowed Time');
-                if (e.key === 'u' || e.key === 'U') this.useConsumable('Mushrooms');
-                if (e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
-                if (e.key === 'k' || e.key === 'K') this.useConsumable('Snacks');
+                if (window.isKey(e, 'useTime') || e.key === 't' || e.key === 'T') this.useConsumable('Borrowed Time');
+                if (window.isKey(e, 'useMushrooms') || e.key === 'u' || e.key === 'U') this.useConsumable('Mushrooms');
+                if (window.isKey(e, 'useWings') || e.key === 'w' || e.key === 'W') this.useConsumable('Wings');
+                if (window.isKey(e, 'useSnacks') || e.key === 'k' || e.key === 'K') this.useConsumable('Snacks');
                 if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
                     this.tryOpenPosterDialog();
-                } else if (e.key === 'p' || e.key === 'P') {
+                } else if (window.isKey(e, 'useProtection') || e.key === 'p' || e.key === 'P') {
                     this.useConsumable('Protection');
                 }
                 if (e.key === 'm' || e.key === 'M') {
@@ -931,7 +931,7 @@ class Game {
                     }
                 }
 
-                if (e.key === 'g' || e.key === 'G') {
+                if (window.isKey(e, 'posterPropaganda') || e.key === 'g' || e.key === 'G') {
                     this.activatePortalGun();
                 }
 
@@ -947,12 +947,12 @@ class Game {
                     this.eatShroom();
                 }
 
-                if (e.key === 'x' || e.key === 'X') {
+                if (window.isKey(e, 'harvestTree') || e.key === 'x' || e.key === 'X') {
                     this.harvestTree();
                 }
 
                 // C key: Ranger animal capture (if near an animal node)
-                if ((e.key === 'c' || e.key === 'C') && this.player && this.player.characterClass === 'char1') {
+                if ((window.isKey(e, 'rangerCapture') || e.key === 'c' || e.key === 'C') && this.player && this.player.characterClass === 'char1') {
                     this._rangerTryCaptureAnimal();
                 }
 

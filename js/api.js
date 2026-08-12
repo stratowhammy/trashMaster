@@ -573,6 +573,26 @@ function initUI() {
     if (btnSoundMenu) btnSoundMenu.addEventListener('click', openSoundOptions);
     if (btnSoundOptionsClose) btnSoundOptionsClose.addEventListener('click', closeSoundOptions);
 
+    // Keybinds Menu Listeners
+    const btnKeybindsSettings = document.getElementById('btn-keybinds-settings');
+    const btnKeybindsMenu = document.getElementById('btn-keybinds-menu');
+    const btnKeybindsClose = document.getElementById('btn-keybinds-close');
+    const btnKeybindsReset = document.getElementById('btn-keybinds-reset');
+
+    const openKeybindsMenu = () => {
+        if (window.keybindManager) window.keybindManager.openMenu();
+    };
+    const closeKeybindsMenu = () => {
+        if (window.keybindManager) window.keybindManager.closeMenu();
+    };
+
+    if (btnKeybindsSettings) btnKeybindsSettings.addEventListener('click', openKeybindsMenu);
+    if (btnKeybindsMenu) btnKeybindsMenu.addEventListener('click', openKeybindsMenu);
+    if (btnKeybindsClose) btnKeybindsClose.addEventListener('click', closeKeybindsMenu);
+    if (btnKeybindsReset) btnKeybindsReset.addEventListener('click', () => {
+        if (window.keybindManager) window.keybindManager.resetKeybinds();
+    });
+
     if (sliderMusicVolume) {
         sliderMusicVolume.addEventListener('input', (e) => {
             const val = parseInt(e.target.value, 10);

@@ -522,13 +522,16 @@ def buy_item():
             return jsonify({'error': f'Follower limit reached! You can only hire {max_allowed} organizers.'}), 400
         
     if item_name == 'Bruno The Trash Truck':
-        current_trucks = user['has_truck']
+        current_trucks = user['has_truck'] or 0
+        price = 100000 + current_trucks * 50000
+        if user['balance'] < price:
+            return jsonify({'error': f'Insufficient funds. Required: ${price:,}'}), 400
         if current_trucks >= 4:
             return jsonify({'error': 'Maximum of 4 trash trucks allowed'}), 400
             
         next_truck_num = current_trucks + 1
         reqs = {1: 0, 2: 27, 3: 81, 4: 343}
-        req_followers = reqs[next_truck_num]
+        req_followers = reqs.get(next_truck_num, 0)
         
         if user['movement_size'] < req_followers:
             return jsonify({'error': f'Requires {req_followers} followers for truck #{next_truck_num}'}), 400

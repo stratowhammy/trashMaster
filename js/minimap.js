@@ -154,12 +154,30 @@ class MiniMap {
         const startTileX = ptx - halfSize;
         const startTileY = pty - halfSize;
 
-        for (let dy = 0; dy < this.viewGridSize; dy++) {
-            for (let dx = 0; dx < this.viewGridSize; dx++) {
-                const tx = wrapTileX(startTileX + dx);
-                const ty = wrapTileY(startTileY + dy);
-                ctx.drawImage(this.staticCanvas, tx * s, ty * s, s, s, mapX + dx * s, mapY + dy * s, s, s);
-            }
+        const stx = wrapTileX(startTileX);
+        const sty = wrapTileY(startTileY);
+
+        const tilesRight = Math.min(this.viewGridSize, MAP_WIDTH - stx);
+        const tilesLeft = this.viewGridSize - tilesRight;
+
+        const tilesDown = Math.min(this.viewGridSize, MAP_HEIGHT - sty);
+        const tilesUp = this.viewGridSize - tilesDown;
+
+        const w1 = tilesRight * s;
+        const w2 = tilesLeft * s;
+        const h1 = tilesDown * s;
+        const h2 = tilesUp * s;
+
+        // Draw pre-rendered static map using at most 4 sub-rectangle draw calls
+        ctx.drawImage(this.staticCanvas, stx * s, sty * s, w1, h1, mapX, mapY, w1, h1);
+        if (w2 > 0) {
+            ctx.drawImage(this.staticCanvas, 0, sty * s, w2, h1, mapX + w1, mapY, w2, h1);
+        }
+        if (h2 > 0) {
+            ctx.drawImage(this.staticCanvas, stx * s, 0, w1, h2, mapX, mapY + h1, w1, h2);
+        }
+        if (w2 > 0 && h2 > 0) {
+            ctx.drawImage(this.staticCanvas, 0, 0, w2, h2, mapX + w1, mapY + h1, w2, h2);
         }
 
         // Highlight open frenzy buildings

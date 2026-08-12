@@ -1449,7 +1449,10 @@ function renderStore() {
         let descOverride = item.desc;
 
         if (item.name === 'Bruno The Trash Truck') {
-            const nextTruckNum = (playerHasTruck || 0) + 1;
+            const currentTrucks = playerHasTruck || 0;
+            const truckPrice = 100000 + currentTrucks * 50000;
+            item.price = truckPrice;
+            const nextTruckNum = currentTrucks + 1;
             const reqs = {1: 0, 2: 27, 3: 81, 4: 343};
             if (nextTruckNum > 4) {
                 btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
@@ -1457,7 +1460,7 @@ function renderStore() {
                 descOverride = 'Max 4 trash trucks reached.';
             } else {
                 const reqFollowers = reqs[nextTruckNum];
-                descOverride = `Truck #${nextTruckNum} needs ${reqFollowers} followers.`;
+                descOverride = `Truck #${nextTruckNum} ($${truckPrice.toLocaleString()}) needs ${reqFollowers} followers.`;
                 if (playerMovementSize < reqFollowers) {
                     btnDisabled = 'disabled style="background: #333; color: #888; border: 2px solid #222; cursor: not-allowed;"';
                     btnText = 'Locked';

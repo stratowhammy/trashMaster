@@ -1618,7 +1618,18 @@ class Game {
             this.hud.showFollowerNotification(`📄 Placed ${posterType.toUpperCase()} POSTER on sidewalk!`, true);
         }
 
-        // 2. Organizer recruitment (1 in 6 chance)
+        // 2. Recruitment Poster effect (50% chance of recruiting a new follower)
+        if (posterType === 'recruitment' && Math.random() < 0.50) {
+            this.followerManager.addFollower(this.player.x, this.player.y);
+            if (this.hud) {
+                this.hud.followerCount = this.getRoundTotalFollowers ? this.getRoundTotalFollowers() : this.followerManager.followers.length;
+            }
+            setTimeout(() => {
+                this.hud.showFollowerNotification("📢 Recruitment Success! A new follower joined your posse! (+1 Follower)", true);
+            }, 600);
+        }
+
+        // 3. Organizer recruitment (1 in 6 chance)
         if (Math.random() < (1 / 6)) {
             window.playerInventory['Organizer'] = (window.playerInventory['Organizer'] || 0) + 1;
             setTimeout(() => {
@@ -1626,7 +1637,7 @@ class Game {
             }, 800);
         }
 
-        // 3. Cult member recruitment (1 in 4 chance, Cult Mode ONLY)
+        // 4. Cult member recruitment (1 in 4 chance, Cult Mode ONLY)
         if (window.cultMode && Math.random() < (1 / 4)) {
             this.followerManager.addFollower(this.player.x, this.player.y);
             this.cultMembersRecruitedThisRound = (this.cultMembersRecruitedThisRound || 0) + 1;
@@ -1647,8 +1658,8 @@ class Game {
             }
         }
 
-        // 4. Rebellion / Riot incitement (1 in 10 chance -> trash on every tile in 6-tile radius)
-        if (Math.random() < (1 / 10)) {
+        // 5. Propaganda Poster effect (40% chance of incited riot)
+        if (posterType === 'propaganda' && Math.random() < 0.40) {
             let trashCount = 0;
             for (let dy = -6; dy <= 6; dy++) {
                 for (let dx = -6; dx <= 6; dx++) {
@@ -1662,7 +1673,7 @@ class Game {
             }
             setTimeout(() => {
                 this.hud.showFollowerNotification(`🔥 REBELLION INCITED! Rioting crowd dumped trash on every tile in a 6-tile radius! (${trashCount} trash spawned) 💥🗑️`, false);
-            }, 1600);
+            }, 1400);
         }
     }
 

@@ -126,19 +126,6 @@ class Game {
         }
     }
 
-    constructor(canvas) {
-        if (window.gameLog) window.gameLog("Game class instantiation starting");
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.state = GameState.LOADING;
-
-        // Core systems
-        this.spriteManager = new SpriteManager();
-        this.gameMap = new GameMap();
-        this.camera = new Camera(canvas.width, canvas.height);
-        this.miniMap = new MiniMap();
-        this.hud = new HUD();
-
     initCustomMap(customData) {
         window.customMapData = customData;
         this.gameMap = new GameMap();
@@ -151,6 +138,19 @@ class Game {
             this.camera.snapTo(64 * 32, 64 * 32);
         }
     }
+
+    constructor(canvas) {
+        if (window.gameLog) window.gameLog("Game class instantiation starting");
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.state = GameState.LOADING;
+
+        // Core systems
+        this.spriteManager = new SpriteManager();
+        this.gameMap = new GameMap();
+        this.camera = new Camera(canvas.width, canvas.height);
+        this.miniMap = new MiniMap();
+        this.hud = new HUD();
         this.trashManager = new TrashManager();
         this.followerManager = new FollowerManager();
         this.carManager = new CarManager();

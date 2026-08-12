@@ -17,8 +17,8 @@ const TileType = {
 };
 
 const TILE_SIZE = 64;
-const MAP_WIDTH = 64;
-const MAP_HEIGHT = 64;
+const MAP_WIDTH = 128;
+const MAP_HEIGHT = 128;
 const MAP_PIXEL_W = MAP_WIDTH * TILE_SIZE;
 const MAP_PIXEL_H = MAP_HEIGHT * TILE_SIZE;
 
@@ -374,11 +374,16 @@ class BaseMap {
     }
 
     _createParks() {
-        this.parkBlocks = [
-            {id: 'park_1', x1:8,y1:8,x2:12,y2:12},{id: 'park_2', x1:28,y1:28,x2:32,y2:32},
-            {id: 'park_3', x1:48,y1:8,x2:52,y2:12},{id: 'park_4', x1:8,y1:48,x2:12,y2:52},
-            {id: 'park_5', x1:38,y1:48,x2:42,y2:52},{id: 'park_6', x1:18,y1:18,x2:22,y2:22},
-        ];
+        this.parkBlocks = [];
+        let pId = 1;
+        for (let py = 8; py < MAP_HEIGHT - 6; py += 20) {
+            for (let px = 8; px < MAP_WIDTH - 6; px += 20) {
+                this.parkBlocks.push({
+                    id: `park_${pId++}`,
+                    x1: px, y1: py, x2: px + 4, y2: py + 4
+                });
+            }
+        }
         for (const park of this.parkBlocks) {
             for (let y = park.y1; y <= park.y2; y++)
                 for (let x = park.x1; x <= park.x2; x++)
@@ -967,6 +972,9 @@ class BaseMap {
 
 class GameMap extends BaseMap {
     constructor() {
+        if (window.customMapData) {
+            return new CustomMap(window.customMapData);
+        }
         const theme = (window.travelDestination) ? window.travelDestination.toLowerCase() : 'default';
         if (theme === 'dahgbad') {
             return new DahgbadMap();
@@ -998,8 +1006,10 @@ class GameMap extends BaseMap {
             Array.from({ length: MAP_WIDTH }, () => null)
         );
 
-        const hRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
-        const vRoads = [4, 5, 14, 15, 24, 25, 34, 35, 44, 45, 54, 55];
+        const hRoads = [];
+        for (let r = 4; r < MAP_HEIGHT - 2; r += 10) { hRoads.push(r, r + 1); }
+        const vRoads = [];
+        for (let c = 4; c < MAP_WIDTH - 2; c += 10) { vRoads.push(c, c + 1); }
 
         for (const ry of hRoads) {
             const type = (ry % 2 === 0) ? TileType.ROAD_LEFT : TileType.ROAD_RIGHT;

@@ -208,6 +208,20 @@ function initUI() {
         });
     }
 
+    const btnOpenWorldBuilder = document.getElementById('btn-open-world-builder');
+    if (btnOpenWorldBuilder) {
+        btnOpenWorldBuilder.addEventListener('click', () => {
+            if (window.worldBuilder) window.worldBuilder.open();
+        });
+    }
+
+    const btnOpenMapBrowser = document.getElementById('btn-open-map-browser');
+    if (btnOpenMapBrowser) {
+        btnOpenMapBrowser.addEventListener('click', () => {
+            if (window.mapBrowser) window.mapBrowser.open();
+        });
+    }
+
     const btnBackToStoreMain = document.getElementById('btn-back-to-store-main');
     if (btnBackToStoreMain) {
         btnBackToStoreMain.addEventListener('click', () => {
@@ -3215,4 +3229,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (endCapSize) endCapSize.addEventListener('change', window.updateEndScreenCaptionPreview);
     if (endCapColor) endCapColor.addEventListener('change', window.updateEndScreenCaptionPreview);
 });
+
+// Custom Maps API Frontend Helpers
+window.fetchPublishedMaps = async function() {
+    try {
+        const res = await apiCall('/api/maps', 'GET');
+        return res.maps || [];
+    } catch (err) {
+        console.warn('Failed to fetch published maps from backend:', err);
+        return [];
+    }
+};
+
+window.publishMapData = async function(title, description, restricted_mode, map_data) {
+    return await apiCall('/api/maps/publish', 'POST', {
+        title,
+        description,
+        restricted_mode,
+        map_data
+    });
+};
+
+window.fetchMapById = async function(mapId) {
+    const res = await apiCall(`/api/maps/${mapId}`, 'GET');
+    return res.map;
+};
+
+window.recordMapPlay = async function(mapId) {
+    try {
+        const res = await apiCall(`/api/maps/${mapId}/play`, 'POST');
+        return res.map;
+    } catch (err) {
+        console.warn('Failed to record map play:', err);
+        return null;
+    }
+};
 

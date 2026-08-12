@@ -138,6 +138,19 @@ class Game {
         this.camera = new Camera(canvas.width, canvas.height);
         this.miniMap = new MiniMap();
         this.hud = new HUD();
+
+    initCustomMap(customData) {
+        window.customMapData = customData;
+        this.gameMap = new GameMap();
+        if (this.miniMap) this.miniMap.staticDirty = true;
+        if (this.player) {
+            this.player.x = 64 * 32;
+            this.player.y = 64 * 32;
+        }
+        if (this.camera) {
+            this.camera.snapTo(64 * 32, 64 * 32);
+        }
+    }
         this.trashManager = new TrashManager();
         this.followerManager = new FollowerManager();
         this.carManager = new CarManager();

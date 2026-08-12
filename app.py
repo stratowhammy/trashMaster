@@ -56,6 +56,18 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS custom_maps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                author_username TEXT NOT NULL,
+                description TEXT,
+                restricted_mode TEXT DEFAULT 'all',
+                map_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                play_count INTEGER DEFAULT 0
+            )
+        ''')
         try:
             db.execute("ALTER TABLE users ADD COLUMN employee_death_penalty FLOAT DEFAULT 1.0")
         except sqlite3.OperationalError:
@@ -1331,6 +1343,89 @@ def political_choice():
     """, (office, election_state, rounds_in_state, user_data['user_id']))
     db.commit()
     return jsonify({'success': True, 'political_office': office, 'election_state': election_state})
+
+# ------------------------------------------------------------
+# Custom Maps API
+# ------------------------------------------------------------
+@app.route('/api/maps', methods=['GET'])
+def get_maps():
+    db = get_db()
+    cursor = db.execute("""
+        SELECT id, title, author_username, description, restricted_mode, created_at, play_count
+        FROM custom_maps
+        ORDER BY created_at DESC
+        LIMIT 100
+    """)
+    maps = [dict(row) for row in cursor.fetchall()]
+    return jsonify({'success': True, 'maps': maps})
+
+@app.route('/api/maps/publish', methods=['POST'])
+def publish_map():
+    auth_header = request.headers.get('Authorization')
+    username = 'Anonymous Builder'
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            username = payload.get('username', 'Anonymous Builder')
+        except Exception:
+            pass
+
+    data = request.json or {}
+    title = data.get('title', 'Untitled Map').strip()
+    description = data.get('description', '').strip()
+    restricted_mode = data.get('restricted_mode', 'all').strip()
+    map_data = data.get('map_data', '')
+    if isinstance(map_data, (dict, list)):
+        map_data = json.dumps(map_data)
+
+    if not map_data:
+        return jsonify({'error': 'Map data is required'}), 400
+
+    db = get_db()
+    cursor = db.execute("""
+        INSERT INTO custom_maps (title, author_username, description, restricted_mode, map_data)
+        VALUES (?, ?, ?, ?, ?)
+    """, (title, username, description, restricted_mode, map_data))
+    db.commit()
+
+    return jsonify({
+        'success': True,
+        'map_id': cursor.lastrowid,
+        'title': title,
+        'author_username': username,
+        'restricted_mode': restricted_mode
+    })
+
+@app.route('/api/maps/<int:map_id>', methods=['GET'])
+def get_map_by_id(map_id):
+    db = get_db()
+    cursor = db.execute("SELECT * FROM custom_maps WHERE id = ?", (map_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({'error': 'Map not found'}), 404
+    m = dict(row)
+    try:
+        m['map_data'] = json.loads(m['map_data'])
+    except Exception:
+        pass
+    return jsonify({'success': True, 'map': m})
+
+@app.route('/api/maps/<int:map_id>/play', methods=['POST'])
+def record_map_play(map_id):
+    db = get_db()
+    db.execute("UPDATE custom_maps SET play_count = play_count + 1 WHERE id = ?", (map_id,))
+    db.commit()
+    cursor = db.execute("SELECT * FROM custom_maps WHERE id = ?", (map_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({'error': 'Map not found'}), 404
+    m = dict(row)
+    try:
+        m['map_data'] = json.loads(m['map_data'])
+    except Exception:
+        pass
+    return jsonify({'success': True, 'map': m})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)

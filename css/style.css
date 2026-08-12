@@ -871,4 +871,33 @@ input:checked + .slider:before {
     box-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
 }
 
+/* World Builder & Map Browser Styling */
+.tool-tab-btn.active,
+.size-btn.active,
+.tile-select-btn.active,
+.brush-btn.active,
+.filter-option-btn.active,
+.entity-cat-btn.active,
+.filter-mode-btn.active,
+.entity-card.active {
+    background: linear-gradient(135deg, #00aa55, #006633) !important;
+    border-color: #00ffcc !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+}
+
+.size-btn, .brush-btn, .tile-select-btn, .filter-option-btn, .entity-cat-btn, .filter-mode-btn {
+    background: #16243b;
+    border: 1px solid #2a3b5c;
+    color: #aaa;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.size-btn:hover, .brush-btn:hover, .tile-select-btn:hover, .filter-option-btn:hover, .entity-cat-btn:hover, .filter-mode-btn:hover {
+    border-color: #00ffcc;
+    color: #fff;
+}
+
 

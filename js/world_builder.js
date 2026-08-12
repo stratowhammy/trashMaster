@@ -35,9 +35,9 @@ class WorldBuilder {
         // Gallery Filter state
         this.activeFilter = 'normal';
 
-        // Undo / Redo history stack
-        this.history = [];
-        this.historyIndex = -1;
+        // Draft ID tracking
+        this.currentDraftId = null;
+        this.autoSaveTimer = null;
 
         // Map Data
         this.mapData = this.createBlankMapData();
@@ -52,7 +52,9 @@ class WorldBuilder {
         const buildingMeta = Array.from({ length: this.mapH }, () =>
             Array.from({ length: this.mapW }, () => -1)
         );
+        this.currentDraftId = `draft_${Date.now()}`;
         return {
+            id: this.currentDraftId,
             title,
             description: 'Custom map built in World Builder',
             restricted_mode: 'all',
@@ -81,25 +83,27 @@ class WorldBuilder {
         modal.innerHTML = `
             <!-- Top Navigation Bar -->
             <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:linear-gradient(180deg,#151c28,#0c1018); border-bottom:2px solid #2a3b5c; flex-shrink:0;">
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <span style="color:#00ffcc; font-size:12px; text-shadow:0 0 10px rgba(0,255,204,0.5);">🗺️ WORLD BUILDER</span>
-                    <input type="text" id="builder-map-title" value="My Custom 128x128 Map" style="background:#101724; border:1px solid #3b4d70; color:#fff; font-family:inherit; font-size:9px; padding:6px 10px; border-radius:6px; width:220px;" placeholder="Map Name..." />
-                    <select id="builder-restricted-mode" style="background:#101724; border:1px solid #3b4d70; color:#00ffcc; font-family:inherit; font-size:8px; padding:6px 8px; border-radius:6px;">
-                        <option value="all">🌐 Restricted Mode: ALL MODES</option>
-                        <option value="standard">🏙️ Standard / Trash Master</option>
-                        <option value="pirate">🏴‍☠️ Pirate Mode Only</option>
-                        <option value="car">🏎️ Car Mode Only</option>
-                        <option value="crime">💰 Crime / Mafia Mode</option>
-                        <option value="cult">👁️ Cult Mode Only</option>
-                        <option value="flowers">🌸 Flowers Mode Only</option>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="color:#00ffcc; font-size:11px; text-shadow:0 0 10px rgba(0,255,204,0.5);">🗺️ WORLD BUILDER</span>
+                    <input type="text" id="builder-map-title" value="My Custom 128x128 Map" style="background:#101724; border:1px solid #3b4d70; color:#fff; font-family:inherit; font-size:8px; padding:6px 10px; border-radius:6px; width:200px;" placeholder="Map Name..." />
+                    <select id="builder-restricted-mode" style="background:#101724; border:1px solid #3b4d70; color:#00ffcc; font-family:inherit; font-size:7px; padding:6px 8px; border-radius:6px;">
+                        <option value="all">🌐 Mode: ALL</option>
+                        <option value="standard">🏙️ Standard</option>
+                        <option value="pirate">🏴‍☠️ Pirate</option>
+                        <option value="car">🏎️ Car</option>
+                        <option value="crime">💰 Crime</option>
+                        <option value="cult">👁️ Cult</option>
+                        <option value="flowers">🌸 Flowers</option>
                     </select>
                 </div>
-                <div style="display:flex; gap:10px;">
-                    <button id="btn-builder-new" class="btn secondary" style="font-size:8px; padding:8px 12px;">Blank Map</button>
-                    <button id="btn-builder-load-preset" class="btn secondary" style="font-size:8px; padding:8px 12px;">Load Preset Map</button>
-                    <button id="btn-builder-test" class="btn" style="background:linear-gradient(135deg,#00aa55,#006633); font-size:8px; padding:8px 14px;">TEST MAP 🚗</button>
-                    <button id="btn-builder-publish" class="btn" style="background:linear-gradient(135deg,#ffaa00,#cc7700); font-size:8px; padding:8px 14px;">PUBLISH 🌐</button>
-                    <button id="btn-builder-close" class="btn secondary" style="font-size:8px; padding:8px 12px; background:#aa2222; border-color:#881111;">EXIT</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button id="btn-builder-save-draft" class="btn" style="background:linear-gradient(135deg,#0088ff,#0044aa); font-size:7px; padding:8px 10px;">SAVE DRAFT 💾</button>
+                    <button id="btn-builder-my-drafts" class="btn secondary" style="font-size:7px; padding:8px 10px;">MY DRAFTS 📂</button>
+                    <button id="btn-builder-new" class="btn secondary" style="font-size:7px; padding:8px 10px;">Blank Map</button>
+                    <button id="btn-builder-load-preset" class="btn secondary" style="font-size:7px; padding:8px 10px;">Preset Map</button>
+                    <button id="btn-builder-test" class="btn" style="background:linear-gradient(135deg,#00aa55,#006633); font-size:7px; padding:8px 12px;">TEST MAP 🚗</button>
+                    <button id="btn-builder-publish" class="btn" style="background:linear-gradient(135deg,#ffaa00,#cc7700); font-size:7px; padding:8px 12px;">PUBLISH 🌐</button>
+                    <button id="btn-builder-close" class="btn secondary" style="font-size:7px; padding:8px 10px; background:#aa2222; border-color:#881111;">EXIT</button>
                 </div>
             </div>
 
@@ -189,7 +193,6 @@ class WorldBuilder {
                             <button class="btn entity-cat-btn" data-cat="npcs" style="font-size:6px; flex:1;">NPCs / Mobs</button>
                         </div>
                         <div id="entity-list-container" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; max-height:300px; overflow-y:auto; background:#162032; padding:8px; border-radius:8px;">
-                            <!-- Populated dynamically -->
                         </div>
                     </div>
 
@@ -210,8 +213,7 @@ class WorldBuilder {
                     <!-- Canvas Action Bar -->
                     <div style="margin-top:auto; padding-top:12px; border-top:1px solid #2a3b5c; display:flex; flex-direction:column; gap:6px;">
                         <div style="display:flex; gap:6px;">
-                            <button id="btn-builder-undo" class="btn secondary" style="flex:1; font-size:7px;">↩️ Undo</button>
-                            <button id="btn-builder-clear" class="btn secondary" style="flex:1; font-size:7px; background:#aa2222; border-color:#881111;">🗑️ Clear</button>
+                            <button id="btn-builder-clear" class="btn secondary" style="flex:1; font-size:7px; background:#aa2222; border-color:#881111;">🗑️ Clear Grid</button>
                         </div>
                     </div>
                 </div>
@@ -220,6 +222,11 @@ class WorldBuilder {
                 <div id="builder-viewport" style="flex:1; background:#080b12; position:relative; overflow:hidden; cursor:crosshair;">
                     <canvas id="world-builder-canvas"></canvas>
                     
+                    <!-- Save Draft Status Notification Badge -->
+                    <div id="builder-save-badge" style="display:none; position:absolute; top:16px; left:16px; background:rgba(0,170,85,0.9); color:#fff; font-size:8px; padding:8px 14px; border-radius:6px; border:1px solid #00ffcc; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:10;">
+                        Draft Saved! 💾
+                    </div>
+
                     <!-- Viewport HUD Overlay -->
                     <div style="position:absolute; bottom:16px; right:16px; background:rgba(10,16,26,0.85); padding:8px 14px; border-radius:8px; border:1px solid #2a3b5c; font-size:8px; color:#00ffcc; display:flex; gap:16px;">
                         <span id="builder-coords">Tile: (0, 0)</span>
@@ -243,16 +250,61 @@ class WorldBuilder {
         this.canvas = modal.querySelector('#world-builder-canvas');
         this.ctx = this.canvas.getContext('2d');
 
+        this.initDraftsModal();
         this.bindEvents();
         this.renderEntityList();
+    }
+
+    initDraftsModal() {
+        const modal = document.createElement('div');
+        modal.id = 'builder-drafts-modal';
+        modal.className = 'custom-modal';
+        modal.style.cssText = `
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(4, 6, 12, 0.95); backdrop-filter: blur(10px); z-index: 10005;
+            color: #fff; font-family: 'Press Start 2P', monospace; justify-content: center; align-items: center;
+        `;
+
+        modal.innerHTML = `
+            <div style="width: 540px; max-width: 90vw; background: #0f1522; border: 2px solid #2a3b5c; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display:flex; flex-direction:column; gap:16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #2a3b5c; padding-bottom:12px;">
+                    <span style="color:#00ffcc; font-size:12px;">📂 MY SAVED MAP DRAFTS</span>
+                    <button id="btn-drafts-modal-close" class="btn secondary" style="font-size:8px; padding:6px 10px;">✕ CLOSE</button>
+                </div>
+
+                <div id="drafts-list-container" style="display:flex; flex-direction:column; gap:10px; max-height:360px; overflow-y:auto; padding-right:4px;">
+                </div>
+
+                <div style="display:flex; justify-content:space-between; border-top:1px solid #2a3b5c; padding-top:12px;">
+                    <button id="btn-drafts-create-new" class="btn" style="background:linear-gradient(135deg,#00aa55,#006633); font-size:8px; padding:8px 14px;">+ NEW BLANK DRAFT</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#btn-drafts-modal-close').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        modal.querySelector('#btn-drafts-create-new').addEventListener('click', () => {
+            modal.style.display = 'none';
+            this.mapData = this.createBlankMapData('New Saved Draft');
+            this.render();
+            this.saveDraft(true);
+        });
     }
 
     bindEvents() {
         const modal = this.container;
 
         modal.querySelector('#btn-builder-close').addEventListener('click', () => this.close());
+        modal.querySelector('#btn-builder-save-draft').addEventListener('click', () => this.saveDraft(false));
+        modal.querySelector('#btn-builder-my-drafts').addEventListener('click', () => this.showDraftsModal());
+
         modal.querySelector('#btn-builder-new').addEventListener('click', () => {
-            if (confirm('Create new blank 128x128 map? Any unsaved edits will be cleared.')) {
+            if (confirm('Create new blank 128x128 map? Any unsaved edits will be saved as draft.')) {
+                this.saveDraft(true);
                 this.mapData = this.createBlankMapData(modal.querySelector('#builder-map-title').value);
                 this.render();
             }
@@ -272,10 +324,12 @@ class WorldBuilder {
                 this.mapData.buildings = tempMap.buildings;
                 this.mapData.trees = tempMap.trees || [];
                 this.render();
+                this.saveDraft(true);
             }
         });
 
         modal.querySelector('#btn-builder-test').addEventListener('click', () => {
+            this.saveDraft(true);
             this.testMap();
         });
 
@@ -288,31 +342,19 @@ class WorldBuilder {
             this.mapData.title = title;
             this.mapData.restricted_mode = mode;
             this.mapData.description = desc;
+            this.saveDraft(true);
 
             try {
                 const res = await window.publishMapData(title, desc, mode, this.mapData);
                 alert(`🎉 Map Published Successfully!\nMap ID: ${res.map_id}\nUsers can now play your map in Community Maps!`);
             } catch (err) {
-                // Save locally if offline
-                let localMaps = JSON.parse(localStorage.getItem('published_custom_maps') || '[]');
-                localMaps.unshift({
-                    id: Date.now(),
-                    title,
-                    description: desc,
-                    restricted_mode: mode,
-                    author_username: window.currentUsername || 'Local Builder',
-                    created_at: new Date().toISOString(),
-                    play_count: 0,
-                    map_data: this.mapData
-                });
-                localStorage.setItem('published_custom_maps', JSON.stringify(localMaps));
                 alert('Saved map locally to your browser drafts!');
             }
         });
 
         // Tab Switching
         modal.querySelectorAll('.tool-tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', () => {
                 modal.querySelectorAll('.tool-tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.currentTool = btn.dataset.tool;
@@ -394,7 +436,7 @@ class WorldBuilder {
         const viewport = modal.querySelector('#builder-viewport');
 
         viewport.addEventListener('mousedown', (e) => {
-            if (e.button === 1 || e.shiftKey) { // Middle click or shift-click to pan
+            if (e.button === 1 || e.shiftKey) {
                 this.isDragging = true;
                 this.dragStart = { x: e.clientX - this.camera.x, y: e.clientY - this.camera.y };
             } else if (e.button === 0) {
@@ -443,7 +485,158 @@ class WorldBuilder {
             if (confirm('Clear entire map to grass?')) {
                 this.mapData = this.createBlankMapData();
                 this.render();
+                this.saveDraft(true);
             }
+        });
+    }
+
+    // ── Save & Resume Draft Methods ──
+
+    saveDraft(silent = false) {
+        if (!this.mapData) return;
+
+        const title = this.container.querySelector('#builder-map-title').value.trim() || 'Untitled Draft';
+        const mode = this.container.querySelector('#builder-restricted-mode').value;
+
+        this.mapData.title = title;
+        this.mapData.restricted_mode = mode;
+        this.mapData.updatedAt = new Date().toISOString();
+
+        if (!this.currentDraftId) {
+            this.currentDraftId = `draft_${Date.now()}`;
+        }
+        this.mapData.id = this.currentDraftId;
+
+        let drafts = this.getDrafts();
+        const existingIdx = drafts.findIndex(d => d.id === this.currentDraftId);
+
+        const draftRecord = {
+            id: this.currentDraftId,
+            title,
+            restricted_mode: mode,
+            updatedAt: this.mapData.updatedAt,
+            buildingCount: this.mapData.buildings ? this.mapData.buildings.length : 0,
+            entityCount: (this.mapData.trees ? this.mapData.trees.length : 0) + (this.mapData.objects ? this.mapData.objects.length : 0) + (this.mapData.npcs ? this.mapData.npcs.length : 0),
+            mapData: this.mapData
+        };
+
+        if (existingIdx >= 0) {
+            drafts[existingIdx] = draftRecord;
+        } else {
+            drafts.unshift(draftRecord);
+        }
+
+        try {
+            localStorage.setItem('world_builder_drafts', JSON.stringify(drafts));
+            localStorage.setItem('world_builder_active_draft_id', this.currentDraftId);
+
+            if (!silent) {
+                const badge = this.container.querySelector('#builder-save-badge');
+                if (badge) {
+                    badge.style.display = 'block';
+                    setTimeout(() => badge.style.display = 'none', 1600);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to save draft to localStorage:', e);
+        }
+    }
+
+    getDrafts() {
+        try {
+            return JSON.parse(localStorage.getItem('world_builder_drafts') || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    loadDraft(draftId) {
+        const drafts = this.getDrafts();
+        const draft = drafts.find(d => d.id === draftId);
+        if (draft && draft.mapData) {
+            this.currentDraftId = draft.id;
+            this.mapData = draft.mapData;
+
+            const titleInput = this.container.querySelector('#builder-map-title');
+            if (titleInput) titleInput.value = draft.title || 'Untitled Map';
+
+            const modeSelect = this.container.querySelector('#builder-restricted-mode');
+            if (modeSelect) modeSelect.value = draft.restricted_mode || 'all';
+
+            this.render();
+            const badge = this.container.querySelector('#builder-save-badge');
+            if (badge) {
+                badge.innerText = 'Draft Loaded! 📂';
+                badge.style.display = 'block';
+                setTimeout(() => {
+                    badge.innerText = 'Draft Saved! 💾';
+                    badge.style.display = 'none';
+                }, 1600);
+            }
+        }
+    }
+
+    deleteDraft(draftId) {
+        let drafts = this.getDrafts();
+        drafts = drafts.filter(d => d.id !== draftId);
+        localStorage.setItem('world_builder_drafts', JSON.stringify(drafts));
+        this.renderDraftsList();
+    }
+
+    showDraftsModal() {
+        const modal = document.getElementById('builder-drafts-modal');
+        if (!modal) return;
+        this.renderDraftsList();
+        modal.style.display = 'flex';
+    }
+
+    renderDraftsList() {
+        const container = document.getElementById('drafts-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const drafts = this.getDrafts();
+        if (drafts.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:30px; color:#aaa; font-size:8px;">
+                    📁 No saved map drafts in progress.<br><br>Click "+ NEW BLANK DRAFT" to start building!
+                </div>
+            `;
+            return;
+        }
+
+        drafts.forEach(d => {
+            const card = document.createElement('div');
+            card.style.cssText = `
+                background: #16243b; border: 1px solid #2a3b5c; border-radius: 8px; padding: 12px;
+                display: flex; justify-content: space-between; align-items: center; gap: 12px;
+            `;
+
+            const dateStr = d.updatedAt ? new Date(d.updatedAt).toLocaleString() : 'Recently';
+
+            card.innerHTML = `
+                <div style="flex:1;">
+                    <div style="font-size:9px; color:#00ffcc; margin-bottom:4px;">${d.title || 'Untitled Draft'}</div>
+                    <div style="font-size:7px; color:#88a0c0;">Saved: ${dateStr} | Buildings: ${d.buildingCount || 0} | Objects: ${d.entityCount || 0}</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn resume-btn" style="font-size:7px; padding:6px 10px; background:linear-gradient(135deg,#0088ff,#0044aa);">Resume ✏️</button>
+                    <button class="btn delete-btn secondary" style="font-size:7px; padding:6px 10px; background:#aa2222; border-color:#881111;">Delete 🗑️</button>
+                </div>
+            `;
+
+            card.querySelector('.resume-btn').addEventListener('click', () => {
+                document.getElementById('builder-drafts-modal').style.display = 'none';
+                this.loadDraft(d.id);
+            });
+
+            card.querySelector('.delete-btn').addEventListener('click', () => {
+                if (confirm(`Delete draft '${d.title}'?`)) {
+                    this.deleteDraft(d.id);
+                }
+            });
+
+            container.appendChild(card);
         });
     }
 
@@ -548,7 +741,6 @@ class WorldBuilder {
                 }
             }
 
-            // Door on bottom center
             const doorTile = { x: tx + Math.floor(bw / 2), y: ty + bh - 1 };
             this.mapData.tiles[doorTile.y][doorTile.x] = 4; // TileType.BUILDING_DOOR
 
@@ -598,6 +790,7 @@ class WorldBuilder {
         }
 
         this.render();
+        this.saveDraft(true); // Auto-save on edits
     }
 
     floodFillTile(startX, startY, newTile) {
@@ -718,7 +911,7 @@ class WorldBuilder {
         const statsEl = this.container.querySelector('#builder-stats');
         if (statsEl) {
             const bCount = this.mapData.buildings.length;
-            const eCount = (this.mapData.trees.length || 0) + (this.mapData.objects.length || 0) + (this.mapData.npcs.length || 0);
+            const eCount = (this.mapData.trees ? this.mapData.trees.length : 0) + (this.mapData.objects ? this.mapData.objects.length : 0) + (this.mapData.npcs ? this.mapData.npcs.length : 0);
             statsEl.innerText = `Buildings: ${bCount} | Objects/NPCs: ${eCount}`;
         }
     }
@@ -757,7 +950,6 @@ class WorldBuilder {
         window.customMapData = this.mapData;
         this.close();
 
-        // Trigger game initialization with custom map
         if (window.game) {
             window.game.initCustomMap(this.mapData);
         } else {
@@ -767,15 +959,36 @@ class WorldBuilder {
     }
 
     open(existingData = null) {
-        if (existingData) {
-            this.mapData = existingData;
-        }
         this.container.style.display = 'flex';
         this.camera = { x: 50, y: 50, zoom: 0.8 };
+
+        if (existingData) {
+            this.mapData = existingData;
+            this.currentDraftId = existingData.id || `draft_${Date.now()}`;
+        } else {
+            // Check if there are saved drafts
+            const drafts = this.getDrafts();
+            if (drafts.length > 0 && !this.mapData.buildings.length) {
+                this.showDraftsModal();
+            }
+        }
+
+        const titleInput = this.container.querySelector('#builder-map-title');
+        if (titleInput && this.mapData) titleInput.value = this.mapData.title || 'My Custom 128x128 Map';
+
+        const modeSelect = this.container.querySelector('#builder-restricted-mode');
+        if (modeSelect && this.mapData) modeSelect.value = this.mapData.restricted_mode || 'all';
+
         this.render();
+
+        // Start auto-save timer every 20s
+        if (this.autoSaveTimer) clearInterval(this.autoSaveTimer);
+        this.autoSaveTimer = setInterval(() => this.saveDraft(true), 20000);
     }
 
     close() {
+        this.saveDraft(true); // Auto-save on exit
+        if (this.autoSaveTimer) clearInterval(this.autoSaveTimer);
         this.container.style.display = 'none';
     }
 }

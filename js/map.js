@@ -970,6 +970,54 @@ class BaseMap {
     }
 }
 
+class CustomMap extends BaseMap {
+    constructor(data) {
+        super();
+        this.theme = (data && data.theme) || 'custom';
+        this.data = data;
+        this.loadData(data);
+    }
+
+    loadData(data) {
+        if (!data) return;
+        this.title = data.title || 'Custom Map';
+        this.restrictedMode = data.restricted_mode || 'all';
+
+        this.tiles = Array.from({ length: MAP_HEIGHT }, (_, y) =>
+            Array.from({ length: MAP_WIDTH }, (_, x) => {
+                if (data.tiles && data.tiles[y] && data.tiles[y][x] !== undefined) {
+                    return data.tiles[y][x];
+                }
+                return TileType.GRASS;
+            })
+        );
+
+        this.buildingMeta = Array.from({ length: MAP_HEIGHT }, (_, y) =>
+            Array.from({ length: MAP_WIDTH }, (_, x) => {
+                if (data.buildingMeta && data.buildingMeta[y] && data.buildingMeta[y][x] !== undefined) {
+                    return data.buildingMeta[y][x];
+                }
+                return -1;
+            })
+        );
+
+        this.roadDirections = Array.from({ length: MAP_HEIGHT }, () =>
+            Array.from({ length: MAP_WIDTH }, () => null)
+        );
+
+        this.buildings = data.buildings || [];
+        this.trees = data.trees || [];
+        this.objects = data.objects || [];
+        this.npcs = data.npcs || [];
+        this.openDoors = new Set(data.openDoors || []);
+        this.parkBlocks = data.parkBlocks || [];
+
+        if (!this.buildings || this.buildings.length === 0) {
+            this._catalogBuildings();
+        }
+    }
+}
+
 class GameMap extends BaseMap {
     constructor() {
         if (window.customMapData) {

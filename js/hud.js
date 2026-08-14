@@ -617,6 +617,8 @@ class HUD {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Return to Store', centerX, btnY + btnH / 2);
+    }
+
     renderNotifications(ctx, canvasWidth, canvasHeight) {
         if (this.followerNotificationTimer > 0) {
             const notifAlpha = Math.min(1, this.followerNotificationTimer / 30);

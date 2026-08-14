@@ -618,4 +618,170 @@ class HUD {
         ctx.textBaseline = 'middle';
         ctx.fillText('Return to Store', centerX, btnY + btnH / 2);
     }
+
+    renderDoomStatusBar(ctx, w, h, game) {
+        const barH = 64;
+        const barY = h - barH;
+
+        ctx.save();
+        // Outer Doom Status Bar Bevel
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, barY, w, barH);
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(0, barY, w, 4); // Top highlight
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, barY + barH - 2, w, 2); // Bottom shadow
+
+        // Inner Section Panels
+        const panelMargin = 6;
+        const panelY = barY + panelMargin;
+        const panelH = barH - panelMargin * 2;
+
+        const p1W = Math.max(160, w * 0.28); // Trash Capacity Panel
+        const p2W = 70;                      // Character Face Portrait
+        const p3W = Math.max(160, w * 0.28); // Points & Posse
+        const p4W = Math.max(140, w * 0.24); // Timer & Item
+
+        let currX = (w - (p1W + p2W + p3W + p4W + 24)) / 2;
+        if (currX < 10) currX = 10;
+
+        // ── 1. TRASH CAPACITY PANEL ──
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(currX, panelY, p1W, panelH);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(currX, panelY, p1W, panelH);
+
+        const truckCount = (game && game.trashTrucksPurchased) || 0;
+        const maxCapacity = 100 + truckCount * 200;
+        const currentTrash = (this.trashCarried || 0);
+        const trashPct = Math.min(1.0, currentTrash / maxCapacity);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('TRASH LOAD', currX + 8, panelY + 14);
+
+        // Capacity Progress Bar
+        const barW = p1W - 16;
+        const barFillW = barW * trashPct;
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(currX + 8, panelY + 22, barW, 14);
+
+        let fillColor = '#22c55e'; // Green
+        if (trashPct > 0.85) fillColor = '#ef4444'; // Red full
+        else if (trashPct > 0.6) fillColor = '#eab308'; // Yellow
+
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(currX + 8, panelY + 22, barFillW, 14);
+        ctx.strokeStyle = '#000';
+        ctx.strokeRect(currX + 8, panelY + 22, barW, 14);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${currentTrash} / ${maxCapacity}`, currX + p1W / 2, panelY + 46);
+
+        currX += p1W + 8;
+
+        // ── 2. DOOM CHARACTER FACE PORTRAIT ──
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(currX, panelY, p2W, panelH);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(currX, panelY, p2W, panelH);
+
+        // Draw animated 16-bit face in center of portrait frame
+        const faceCX = currX + p2W / 2;
+        const faceCY = panelY + panelH / 2;
+
+        const time = performance.now() / 1000;
+        const lookDir = Math.sin(time * 1.5); // Looks left and right
+
+        // Head Base
+        ctx.fillStyle = '#fed7aa'; // Skin tone
+        ctx.fillRect(faceCX - 14, faceCY - 14, 28, 28);
+
+        // Hair / Cap
+        ctx.fillStyle = '#854d0e';
+        ctx.fillRect(faceCX - 16, faceCY - 18, 32, 8);
+
+        // Eyes
+        const eyeOffset = lookDir > 0.3 ? 2 : (lookDir < -0.3 ? -2 : 0);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(faceCX - 8 + eyeOffset, faceCY - 6, 4, 4);
+        ctx.fillRect(faceCX + 4 + eyeOffset, faceCY - 6, 4, 4);
+
+        // Mouth (Smile if high score/trash, grit teeth if full/cops)
+        if (trashPct > 0.9) {
+            // Gritting teeth
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(faceCX - 8, faceCY + 5, 16, 4);
+            ctx.fillStyle = '#991b1b';
+            ctx.fillRect(faceCX - 8, faceCY + 6, 16, 1);
+        } else {
+            // Grin / Smile
+            ctx.fillStyle = '#991b1b';
+            ctx.fillRect(faceCX - 6, faceCY + 5, 12, 3);
+        }
+
+        currX += p2W + 8;
+
+        // ── 3. BANK & MONEY LED PANEL ──
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(currX, panelY, p3W, panelH);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(currX, panelY, p3W, panelH);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('BANK BALANCE', currX + 8, panelY + 14);
+
+        // Digital LED Green Score
+        ctx.fillStyle = '#22c55e';
+        ctx.font = 'bold 13px "Press Start 2P", monospace';
+        ctx.fillText(`$${this.score || 0}`, currX + 8, panelY + 32);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + 8, panelY + 46);
+
+        currX += p3W + 8;
+
+        // ── 4. TIME & MODE PANEL ──
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(currX, panelY, p4W, panelH);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(currX, panelY, p4W, panelH);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('TIME LEFT', currX + 8, panelY + 14);
+
+        // Timer
+        const m = Math.floor(Math.max(0, this.timer) / 60);
+        const s = Math.floor(Math.max(0, this.timer) % 60);
+        const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+        ctx.fillStyle = this.timer < 30 ? '#ef4444' : '#facc15';
+        ctx.font = 'bold 13px "Press Start 2P", monospace';
+        ctx.fillText(timeStr, currX + 8, panelY + 32);
+
+        let modeLabel = '🏙️ CLEANING';
+        if (window.pirateMode) modeLabel = '🏴‍☠️ PIRATE';
+        else if (window.crimeMode) modeLabel = '🕵️ CRIME';
+        else if (window.cultMode) modeLabel = '🧹 CULT';
+        else if (window.politicsMode) modeLabel = '🏛️ POLITICS';
+
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillText(modeLabel, currX + 8, panelY + 46);
+
+        ctx.restore();
+    }
 }
+

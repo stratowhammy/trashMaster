@@ -51,15 +51,40 @@ class Player {
         }
 
         let dx = 0, dy = 0;
-        if (this.keys.up) dy -= 1;
-        if (this.keys.down) dy += 1;
-        if (this.keys.left) dx -= 1;
-        if (this.keys.right) dx += 1;
+
+        if (window.game && window.game.engine3D && window.game.engine3D.enabled) {
+            const yaw = window.game.engine3D.yaw;
+            let forward = 0;
+            let strafe = 0;
+            if (this.keys.up) forward += 1;
+            if (this.keys.down) forward -= 1;
+            if (this.keys.left) strafe -= 1;
+            if (this.keys.right) strafe += 1;
+
+            if (forward !== 0 || strafe !== 0) {
+                const sinY = Math.sin(yaw);
+                const cosY = Math.cos(yaw);
+                dx = (-sinY * forward + cosY * strafe);
+                dy = (-cosY * forward - sinY * strafe);
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) {
+                    dx /= len;
+                    dy /= len;
+                }
+            }
+        } else {
+            if (this.keys.up) dy -= 1;
+            if (this.keys.down) dy += 1;
+            if (this.keys.left) dx -= 1;
+            if (this.keys.right) dx += 1;
+        }
 
         this.moving = dx !== 0 || dy !== 0;
 
         if (this.moving) {
-            if (dx !== 0 && dy !== 0) { const l = Math.SQRT2; dx /= l; dy /= l; }
+            if (!window.game || !window.game.engine3D || !window.game.engine3D.enabled) {
+                if (dx !== 0 && dy !== 0) { const l = Math.SQRT2; dx /= l; dy /= l; }
+            }
             if (Math.abs(dx) > Math.abs(dy)) this.direction = dx > 0 ? 'right' : 'left';
             else this.direction = dy > 0 ? 'down' : 'up';
 

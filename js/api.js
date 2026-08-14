@@ -55,16 +55,24 @@ function showScreen(screenId) {
         btnReturnStore.style.display = (screenId === 'game-layer') ? 'inline-block' : 'none';
     }
 
+    const gameViewport = document.getElementById('game-viewport');
+    const gameCanvas3d = document.getElementById('gameCanvas3d');
+    const gameCanvas = document.getElementById('gameCanvas');
+
     if (screenId === 'game-layer') {
         document.getElementById('ui-layer').classList.add('hidden');
-        document.getElementById('gameCanvas').classList.remove('hidden');
+        if (gameViewport) gameViewport.classList.remove('hidden');
+        if (gameCanvas) gameCanvas.classList.remove('hidden');
+        if (gameCanvas3d) gameCanvas3d.classList.remove('hidden');
         if (window.soundManager) {
             const track = window.chaosMode ? 'chaos' : (window.selectedMusicTrack || 'game');
             window.soundManager.playTrack(track);
         }
     } else {
         document.getElementById('ui-layer').classList.remove('hidden');
-        document.getElementById('gameCanvas').classList.add('hidden');
+        if (gameViewport) gameViewport.classList.add('hidden');
+        if (gameCanvas) gameCanvas.classList.add('hidden');
+        if (gameCanvas3d) gameCanvas3d.classList.add('hidden');
         if (window.soundManager && (screenId === 'store-screen' || screenId === 'store-items-screen' || screenId === 'login-screen')) {
             window.soundManager.playTrack('store');
         }
@@ -637,6 +645,29 @@ function initUI() {
     if (btnKeybindsReset) btnKeybindsReset.addEventListener('click', () => {
         if (window.keybindManager) window.keybindManager.resetKeybinds();
     });
+
+    // ── 3D FPS / 2D Retro Perspective Toggle Listener ──
+    const btnFpsToggle = document.getElementById('btn-fps-toggle');
+    if (btnFpsToggle) {
+        btnFpsToggle.addEventListener('click', () => {
+            if (window.game && window.game.engine3D) {
+                window.game.engine3D.enabled = !window.game.engine3D.enabled;
+                const is3D = window.game.engine3D.enabled;
+                btnFpsToggle.innerHTML = is3D ? '🎮 3D FPS' : '🕹️ 2D RETRO';
+                btnFpsToggle.style.borderColor = is3D ? '#00ffcc' : '#ffaa00';
+                btnFpsToggle.style.color = is3D ? '#00ffcc' : '#ffaa00';
+
+                const canvas3d = document.getElementById('gameCanvas3d');
+                if (canvas3d) {
+                    canvas3d.style.display = is3D ? 'block' : 'none';
+                }
+
+                if (window.game.hud) {
+                    window.game.hud.showFollowerNotification(is3D ? 'Switched to 3D FPS Mode (Doom)' : 'Switched to 2D Top-Down Mode', true);
+                }
+            }
+        });
+    }
 
     // Return to Store Button Listener
     const btnReturnStore = document.getElementById('btn-return-store');

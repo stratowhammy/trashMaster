@@ -155,6 +155,7 @@ class Game {
         this.followerManager = new FollowerManager();
         this.carManager = new CarManager();
         this.crimeManager = new CrimeManager();
+        this.engine3D = null;
         this.player = null;
 
         // Word Game State
@@ -275,16 +276,19 @@ class Game {
 
                 // Q or q key to pick up trash
                 if (window.isKey(e, 'pickupTrash') || e.key === 'q' || e.key === 'Q') {
+                    if (this.engine3D && this.engine3D.enabled) this.engine3D.viewmodel.triggerAction();
                     this.pickupTrash();
                 }
 
                 // C or c key to fire cannons in Pirate Mode
                 if ((window.isKey(e, 'pirateCannon') || e.key === 'c' || e.key === 'C') && window.pirateMode && this.pirateModeManager) {
+                    if (this.engine3D && this.engine3D.enabled) this.engine3D.viewmodel.triggerAction();
                     this.pirateModeManager.firePlayerCannon(this);
                 }
 
                 // E or e key to interact with NPC or green cars, Dons or Chief
                 if (window.isKey(e, 'interact') || e.key === 'e' || e.key === 'E') {
+                    if (this.engine3D && this.engine3D.enabled) this.engine3D.viewmodel.triggerAction();
                     if (this.navigationTarget) { this._checkNavigationTargetEngaged(); }
                     if (window.soundManager) window.soundManager.playEngageSFX();
 
@@ -1024,6 +1028,20 @@ class Game {
                         this.nullifyLevelAndReturnToStore();
                     }
                     return;
+                }
+            }
+
+            if (this.state === GameState.PLAYING && !this.isPaused) {
+                if (this.engine3D && this.engine3D.enabled) {
+                    this.engine3D.viewmodel.triggerAction();
+                    if (this.engine3D.currentCrosshairTarget) {
+                        const target = this.engine3D.currentCrosshairTarget;
+                        if (target.type === 'trash' && target.item) {
+                            this.trashManager.checkPickup(target.item.x, target.item.y, 64, this.player ? this.player.characterClass : 'char2', this.doubleTrashPickup, this.trashCollectedInTruck, window.playerHasTruck);
+                        } else if (target.type === 'npc' || target.type === 'building') {
+                            this.interact();
+                        }
+                    }
                 }
             }
 
@@ -2048,6 +2066,15 @@ class Game {
 
         // Update timer
         this.hud.update(dt);
+
+        // Update 3D FPS Engine if active
+        if (this.engine3D && this.engine3D.enabled) {
+            if (this.player && this.player.keys && !this.engine3D.pointerLocked) {
+                if (this.player.keys.left) this.engine3D.yaw += 2.4 * dt;
+                if (this.player.keys.right) this.engine3D.yaw -= 2.4 * dt;
+            }
+            this.engine3D.update(dt);
+        }
         
         // Update flowers
         if (window.flowersMode) {
@@ -3322,6 +3349,21 @@ class Game {
         this.camera.snapTo(this.player.x, this.player.y);
         if (window.gameLog) window.gameLog(`_startGame: camera snapped to x=${this.camera.x}, y=${this.camera.y}, size: w=${this.camera.width}, h=${this.camera.height}`);
 
+        // Initialize 3D Retro FPS Engine & Build 3D Map
+        if (window.Engine3D) {
+            if (!this.engine3D) {
+                const canvas3d = document.getElementById('gameCanvas3d') || this.canvas;
+                this.engine3D = new Engine3D(canvas3d, this);
+            }
+            if (this.engine3D) {
+                let theme = 'filthadelphia';
+                if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
+                else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
+                else if (window.pirateMode) theme = 'pirate';
+                this.engine3D.buildMapForGame(this.gameMap, theme);
+            }
+        }
+
         if (window.dragonHoCheat || window.dragonMode) {
             const isCheat = window.dragonHoCheat;
             window.dragonHoCheat = false;
@@ -3758,6 +3800,16 @@ class Game {
             if (window.gameLog) {
                 window.gameLog(`_renderGame FIRST call: w=${w}, h=${h}, player.x=${this.player ? this.player.x : 'null'}, camera.x=${this.camera ? this.camera.x : 'null'}, camera size: w=${this.camera ? this.camera.width : 'null'}, h=${this.camera ? this.camera.height : 'null'}`);
             }
+        }
+
+        // ── 3D Retro FPS (Doom/Wolfenstein) Rendering Pipeline ──
+        if (this.engine3D && this.engine3D.enabled) {
+            ctx.clearRect(0, 0, w, h);
+            this.engine3D.render(ctx);
+            // Render floating notifications and alert texts
+            this.hud.renderNotifications(ctx, w, h);
+            this.hud.renderFloatingTexts(ctx);
+            return;
         }
 
         const rotateWorld = (window.chaosMode && window.chaosLevel >= 4);

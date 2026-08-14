@@ -765,6 +765,270 @@ class BaseMap {
         ctx.restore();
     }
 
+    _drawTile(ctx, tile, sx, sy, tx, ty) {
+        const s = TILE_SIZE;
+
+        if (this.islandTiles && this.islandTiles.has(`${tx},${ty}`) && !window.pirateMode) {
+            const bldg = this.getBuildingAtTile(tx, ty);
+            if (bldg && bldg.type === 'fast_food') {
+                if (tile === TileType.BUILDING_DOOR) {
+                    ctx.fillStyle = '#ffaa00';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('DOOR', sx + s/2, sy + s/2 + 3);
+                    return;
+                }
+                ctx.fillStyle = '#d97706';
+                ctx.fillRect(sx, sy, s, s);
+                ctx.strokeStyle = '#78350f';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+                return;
+            }
+            switch (tile) {
+                case TileType.ROAD:
+                case TileType.ROAD_UP:
+                case TileType.ROAD_DOWN:
+                case TileType.ROAD_LEFT:
+                case TileType.ROAD_RIGHT:
+                case TileType.CROSSWALK:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.SIDEWALK:
+                    this._drawBeachTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.BUILDING:
+                case TileType.BUILDING_DOOR:
+                    this._drawIslandTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                default:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+            }
+        }
+
+        if (window.pirateMode) {
+            if (ty === 0) {
+                this._drawIceWallTile(ctx, sx, sy, tx, ty, s);
+                return;
+            }
+
+            const bldg = this.getBuildingAtTile(tx, ty);
+            if (bldg && bldg.type === 'dump') {
+                this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                // Draw Floating Sea Dump Dock / Wooden Barge
+                ctx.save();
+                ctx.fillStyle = '#6e4726';
+                ctx.fillRect(sx + 2, sy + 2, s - 4, s - 4);
+                ctx.strokeStyle = '#4a2f18';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
+
+                const dumpImg = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage('dump') : null;
+                if (dumpImg && (dumpImg.complete || dumpImg instanceof HTMLCanvasElement)) {
+                    ctx.drawImage(dumpImg, sx + s / 2 - 16, sy + s / 2 - 20, 32, 32);
+                } else {
+                    ctx.fillStyle = '#222222';
+                    ctx.fillRect(sx + 12, sy + 12, s - 24, s - 24);
+                }
+
+                ctx.fillStyle = '#00ff88';
+                ctx.font = 'bold 9px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('🗑️ DUMP', sx + s / 2, sy + s - 5);
+
+                const pulse = Math.sin(performance.now() / 150) * 3;
+                ctx.strokeStyle = '#ffcc00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx + s / 2, sy + s / 2, 28 + pulse, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.restore();
+                return;
+            }
+            switch (tile) {
+                case TileType.ROAD:
+                case TileType.ROAD_UP:
+                case TileType.ROAD_DOWN:
+                case TileType.ROAD_LEFT:
+                case TileType.ROAD_RIGHT:
+                case TileType.CROSSWALK:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.SIDEWALK:
+                    this._drawBeachTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                case TileType.BUILDING:
+                case TileType.BUILDING_DOOR:
+                    this._drawIslandTile(ctx, sx, sy, tx, ty, s);
+                    return;
+                default:
+                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
+                    return;
+            }
+        }
+
+        switch (tile) {
+            case TileType.ROAD:
+            case TileType.ROAD_UP:
+            case TileType.ROAD_DOWN:
+            case TileType.ROAD_LEFT:
+            case TileType.ROAD_RIGHT:
+                let roadColor = TILE_COLORS[tile];
+                ctx.fillStyle = roadColor; ctx.fillRect(sx,sy,s,s);
+                if ((tx+ty)%4<2) { ctx.fillStyle='#666';
+                    if(ty%2===0) ctx.fillRect(sx+s/2-1,sy+2,2,s-4);
+                    else ctx.fillRect(sx+2,sy+s/2-1,s-4,2);
+                } break;
+            case TileType.SIDEWALK:
+                let sidewalkColor = TILE_COLORS[TileType.SIDEWALK];
+                let sidewalkDetail = TILE_DETAIL_COLORS[TileType.SIDEWALK];
+                ctx.fillStyle = sidewalkColor; ctx.fillRect(sx,sy,s,s);
+                ctx.strokeStyle=sidewalkDetail; ctx.lineWidth=0.5;
+                ctx.strokeRect(sx+1,sy+1,s-2,s-2);
+                if((tx+ty)%3===0) ctx.strokeRect(sx+s/4,sy+s/4,s/2,s/2);
+                if (this.trees && this.trees.length > 0) {
+                    const tree = this.trees.find(tr => tr.tileX === tx && tr.tileY === ty && !tr.cut);
+                    if (tree) {
+                        this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                    }
+                }
+                break;
+            case TileType.GRASS:
+                let grassColor = TILE_COLORS[TileType.GRASS];
+                let grassDetail = TILE_DETAIL_COLORS[TileType.GRASS];
+                ctx.fillStyle = grassColor; ctx.fillRect(sx,sy,s,s);
+                ctx.fillStyle=grassDetail;
+                const seed=(tx*7+ty*13)%5;
+                for(let i=0;i<3;i++){ctx.fillRect(sx+((seed+i*11)%s),sy+((seed+i*7)%s),1,3);}
+                if((tx*3+ty*7)%17===0){ctx.fillStyle='#e8d44d';ctx.fillRect(sx+10,sy+12,3,3);}
+                else if((tx*5+ty*11)%19===0){ctx.fillStyle='#d46a6a';ctx.fillRect(sx+20,sy+8,3,3);}
+                if (this.trees && this.trees.length > 0) {
+                    const tree = this.trees.find(tr => tr.tileX === tx && tr.tileY === ty && !tr.cut);
+                    if (tree) {
+                        this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
+                    }
+                }
+                if (this.shrooms && this.shrooms.length > 0) {
+                    const shroom = this.shrooms.find(sh => sh.tileX === tx && sh.tileY === ty && !sh.collected);
+                    if (shroom) {
+                        this._drawShroom(ctx, sx + s/2, sy + s/2);
+                    }
+                }
+                break;
+            case TileType.BUILDING: {
+                const bldg = this.getBuildingAtTile(tx, ty);
+                if (bldg && this._playerInsideBuildingId === bldg.id) {
+                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
+                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
+                    break;
+                }
+                
+                if (window.crimeMode && bldg) {
+                    if (bldg.id === 0) {
+                        ctx.fillStyle = '#d4af37';
+                        ctx.fillRect(sx, sy, s, s);
+                        ctx.strokeStyle = '#aa8800';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+                        ctx.fillStyle = '#ffd700';
+                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
+                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
+                        break;
+                    } else if (bldg.id === 1) {
+                        ctx.fillStyle = '#0f2b5c';
+                        ctx.fillRect(sx, sy, s, s);
+                        ctx.strokeStyle = '#05132d';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+                        ctx.fillStyle = '#1c4280';
+                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
+                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
+                        break;
+                    }
+                }
+
+                const ci = (this.buildingMeta && this.buildingMeta[ty]) ? this.buildingMeta[ty][tx] : -1;
+                let c = BUILDING_COLORS[(ci !== undefined && ci >= 0) ? ci : 0] || BUILDING_COLORS[0];
+                let isHospital = bldg && bldg.type === 'hospital';
+                let isAirport = bldg && bldg.type === 'airport';
+                let isPulpMill = bldg && bldg.type === 'pulp_mill';
+                let isBlackMarket = bldg && bldg.type === 'black_market';
+                
+                if (isHospital) {
+                    ctx.fillStyle = '#e8e8e8';
+                } else if (isAirport) {
+                    ctx.fillStyle = '#b0b8c0';
+                } else if (isPulpMill) {
+                    ctx.fillStyle = '#8b5a2b';
+                } else if (isBlackMarket) {
+                    ctx.fillStyle = '#12061c';
+                } else {
+                    ctx.fillStyle = c.base;
+                }
+                ctx.fillRect(sx, sy, s, s);
+                ctx.fillStyle='#2a2a3a';
+                for(let wy=4;wy<s-4;wy+=8) for(let wx=4;wx<s-4;wx+=8){
+                    ctx.fillRect(sx+wx,sy+wy,4,4);
+                    if((tx+ty+wx+wy)%3!==0){ctx.fillStyle='#ffd86e44';ctx.fillRect(sx+wx,sy+wy,4,4);ctx.fillStyle='#2a2a3a';}
+                }
+                ctx.strokeStyle=c.dark;ctx.lineWidth=1;ctx.strokeRect(sx+.5,sy+.5,s-1,s-1);
+                break; }
+            case TileType.BUILDING_DOOR: {
+                const bldg2 = this.getBuildingAtTile(tx, ty);
+                if (bldg2 && this._playerInsideBuildingId === bldg2.id) {
+                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
+                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
+                    break;
+                }
+                const isOpen = bldg2 && this.openDoors.has(bldg2.id);
+                if (isOpen) {
+                    ctx.fillStyle = '#111111';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#ffaa00';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
+                } else {
+                    ctx.fillStyle = TILE_COLORS[TileType.BUILDING_DOOR];
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#5a4530';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(sx + s - 16, sy + s / 2, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#b59300';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                break; }
+            case TileType.CROSSWALK:
+                ctx.fillStyle = TILE_COLORS[TileType.CROSSWALK]; ctx.fillRect(sx,sy,s,s);
+                ctx.fillStyle = TILE_DETAIL_COLORS[TileType.CROSSWALK];
+                ctx.fillRect(sx+4,sy+s/2-2,s-8,4);
+                break;
+            case TileType.PARK_PATH:
+                ctx.fillStyle = TILE_COLORS[TileType.PARK_PATH]; ctx.fillRect(sx,sy,s,s);
+                ctx.fillStyle = TILE_DETAIL_COLORS[TileType.PARK_PATH];
+                ctx.fillRect(sx+2,sy+2,s-4,1);
+                ctx.fillRect(sx+2,sy+s-3,s-4,1);
+                break;
+        }
+    }
+
+    _drawTree(ctx, x, y, theme) {
+        ctx.fillStyle = '#5c4033';
+        ctx.fillRect(x - 2, y, 4, 12); // Trunk
+        ctx.fillStyle = '#2e8b57';
+        ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3cb371';
+        ctx.beginPath(); ctx.arc(x - 4, y - 8, 8, 0, Math.PI * 2); ctx.fill();
+    }
+
     _catalogBuildings() {
         this.buildings = [];
         const visited = Array.from({ length: MAP_HEIGHT }, () => Array(MAP_WIDTH).fill(false));
@@ -1263,270 +1527,6 @@ class GameMap extends BaseMap {
             width: TILE_SIZE,
             height: TILE_SIZE
         });
-    }
-
-    _drawTile(ctx, tile, sx, sy, tx, ty) {
-        const s = TILE_SIZE;
-
-        if (this.islandTiles && this.islandTiles.has(`${tx},${ty}`) && !window.pirateMode) {
-            const bldg = this.getBuildingAtTile(tx, ty);
-            if (bldg && bldg.type === 'fast_food') {
-                if (tile === TileType.BUILDING_DOOR) {
-                    ctx.fillStyle = '#ffaa00';
-                    ctx.fillRect(sx, sy, s, s);
-                    ctx.fillStyle = '#000';
-                    ctx.font = 'bold 8px "Press Start 2P", monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('DOOR', sx + s/2, sy + s/2 + 3);
-                    return;
-                }
-                ctx.fillStyle = '#d97706';
-                ctx.fillRect(sx, sy, s, s);
-                ctx.strokeStyle = '#78350f';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
-                return;
-            }
-            switch (tile) {
-                case TileType.ROAD:
-                case TileType.ROAD_UP:
-                case TileType.ROAD_DOWN:
-                case TileType.ROAD_LEFT:
-                case TileType.ROAD_RIGHT:
-                case TileType.CROSSWALK:
-                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
-                    return;
-                case TileType.SIDEWALK:
-                    this._drawBeachTile(ctx, sx, sy, tx, ty, s);
-                    return;
-                case TileType.BUILDING:
-                case TileType.BUILDING_DOOR:
-                    this._drawIslandTile(ctx, sx, sy, tx, ty, s);
-                    return;
-                default:
-                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
-                    return;
-            }
-        }
-
-        if (window.pirateMode) {
-            if (ty === 0) {
-                this._drawIceWallTile(ctx, sx, sy, tx, ty, s);
-                return;
-            }
-
-            const bldg = this.getBuildingAtTile(tx, ty);
-            if (bldg && bldg.type === 'dump') {
-                this._drawWaterTile(ctx, sx, sy, tx, ty, s);
-                // Draw Floating Sea Dump Dock / Wooden Barge
-                ctx.save();
-                ctx.fillStyle = '#6e4726';
-                ctx.fillRect(sx + 2, sy + 2, s - 4, s - 4);
-                ctx.strokeStyle = '#4a2f18';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
-
-                const dumpImg = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage('dump') : null;
-                if (dumpImg && (dumpImg.complete || dumpImg instanceof HTMLCanvasElement)) {
-                    ctx.drawImage(dumpImg, sx + s / 2 - 16, sy + s / 2 - 20, 32, 32);
-                } else {
-                    ctx.fillStyle = '#222222';
-                    ctx.fillRect(sx + 12, sy + 12, s - 24, s - 24);
-                }
-
-                ctx.fillStyle = '#00ff88';
-                ctx.font = 'bold 9px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('🗑️ DUMP', sx + s / 2, sy + s - 5);
-
-                const pulse = Math.sin(performance.now() / 150) * 3;
-                ctx.strokeStyle = '#ffcc00';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(sx + s / 2, sy + s / 2, 28 + pulse, 0, Math.PI * 2);
-                ctx.stroke();
-
-                ctx.restore();
-                return;
-            }
-            switch (tile) {
-                case TileType.ROAD:
-                case TileType.ROAD_UP:
-                case TileType.ROAD_DOWN:
-                case TileType.ROAD_LEFT:
-                case TileType.ROAD_RIGHT:
-                case TileType.CROSSWALK:
-                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
-                    return;
-                case TileType.SIDEWALK:
-                    this._drawBeachTile(ctx, sx, sy, tx, ty, s);
-                    return;
-                case TileType.BUILDING:
-                case TileType.BUILDING_DOOR:
-                    this._drawIslandTile(ctx, sx, sy, tx, ty, s);
-                    return;
-                default:
-                    this._drawWaterTile(ctx, sx, sy, tx, ty, s);
-                    return;
-            }
-        }
-
-        switch (tile) {
-            case TileType.ROAD:
-            case TileType.ROAD_UP:
-            case TileType.ROAD_DOWN:
-            case TileType.ROAD_LEFT:
-            case TileType.ROAD_RIGHT:
-                let roadColor = TILE_COLORS[tile];
-                ctx.fillStyle = roadColor; ctx.fillRect(sx,sy,s,s);
-                if ((tx+ty)%4<2) { ctx.fillStyle='#666';
-                    if(ty%2===0) ctx.fillRect(sx+s/2-1,sy+2,2,s-4);
-                    else ctx.fillRect(sx+2,sy+s/2-1,s-4,2);
-                } break;
-            case TileType.SIDEWALK:
-                let sidewalkColor = TILE_COLORS[TileType.SIDEWALK];
-                let sidewalkDetail = TILE_DETAIL_COLORS[TileType.SIDEWALK];
-                ctx.fillStyle = sidewalkColor; ctx.fillRect(sx,sy,s,s);
-                ctx.strokeStyle=sidewalkDetail; ctx.lineWidth=0.5;
-                ctx.strokeRect(sx+1,sy+1,s-2,s-2);
-                if((tx+ty)%3===0) ctx.strokeRect(sx+s/4,sy+s/4,s/2,s/2);
-                if (this.trees && this.trees.length > 0) {
-                    const tree = this.trees.find(tr => tr.tileX === tx && tr.tileY === ty && !tr.cut);
-                    if (tree) {
-                        this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
-                    }
-                }
-                break;
-            case TileType.GRASS:
-                let grassColor = TILE_COLORS[TileType.GRASS];
-                let grassDetail = TILE_DETAIL_COLORS[TileType.GRASS];
-                ctx.fillStyle = grassColor; ctx.fillRect(sx,sy,s,s);
-                ctx.fillStyle=grassDetail;
-                const seed=(tx*7+ty*13)%5;
-                for(let i=0;i<3;i++){ctx.fillRect(sx+((seed+i*11)%s),sy+((seed+i*7)%s),1,3);}
-                if((tx*3+ty*7)%17===0){ctx.fillStyle='#e8d44d';ctx.fillRect(sx+10,sy+12,3,3);}
-                else if((tx*5+ty*11)%19===0){ctx.fillStyle='#d46a6a';ctx.fillRect(sx+20,sy+8,3,3);}
-                if (this.trees && this.trees.length > 0) {
-                    const tree = this.trees.find(tr => tr.tileX === tx && tr.tileY === ty && !tr.cut);
-                    if (tree) {
-                        this._drawTree(ctx, sx + s/2, sy + s/2, this.theme);
-                    }
-                }
-                if (this.shrooms && this.shrooms.length > 0) {
-                    const shroom = this.shrooms.find(sh => sh.tileX === tx && sh.tileY === ty && !sh.collected);
-                    if (shroom) {
-                        this._drawShroom(ctx, sx + s/2, sy + s/2);
-                    }
-                }
-                break;
-            case TileType.BUILDING: {
-                const bldg = this.getBuildingAtTile(tx, ty);
-                if (bldg && this._playerInsideBuildingId === bldg.id) {
-                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
-                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
-                    break;
-                }
-                
-                if (window.crimeMode && bldg) {
-                    if (bldg.id === 0) {
-                        ctx.fillStyle = '#d4af37';
-                        ctx.fillRect(sx, sy, s, s);
-                        ctx.strokeStyle = '#aa8800';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
-                        ctx.fillStyle = '#ffd700';
-                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
-                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
-                        break;
-                    } else if (bldg.id === 1) {
-                        ctx.fillStyle = '#0f2b5c';
-                        ctx.fillRect(sx, sy, s, s);
-                        ctx.strokeStyle = '#05132d';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
-                        ctx.fillStyle = '#1c4280';
-                        ctx.fillRect(sx + 4, sy + 4, 8, 4);
-                        ctx.fillRect(sx + 16, sy + 16, 8, 4);
-                        break;
-                    }
-                }
-
-                const ci = this.buildingMeta[ty][tx];
-                let c = BUILDING_COLORS[ci>=0?ci:0];
-                let isHospital = bldg && bldg.type === 'hospital';
-                let isAirport = bldg && bldg.type === 'airport';
-                let isPulpMill = bldg && bldg.type === 'pulp_mill';
-                let isBlackMarket = bldg && bldg.type === 'black_market';
-                
-                if (isHospital) {
-                    ctx.fillStyle = '#e8e8e8';
-                } else if (isAirport) {
-                    ctx.fillStyle = '#b0b8c0';
-                } else if (isPulpMill) {
-                    ctx.fillStyle = '#8b5a2b';
-                } else if (isBlackMarket) {
-                    ctx.fillStyle = '#12061c';
-                } else {
-                    ctx.fillStyle = c.base;
-                }
-                ctx.fillRect(sx, sy, s, s);
-                ctx.fillStyle='#2a2a3a';
-                for(let wy=4;wy<s-4;wy+=8) for(let wx=4;wx<s-4;wx+=8){
-                    ctx.fillRect(sx+wx,sy+wy,4,4);
-                    if((tx+ty+wx+wy)%3!==0){ctx.fillStyle='#ffd86e44';ctx.fillRect(sx+wx,sy+wy,4,4);ctx.fillStyle='#2a2a3a';}
-                }
-                ctx.strokeStyle=c.dark;ctx.lineWidth=1;ctx.strokeRect(sx+.5,sy+.5,s-1,s-1);
-                break; }
-            case TileType.BUILDING_DOOR: {
-                const bldg2 = this.getBuildingAtTile(tx, ty);
-                if (bldg2 && this._playerInsideBuildingId === bldg2.id) {
-                    ctx.fillStyle = '#8b7355'; ctx.fillRect(sx,sy,s,s);
-                    ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
-                    break;
-                }
-                const isOpen = bldg2 && this.openDoors.has(bldg2.id);
-                if (isOpen) {
-                    ctx.fillStyle = '#111111';
-                    ctx.fillRect(sx, sy, s, s);
-                    ctx.strokeStyle = '#ffaa00';
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(sx + 2, sy + 2, s - 4, s - 4);
-                } else {
-                    ctx.fillStyle = TILE_COLORS[TileType.BUILDING_DOOR];
-                    ctx.fillRect(sx, sy, s, s);
-                    ctx.strokeStyle = '#5a4530';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
-                    ctx.fillStyle = '#ffd700';
-                    ctx.beginPath();
-                    ctx.arc(sx + s - 16, sy + s / 2, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#b59300';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
-                break; }
-            case TileType.CROSSWALK:
-                ctx.fillStyle = TILE_COLORS[TileType.CROSSWALK]; ctx.fillRect(sx,sy,s,s);
-                ctx.fillStyle = TILE_DETAIL_COLORS[TileType.CROSSWALK];
-                ctx.fillRect(sx+4,sy+s/2-2,s-8,4);
-                break;
-            case TileType.PARK_PATH:
-                ctx.fillStyle = TILE_COLORS[TileType.PARK_PATH]; ctx.fillRect(sx,sy,s,s);
-                ctx.fillStyle = TILE_DETAIL_COLORS[TileType.PARK_PATH];
-                ctx.fillRect(sx+2,sy+2,s-4,1);
-                ctx.fillRect(sx+2,sy+s-3,s-4,1);
-                break;
-        }
-    }
-
-    _drawTree(ctx, x, y, theme) {
-        ctx.fillStyle = '#5c4033';
-        ctx.fillRect(x - 2, y, 4, 12); // Trunk
-        ctx.fillStyle = '#2e8b57';
-        ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#3cb371';
-        ctx.beginPath(); ctx.arc(x - 4, y - 8, 8, 0, Math.PI * 2); ctx.fill();
     }
 }
 

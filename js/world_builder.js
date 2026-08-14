@@ -39,8 +39,11 @@ class WorldBuilder {
         this.currentDraftId = null;
         this.autoSaveTimer = null;
 
-        // Map Data
+        // Map Data & Undo Stack (20 steps)
         this.mapData = this.createBlankMapData();
+        this.undoStack = [];
+        this.drawStartTile = null;
+        this.lastTile = null;
 
         this.initDOM();
     }
@@ -97,6 +100,7 @@ class WorldBuilder {
                     </select>
                 </div>
                 <div style="display:flex; gap:8px; align-items:center;">
+                    <button id="btn-builder-undo" class="btn secondary" style="font-size:7px; padding:8px 10px; background:#442266; border-color:#8844cc; opacity:0.5;" disabled>UNDO ↩️</button>
                     <button id="btn-builder-save-draft" class="btn" style="background:linear-gradient(135deg,#0088ff,#0044aa); font-size:7px; padding:8px 10px;">SAVE DRAFT 💾</button>
                     <button id="btn-builder-my-drafts" class="btn secondary" style="font-size:7px; padding:8px 10px;">MY DRAFTS 📂</button>
                     <button id="btn-builder-new" class="btn secondary" style="font-size:7px; padding:8px 10px;">Blank Map</button>
@@ -436,11 +440,19 @@ class WorldBuilder {
         const viewport = modal.querySelector('#builder-viewport');
 
         viewport.addEventListener('mousedown', (e) => {
-            if (e.button === 1 || e.shiftKey) {
+            if (e.button === 1) {
                 this.isDragging = true;
                 this.dragStart = { x: e.clientX - this.camera.x, y: e.clientY - this.camera.y };
             } else if (e.button === 0) {
+                this.saveUndoState();
                 this.isMouseDown = true;
+                const rect = this.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                const tx = Math.floor((mouseX - this.camera.x) / (this.tileSize * this.camera.zoom));
+                const ty = Math.floor((mouseY - this.camera.y) / (this.tileSize * this.camera.zoom));
+                this.drawStartTile = { x: tx, y: ty };
+                this.lastTile = { x: tx, y: ty };
                 this.applyToolAtMouse(e);
             }
         });
@@ -469,7 +481,19 @@ class WorldBuilder {
         window.addEventListener('mouseup', () => {
             this.isDragging = false;
             this.isMouseDown = false;
+            this.drawStartTile = null;
+            this.lastTile = null;
         });
+
+        window.addEventListener('keydown', (e) => {
+            const overlay = document.getElementById('world-builder-overlay');
+            if (overlay && overlay.style.display !== 'none' && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                this.undo();
+            }
+        });
+
+        modal.querySelector('#btn-builder-undo').addEventListener('click', () => this.undo());
 
         viewport.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -483,11 +507,82 @@ class WorldBuilder {
 
         modal.querySelector('#btn-builder-clear').addEventListener('click', () => {
             if (confirm('Clear entire map to grass?')) {
+                this.saveUndoState();
                 this.mapData = this.createBlankMapData();
                 this.render();
                 this.saveDraft(true);
             }
         });
+    }
+
+    // ── Undo History Methods (Max 20 steps) ──
+
+    saveUndoState() {
+        if (!this.mapData) return;
+        const snapshot = JSON.stringify(this.mapData);
+        if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === snapshot) {
+            return;
+        }
+        this.undoStack.push(snapshot);
+        if (this.undoStack.length > 20) {
+            this.undoStack.shift();
+        }
+        this.updateUndoButtonState();
+    }
+
+    undo() {
+        if (this.undoStack.length === 0) return;
+        const snapshot = this.undoStack.pop();
+        try {
+            this.mapData = JSON.parse(snapshot);
+        } catch (e) {
+            console.error("Failed to restore undo state:", e);
+        }
+        this.updateUndoButtonState();
+        this.render();
+    }
+
+    updateUndoButtonState() {
+        const btn = this.container ? this.container.querySelector('#btn-builder-undo') : null;
+        if (btn) {
+            if (this.undoStack.length > 0) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.innerText = `UNDO (${this.undoStack.length}) ↩️`;
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                btn.innerText = `UNDO ↩️`;
+            }
+        }
+    }
+
+    drawLine(x0, y0, x1, y1, callback) {
+        const dx = Math.abs(x1 - x0);
+        const dy = Math.abs(y1 - y0);
+        const sx = (x0 < x1) ? 1 : -1;
+        const sy = (y0 < y1) ? 1 : -1;
+        let err = dx - dy;
+        let currX = x0;
+        let currY = y0;
+
+        while (true) {
+            if (currX >= 0 && currX < this.mapW && currY >= 0 && currY < this.mapH) {
+                callback(currX, currY);
+            }
+            if (currX === x1 && currY === y1) break;
+            const e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                currX += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                currY += sy;
+            }
+        }
     }
 
     // ── Save & Resume Draft Methods ──
@@ -704,23 +799,43 @@ class WorldBuilder {
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        const tx = Math.floor((mouseX - this.camera.x) / (this.tileSize * this.camera.zoom));
-        const ty = Math.floor((mouseY - this.camera.y) / (this.tileSize * this.camera.zoom));
+        let tx = Math.floor((mouseX - this.camera.x) / (this.tileSize * this.camera.zoom));
+        let ty = Math.floor((mouseY - this.camera.y) / (this.tileSize * this.camera.zoom));
 
         if (tx < 0 || tx >= this.mapW || ty < 0 || ty >= this.mapH) return;
+
+        if (!this.drawStartTile) this.drawStartTile = { x: tx, y: ty };
+        if (!this.lastTile) this.lastTile = { x: tx, y: ty };
+
+        if (e.shiftKey && this.drawStartTile) {
+            const dx = Math.abs(tx - this.drawStartTile.x);
+            const dy = Math.abs(ty - this.drawStartTile.y);
+            if (dx >= dy) {
+                ty = this.drawStartTile.y;
+            } else {
+                tx = this.drawStartTile.x;
+            }
+        }
 
         if (this.currentTool === 'tile') {
             if (this.brushSize === 'fill') {
                 this.floodFillTile(tx, ty, this.selectedTileType);
             } else {
-                for (let dy = 0; dy < this.brushSize; dy++) {
-                    for (let dx = 0; dx < this.brushSize; dx++) {
-                        const wx = tx + dx;
-                        const wy = ty + dy;
-                        if (wx < this.mapW && wy < this.mapH) {
-                            this.mapData.tiles[wy][wx] = this.selectedTileType;
+                const applyAt = (targetX, targetY) => {
+                    for (let dy = 0; dy < this.brushSize; dy++) {
+                        for (let dx = 0; dx < this.brushSize; dx++) {
+                            const wx = targetX + dx;
+                            const wy = targetY + dy;
+                            if (wx >= 0 && wx < this.mapW && wy >= 0 && wy < this.mapH) {
+                                this.mapData.tiles[wy][wx] = this.selectedTileType;
+                            }
                         }
                     }
+                };
+                if (e.shiftKey && this.drawStartTile) {
+                    this.drawLine(this.drawStartTile.x, this.drawStartTile.y, tx, ty, (lx, ly) => applyAt(lx, ly));
+                } else {
+                    this.drawLine(this.lastTile.x, this.lastTile.y, tx, ty, (lx, ly) => applyAt(lx, ly));
                 }
             }
         } else if (this.currentTool === 'building') {
@@ -734,7 +849,7 @@ class WorldBuilder {
                     const wx = tx + dx;
                     const wy = ty + dy;
                     if (wx < this.mapW && wy < this.mapH) {
-                        this.mapData.tiles[wy][wx] = 3; // TileType.BUILDING
+                        this.mapData.tiles[wy][wx] = 3;
                         this.mapData.buildingMeta[wy][wx] = bldgId;
                         bldgTiles.push({ x: wx, y: wy });
                     }
@@ -742,7 +857,7 @@ class WorldBuilder {
             }
 
             const doorTile = { x: tx + Math.floor(bw / 2), y: ty + bh - 1 };
-            this.mapData.tiles[doorTile.y][doorTile.x] = 4; // TileType.BUILDING_DOOR
+            this.mapData.tiles[doorTile.y][doorTile.x] = 4;
 
             this.mapData.buildings.push({
                 id: bldgId,
@@ -784,7 +899,8 @@ class WorldBuilder {
                     x: tx * 64 + 32,
                     y: ty * 64 + 32,
                     role: this.selectedEntity.role,
-                    spriteId: this.selectedEntity.spriteId
+                    spriteId: this.selectedEntity.spriteId || 'char_npc',
+                    type: this.selectedEntity.id || 'npc_citizen'
                 });
             }
         }
@@ -893,14 +1009,22 @@ class WorldBuilder {
         }
 
         if (this.mapData.npcs) {
-            ctx.fillStyle = '#00ffff';
             for (const npc of this.mapData.npcs) {
+                const spriteKey = npc.spriteId || (npc.type && npc.type.startsWith('char') ? npc.type : 'char_npc');
+                let img = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage(spriteKey) : null;
+                if (!img) img = (window.game && window.game.spriteManager) ? window.game.spriteManager.getImage('char_npc') : null;
+
                 const sx = this.camera.x + npc.tileX * ts;
                 const sy = this.camera.y + npc.tileY * ts;
                 if (sx + ts >= 0 && sx <= this.canvas.width && sy + ts >= 0 && sy <= this.canvas.height) {
-                    ctx.beginPath();
-                    ctx.arc(sx + ts / 2, sy + ts / 2, ts * 0.35, 0, Math.PI * 2);
-                    ctx.fill();
+                    if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+                        ctx.drawImage(img, sx, sy, ts, ts);
+                    } else {
+                        ctx.fillStyle = '#00ffff';
+                        ctx.beginPath();
+                        ctx.arc(sx + ts / 2, sy + ts / 2, ts * 0.35, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             }
         }

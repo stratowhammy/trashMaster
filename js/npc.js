@@ -299,6 +299,21 @@ class NPCManager {
         this.npcs = [];
         this.activeDialogue = null;
 
+        // If gameMap provides custom placed NPCs (e.g. from CustomMap), spawn them
+        if (gameMap && gameMap.npcs && Array.isArray(gameMap.npcs) && gameMap.npcs.length > 0) {
+            for (const nData of gameMap.npcs) {
+                const spriteId = nData.spriteId || (nData.type && nData.type.startsWith('char') ? nData.type : 'char_npc');
+                const dlg = nData.dialogue || ["Hello there!", "Enjoying this custom map!"];
+                const name = nData.name || NPC_NAMES[Math.floor(Math.random() * NPC_NAMES.length)];
+                const npc = new NPC(nData.tileX || 0, nData.tileY || 0, spriteId, dlg, name, false);
+                if (window.game && window.game.letterSpawnPool) {
+                    const pool = window.game.letterSpawnPool;
+                    npc.assignedLetter = pool[Math.floor(Math.random() * pool.length)];
+                }
+                this.npcs.push(npc);
+            }
+        }
+
         // Find all walkable tiles (sidewalks, roads, crosswalks) across any map
         const sidewalks = [];
         for (let y = 0; y < MAP_HEIGHT; y++) {

@@ -1017,6 +1017,16 @@ class Game {
                 }
             }
 
+            if (this.isPaused && this.pauseReturnBtnBounds) {
+                const b = this.pauseReturnBtnBounds;
+                if (clickX >= b.x && clickX <= b.x + b.w && clickY >= b.y && clickY <= b.y + b.h) {
+                    if (confirm("Return to store? The current level will be nullified and nothing will be recorded.")) {
+                        this.nullifyLevelAndReturnToStore();
+                    }
+                    return;
+                }
+            }
+
             if (this.state === GameState.CHARACTER_SELECT) {
                 this._handleCharSelect(e);
             } else if (this.state === GameState.GAME_OVER) {
@@ -3516,6 +3526,64 @@ class Game {
         }
     }
 
+    async nullifyLevelAndReturnToStore() {
+        console.log("Level nullified by user. Returning to store without recording stats.");
+        this.isPaused = false;
+
+        const btnPause = document.getElementById('btn-pause');
+        if (btnPause) {
+            btnPause.innerHTML = 'PAUSE';
+            btnPause.style.background = 'rgba(20, 25, 40, 0.88)';
+            btnPause.style.borderColor = '#ffcc00';
+        }
+
+        // Reset temporary in-level flags and modes
+        this.doubleTrashPickup = false;
+        window.chaosCheatActive = false;
+        window.chaosMode = false;
+        window.employeesHired = 0;
+        window.cultMode = false;
+        window.pirateMode = false;
+        window.flowersMode = false;
+        window.fastFoodMode = false;
+        window.cultLeavingActive = false;
+        window.travelDestination = null;
+        window.customMapData = null;
+
+        const chaosToggle = document.getElementById('chaos-toggle');
+        if (chaosToggle) chaosToggle.checked = false;
+
+        // Hide overlay dialogs
+        const dialogsToHide = [
+            'cult-leaving-dialog',
+            'fast-food-dialog',
+            'instructions-dialog',
+            'pirate-defeat-screen',
+            'stranded-screen',
+            'primary-win-screen',
+            'death-screen',
+            'messages-log-dialog'
+        ];
+        for (const id of dialogsToHide) {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        }
+
+        // Revert to backend state without calling /api/game/end-round
+        if (window.refreshGameState) {
+            try {
+                await window.refreshGameState();
+            } catch (e) {
+                console.error("Error refreshing game state during level nullification:", e);
+            }
+        }
+
+        if (window.renderStore) window.renderStore();
+        if (window.showScreen) window.showScreen('store-screen');
+
+        this.state = GameState.UI_OVERLAY;
+    }
+
     async _endRoundAndReturnToStore() {
         if (!window.apiCall) return; // Not logged in
         if (window.soundManager) window.soundManager.playVictoriousEndSoundtrack();
@@ -4257,17 +4325,43 @@ class Game {
         // Render Pause Screen Overlay
         if (this.isPaused) {
             ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
             ctx.fillRect(0, 0, w, h);
 
             ctx.fillStyle = '#ffcc00';
             ctx.font = 'bold 36px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('PAUSED', w / 2, h / 2 - 20);
+            ctx.fillText('PAUSED', w / 2, h / 2 - 50);
 
             ctx.fillStyle = '#ffffff';
             ctx.font = '11px "Press Start 2P", monospace';
-            ctx.fillText('Press [P], [ESC] or click PAUSE button to resume', w / 2, h / 2 + 30);
+            ctx.fillText('Press [P], [ESC] or click PAUSE button to resume', w / 2, h / 2 - 10);
+
+            // Draw Return to Store button on Pause screen
+            const btnW = 260;
+            const btnH = 44;
+            const btnX = w / 2 - btnW / 2;
+            const btnY = h / 2 + 25;
+
+            this.pauseReturnBtnBounds = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+            const pulse = Math.sin(performance.now() / 250) * 0.08 + 0.92;
+            ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+            else ctx.fillRect(btnX, btnY, btnW, btnH);
+            ctx.fill();
+
+            ctx.strokeStyle = '#ff6666';
+            ctx.lineWidth = 2;
+            if (ctx.roundRect) ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+            else ctx.strokeRect(btnX, btnY, btnW, btnH);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px "Press Start 2P", monospace';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('RETURN TO STORE', w / 2, btnY + btnH / 2);
             ctx.restore();
         }
     }

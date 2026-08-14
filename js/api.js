@@ -50,6 +50,11 @@ function showScreen(screenId) {
     const cultDialog = document.getElementById('cult-leaving-dialog');
     if (cultDialog) cultDialog.classList.add('hidden');
 
+    const btnReturnStore = document.getElementById('btn-return-store');
+    if (btnReturnStore) {
+        btnReturnStore.style.display = (screenId === 'game-layer') ? 'inline-block' : 'none';
+    }
+
     if (screenId === 'game-layer') {
         document.getElementById('ui-layer').classList.add('hidden');
         document.getElementById('gameCanvas').classList.remove('hidden');
@@ -190,8 +195,10 @@ function initUI() {
     const logout = () => {
         authToken = null;
         userRole = null;
+        window.currentUsername = null;
         localStorage.removeItem('trashMasterToken');
         localStorage.removeItem('trashMasterRole');
+        localStorage.removeItem('trashMasterUsername');
         showScreen('login-screen');
     };
 
@@ -630,6 +637,20 @@ function initUI() {
     if (btnKeybindsReset) btnKeybindsReset.addEventListener('click', () => {
         if (window.keybindManager) window.keybindManager.resetKeybinds();
     });
+
+    // Return to Store Button Listener
+    const btnReturnStore = document.getElementById('btn-return-store');
+    if (btnReturnStore) {
+        btnReturnStore.addEventListener('click', () => {
+            if (confirm("Return to store? The current level will be nullified and nothing will be recorded.")) {
+                if (window.game && typeof window.game.nullifyLevelAndReturnToStore === 'function') {
+                    window.game.nullifyLevelAndReturnToStore();
+                } else if (window.showScreen) {
+                    window.showScreen('store-screen');
+                }
+            }
+        });
+    }
 
     if (sliderMusicVolume) {
         sliderMusicVolume.addEventListener('input', (e) => {
@@ -2756,7 +2777,7 @@ window.getGallerySnapshots = function() {
     try {
         const username = window.currentUsername || localStorage.getItem('trashMasterUsername') || 'default';
         const userKey = `trashMasterGallery_${username}`;
-        const data = localStorage.getItem(userKey) || localStorage.getItem('trashMasterGallery');
+        const data = localStorage.getItem(userKey);
         return data ? JSON.parse(data) : [];
     } catch (e) {
         return [];
@@ -2768,7 +2789,6 @@ window.saveGallerySnapshots = function(array) {
         const username = window.currentUsername || localStorage.getItem('trashMasterUsername') || 'default';
         const userKey = `trashMasterGallery_${username}`;
         localStorage.setItem(userKey, JSON.stringify(array));
-        localStorage.setItem('trashMasterGallery', JSON.stringify(array));
     } catch (e) {
         console.error('Failed to save gallery to localStorage', e);
     }

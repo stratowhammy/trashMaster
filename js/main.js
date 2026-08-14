@@ -3363,6 +3363,8 @@ class Game {
         this.camera.snapTo(this.player.x, this.player.y);
         if (window.gameLog) window.gameLog(`_startGame: camera snapped to x=${this.camera.x}, y=${this.camera.y}, size: w=${this.camera.width}, h=${this.camera.height}`);
 
+        this._resizeCanvas();
+
         // Initialize 3D Retro FPS Engine & Build 3D Map
         if (window.Engine3D) {
             if (!this.engine3D) {

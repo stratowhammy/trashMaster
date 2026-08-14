@@ -11,9 +11,9 @@ class Engine3D {
 
         // 3D Three.js core
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.FogExp2(0x0f172a, 0.015); // Retro Doom sector fog
+        this.scene.fog = new THREE.Fog(0x1e3a8a, 80, 350); // Crisp 16-bit retro atmospheric horizon
 
-        this.camera = new THREE.PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 500);
+        this.camera = new THREE.PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 800);
         this.camera.position.set(0, 2.0, 0); // Eye height
 
         // Hardware-accelerated WebGL Renderer
@@ -25,11 +25,15 @@ class Engine3D {
         this.renderer.setSize(canvas.width, canvas.height, false);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // Atmospheric lighting
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        // Atmospheric lighting for rich 16-bit materials
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
         this.scene.add(this.ambientLight);
 
-        this.playerLight = new THREE.PointLight(0xfffbeb, 1.2, 35);
+        this.sunLight = new THREE.DirectionalLight(0xfffbeb, 0.9);
+        this.sunLight.position.set(60, 120, 40);
+        this.scene.add(this.sunLight);
+
+        this.playerLight = new THREE.PointLight(0xfffbeb, 1.0, 40);
         this.playerLight.position.set(0, 2.0, 0);
         this.scene.add(this.playerLight);
 

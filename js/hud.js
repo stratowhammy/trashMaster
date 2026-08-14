@@ -617,6 +617,43 @@ class HUD {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Return to Store', centerX, btnY + btnH / 2);
+    renderNotifications(ctx, canvasWidth, canvasHeight) {
+        if (this.followerNotificationTimer > 0) {
+            const notifAlpha = Math.min(1, this.followerNotificationTimer / 30);
+            const notifY = 80;
+            const notifScale = this.followerNotificationTimer > 150 ?
+                1 + (180 - this.followerNotificationTimer) * 0.01 : 1;
+
+            ctx.save();
+            ctx.globalAlpha = notifAlpha;
+            ctx.translate(canvasWidth / 2, notifY);
+            ctx.scale(notifScale, notifScale);
+
+            // Background
+            ctx.fillStyle = this.followerNotificationPositive ? 'rgba(0,50,100,0.85)' : 'rgba(100,20,20,0.85)';
+            ctx.font = 'bold 10px "Press Start 2P", monospace';
+            const tw = ctx.measureText(this.followerNotification).width + 40;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(-tw / 2 - 10, -18, tw + 20, 40, 10);
+            else ctx.fillRect(-tw / 2 - 10, -18, tw + 20, 40);
+            ctx.fill();
+            ctx.strokeStyle = this.followerNotificationPositive ? '#00ccff' : '#ff4444';
+            ctx.lineWidth = 2;
+            if (ctx.roundRect) ctx.roundRect(-tw / 2 - 10, -18, tw + 20, 40, 10);
+            else ctx.strokeRect(-tw / 2 - 10, -18, tw + 20, 40);
+            ctx.stroke();
+
+            ctx.fillStyle = this.followerNotificationPositive ? '#00ff88' : '#ff4444';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.followerNotification, 0, 2);
+
+            ctx.restore();
+        }
+    }
+
+    renderFloatingTexts(ctx) {
+        // Floating texts hook
     }
 
     renderDoomStatusBar(ctx, w, h, game) {
@@ -624,37 +661,40 @@ class HUD {
         const barY = h - barH;
 
         ctx.save();
-        // Outer Doom Status Bar Bevel
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, barY, w, barH);
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(0, barY, w, 4); // Top highlight
+        // Full width bottom bar background
         ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, barY, w, barH);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(0, barY, w, 3); // Top highlight border
+        ctx.fillStyle = '#020617';
         ctx.fillRect(0, barY + barH - 2, w, 2); // Bottom shadow
 
-        // Inner Section Panels
+        // Calculate panel dimensions
+        const maxBarWidth = Math.min(w - 20, 960);
+        const startX = (w - maxBarWidth) / 2;
+
+        const pFaceW = 64;
+        const remainingW = maxBarWidth - pFaceW - 24;
+        const p1W = Math.floor(remainingW * 0.35); // Trash Load
+        const p3W = Math.floor(remainingW * 0.35); // Bank Balance & Posse
+        const p4W = remainingW - p1W - p3W;        // Time & Mode
+
+        let currX = startX;
+
+        // 1. TRASH LOAD PANEL
         const panelMargin = 6;
         const panelY = barY + panelMargin;
         const panelH = barH - panelMargin * 2;
 
-        const p1W = Math.max(160, w * 0.28); // Trash Capacity Panel
-        const p2W = 70;                      // Character Face Portrait
-        const p3W = Math.max(160, w * 0.28); // Points & Posse
-        const p4W = Math.max(140, w * 0.24); // Timer & Item
-
-        let currX = (w - (p1W + p2W + p3W + p4W + 24)) / 2;
-        if (currX < 10) currX = 10;
-
-        // ── 1. TRASH CAPACITY PANEL ──
         ctx.fillStyle = '#090d16';
         ctx.fillRect(currX, panelY, p1W, panelH);
         ctx.strokeStyle = '#334155';
         ctx.lineWidth = 2;
         ctx.strokeRect(currX, panelY, p1W, panelH);
 
-        const truckCount = (game && game.trashTrucksPurchased) || 0;
+        const truckCount = (game && game.trashTrucksPurchased) || (window.playerHasTruck) || 0;
         const maxCapacity = 100 + truckCount * 200;
-        const currentTrash = (this.trashCarried || 0);
+        const currentTrash = (game && game.trashCollectedInRound !== undefined) ? game.trashCollectedInRound : (this.trashCarried || 0);
         const trashPct = Math.min(1.0, currentTrash / maxCapacity);
 
         ctx.fillStyle = '#94a3b8';
@@ -662,72 +702,65 @@ class HUD {
         ctx.textAlign = 'left';
         ctx.fillText('TRASH LOAD', currX + 8, panelY + 14);
 
-        // Capacity Progress Bar
+        // Progress Bar
         const barW = p1W - 16;
-        const barFillW = barW * trashPct;
+        const barFillW = Math.max(0, barW * trashPct);
         ctx.fillStyle = '#1e293b';
-        ctx.fillRect(currX + 8, panelY + 22, barW, 14);
+        ctx.fillRect(currX + 8, panelY + 20, barW, 12);
 
-        let fillColor = '#22c55e'; // Green
-        if (trashPct > 0.85) fillColor = '#ef4444'; // Red full
-        else if (trashPct > 0.6) fillColor = '#eab308'; // Yellow
+        let fillColor = '#22c55e';
+        if (trashPct >= 1.0) fillColor = '#ef4444';
+        else if (trashPct > 0.6) fillColor = '#eab308';
 
         ctx.fillStyle = fillColor;
-        ctx.fillRect(currX + 8, panelY + 22, barFillW, 14);
+        ctx.fillRect(currX + 8, panelY + 20, barFillW, 12);
         ctx.strokeStyle = '#000';
-        ctx.strokeRect(currX + 8, panelY + 22, barW, 14);
+        ctx.strokeRect(currX + 8, panelY + 20, barW, 12);
 
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 8px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${currentTrash} / ${maxCapacity}`, currX + p1W / 2, panelY + 46);
+        ctx.fillText(`${currentTrash} / ${maxCapacity}`, currX + p1W / 2, panelY + 44);
 
         currX += p1W + 8;
 
-        // ── 2. DOOM CHARACTER FACE PORTRAIT ──
+        // 2. DOOM FACE PORTRAIT
         ctx.fillStyle = '#090d16';
-        ctx.fillRect(currX, panelY, p2W, panelH);
+        ctx.fillRect(currX, panelY, pFaceW, panelH);
         ctx.strokeStyle = '#e2e8f0';
         ctx.lineWidth = 2;
-        ctx.strokeRect(currX, panelY, p2W, panelH);
+        ctx.strokeRect(currX, panelY, pFaceW, panelH);
 
-        // Draw animated 16-bit face in center of portrait frame
-        const faceCX = currX + p2W / 2;
+        const faceCX = currX + pFaceW / 2;
         const faceCY = panelY + panelH / 2;
-
         const time = performance.now() / 1000;
-        const lookDir = Math.sin(time * 1.5); // Looks left and right
+        const lookDir = Math.sin(time * 1.5);
 
-        // Head Base
-        ctx.fillStyle = '#fed7aa'; // Skin tone
-        ctx.fillRect(faceCX - 14, faceCY - 14, 28, 28);
-
-        // Hair / Cap
+        // Face skin
+        ctx.fillStyle = '#fed7aa';
+        ctx.fillRect(faceCX - 12, faceCY - 12, 24, 24);
+        // Hair
         ctx.fillStyle = '#854d0e';
-        ctx.fillRect(faceCX - 16, faceCY - 18, 32, 8);
-
+        ctx.fillRect(faceCX - 14, faceCY - 15, 28, 7);
         // Eyes
         const eyeOffset = lookDir > 0.3 ? 2 : (lookDir < -0.3 ? -2 : 0);
         ctx.fillStyle = '#0f172a';
-        ctx.fillRect(faceCX - 8 + eyeOffset, faceCY - 6, 4, 4);
-        ctx.fillRect(faceCX + 4 + eyeOffset, faceCY - 6, 4, 4);
-
-        // Mouth (Smile if high score/trash, grit teeth if full/cops)
-        if (trashPct > 0.9) {
-            // Gritting teeth
+        ctx.fillRect(faceCX - 7 + eyeOffset, faceCY - 4, 3, 3);
+        ctx.fillRect(faceCX + 3 + eyeOffset, faceCY - 4, 3, 3);
+        // Mouth
+        if (trashPct >= 1.0) {
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(faceCX - 8, faceCY + 5, 16, 4);
+            ctx.fillRect(faceCX - 6, faceCY + 5, 12, 4);
             ctx.fillStyle = '#991b1b';
-            ctx.fillRect(faceCX - 8, faceCY + 6, 16, 1);
+            ctx.fillRect(faceCX - 6, faceCY + 6, 12, 1);
         } else {
-            // Grin / Smile
             ctx.fillStyle = '#991b1b';
-            ctx.fillRect(faceCX - 6, faceCY + 5, 12, 3);
+            ctx.fillRect(faceCX - 5, faceCY + 5, 10, 3);
         }
 
-        currX += p2W + 8;
+        currX += pFaceW + 8;
 
-        // ── 3. BANK & MONEY LED PANEL ──
+        // 3. BANK & SCORE LED PANEL
         ctx.fillStyle = '#090d16';
         ctx.fillRect(currX, panelY, p3W, panelH);
         ctx.strokeStyle = '#334155';
@@ -739,18 +772,17 @@ class HUD {
         ctx.textAlign = 'left';
         ctx.fillText('BANK BALANCE', currX + 8, panelY + 14);
 
-        // Digital LED Green Score
         ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 13px "Press Start 2P", monospace';
-        ctx.fillText(`$${this.score || 0}`, currX + 8, panelY + 32);
+        ctx.font = 'bold 12px "Press Start 2P", monospace';
+        ctx.fillText(`$${this.score || 0}`, currX + 8, panelY + 30);
 
         ctx.fillStyle = '#38bdf8';
-        ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + 8, panelY + 46);
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + 8, panelY + 44);
 
         currX += p3W + 8;
 
-        // ── 4. TIME & MODE PANEL ──
+        // 4. TIME LEFT & MODE PANEL
         ctx.fillStyle = '#090d16';
         ctx.fillRect(currX, panelY, p4W, panelH);
         ctx.strokeStyle = '#334155';
@@ -762,14 +794,14 @@ class HUD {
         ctx.textAlign = 'left';
         ctx.fillText('TIME LEFT', currX + 8, panelY + 14);
 
-        // Timer
-        const m = Math.floor(Math.max(0, this.timer) / 60);
-        const s = Math.floor(Math.max(0, this.timer) % 60);
+        const timeLeft = (this.timeRemaining !== undefined ? this.timeRemaining : 120);
+        const m = Math.floor(Math.max(0, timeLeft) / 60);
+        const s = Math.floor(Math.max(0, timeLeft) % 60);
         const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 
-        ctx.fillStyle = this.timer < 30 ? '#ef4444' : '#facc15';
-        ctx.font = 'bold 13px "Press Start 2P", monospace';
-        ctx.fillText(timeStr, currX + 8, panelY + 32);
+        ctx.fillStyle = timeLeft < 30 ? '#ef4444' : '#facc15';
+        ctx.font = 'bold 12px "Press Start 2P", monospace';
+        ctx.fillText(timeStr, currX + 8, panelY + 30);
 
         let modeLabel = '🏙️ CLEANING';
         if (window.pirateMode) modeLabel = '🏴‍☠️ PIRATE';
@@ -779,7 +811,7 @@ class HUD {
 
         ctx.fillStyle = '#e2e8f0';
         ctx.font = '7px "Press Start 2P", monospace';
-        ctx.fillText(modeLabel, currX + 8, panelY + 46);
+        ctx.fillText(modeLabel, currX + 8, panelY + 44);
 
         ctx.restore();
     }

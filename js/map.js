@@ -15,6 +15,7 @@ const TileType = {
     ROAD_LEFT: 9,
     ROAD_RIGHT: 10,
 };
+window.TileType = TileType;
 
 const TILE_SIZE = 64;
 const MAP_WIDTH = 128;

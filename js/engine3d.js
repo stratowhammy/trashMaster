@@ -57,17 +57,18 @@ class Engine3D {
     }
 
     _setupPointerLock() {
-        // Request pointer lock on canvas click
-        this.canvas.addEventListener('click', () => {
+        const clickTarget = (this.game && this.game.canvas) ? this.game.canvas : this.canvas;
+
+        clickTarget.addEventListener('click', () => {
             if (this.game && this.game.state === GameState.PLAYING && !this.game.isPaused) {
                 if (!document.pointerLockElement) {
-                    this.canvas.requestPointerLock();
+                    clickTarget.requestPointerLock();
                 }
             }
         });
 
         document.addEventListener('pointerlockchange', () => {
-            this.pointerLocked = (document.pointerLockElement === this.canvas);
+            this.pointerLocked = (document.pointerLockElement === clickTarget || document.pointerLockElement === this.canvas);
         });
 
         // Mouse movement for mouselook
@@ -77,7 +78,7 @@ class Engine3D {
                 this.yaw -= e.movementX * sensitivity;
                 this.pitch -= e.movementY * sensitivity;
 
-                // Clamp pitch so camera doesn't flip upside down (-85 deg to +85 deg)
+                // Clamp pitch (-85 deg to +85 deg)
                 const maxPitch = (85 * Math.PI) / 180;
                 this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch));
             }
@@ -208,8 +209,8 @@ class Engine3D {
     }
 
     render(ctx) {
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const w = (ctx && ctx.canvas) ? ctx.canvas.width : (this.canvas ? this.canvas.width : window.innerWidth);
+        const h = (ctx && ctx.canvas) ? ctx.canvas.height : (this.canvas ? this.canvas.height : window.innerHeight);
 
         // 1. Render 3D WebGL Scene
         this.renderer.render(this.scene, this.camera);

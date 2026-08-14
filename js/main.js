@@ -1118,8 +1118,18 @@ class Game {
     _resizeCanvas() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        const canvas3d = document.getElementById('gameCanvas3d');
+        if (canvas3d) {
+            canvas3d.width = window.innerWidth;
+            canvas3d.height = window.innerHeight;
+        }
         if (this.camera) {
             this.camera.resize(this.canvas.width, this.canvas.height);
+        }
+        if (this.engine3D && this.engine3D.renderer) {
+            this.engine3D.camera.aspect = window.innerWidth / window.innerHeight;
+            this.engine3D.camera.updateProjectionMatrix();
+            this.engine3D.renderer.setSize(window.innerWidth, window.innerHeight, false);
         }
     }
 
@@ -2774,8 +2784,12 @@ class Game {
             this.canvas.style.filter = 'none';
         }
 
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, w, h);
+        if (this.state === GameState.PLAYING && this.engine3D && this.engine3D.enabled) {
+            ctx.clearRect(0, 0, w, h);
+        } else {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, w, h);
+        }
 
         switch (this.state) {
             case GameState.LOADING:

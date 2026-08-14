@@ -223,9 +223,9 @@ class FPSViewmodel {
 
         if (!toolImg) return;
 
-        const size = Math.min(screenWidth, screenHeight) * 0.55;
+        const size = Math.min(screenWidth, screenHeight) * 0.45;
         const x = screenWidth / 2 - size / 2 + this.bobAmountX;
-        const y = screenHeight - size + 20 + this.bobAmountY + (this.isActing ? -15 : 0);
+        const y = screenHeight - size - 45 + this.bobAmountY + (this.isActing ? -15 : 0);
 
         ctx.drawImage(toolImg, x, y, size, size);
     }

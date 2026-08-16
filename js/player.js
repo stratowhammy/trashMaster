@@ -29,7 +29,7 @@ class Player {
         this.stamina = 100;
         this.isSprinting = false;
         this.staminaDepletionRate = 22; // ~4.5s of continuous sprinting
-        this.staminaRecoveryRate = 20;   // ~5s to fully recover
+        this.staminaRecoveryRate = 16;   // ~6.25s to fully recover (+25% longer recovery time)
 
         // Jumping state
         this.isJumping = false;

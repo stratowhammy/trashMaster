@@ -18,7 +18,8 @@ class ProfileManager {
             { id: 'penguin_sticker.png', file: 'penguin_sticker.png', path: 'assets/stickers/penguin_sticker.png', name: 'Penguin' },
             { id: 'polarbear_sticker.png', file: 'polarbear_sticker.png', path: 'assets/stickers/polarbear_sticker.png', name: 'Polar Bear' },
             { id: 'puma_sticker.png', file: 'puma_sticker.png', path: 'assets/stickers/puma_sticker.png', name: 'Puma' },
-            { id: 'ronaldo_sticker.png', file: 'ronaldo_sticker.png', path: 'assets/stickers/ronaldo_sticker.png', name: 'Ronaldo' }
+            { id: 'ronaldo_sticker.png', file: 'ronaldo_sticker.png', path: 'assets/stickers/ronaldo_sticker.png', name: 'Ronaldo' },
+            { id: 'melted_face_sticker.png', file: 'melted_face_sticker.png', path: 'assets/stickers/melted_face_sticker.png', name: '💀 Melted Skull (Alex Jones Face Melt)' }
         ];
 
         this.currentProfile = null;

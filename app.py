@@ -936,6 +936,62 @@ def spend_credit():
     return jsonify({'success': True, 'credits_remaining': int(updated['credits'] or 0)})
 
 
+@app.route('/api/game/buy-credit', methods=['POST'])
+def buy_credit():
+    """Purchase or acquire extra starting credits."""
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT credits, balance FROM users WHERE id=?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    amount = int(request.json.get('amount', 1))
+    cost = int(request.json.get('cost', 0))
+    balance = user['balance'] or 0
+
+    if cost > 0 and balance < cost:
+        return jsonify({'error': f'Not enough cash. Need ${cost:,}'}), 400
+
+    new_credits = (user['credits'] or 0) + amount
+    if cost > 0:
+        db.execute("UPDATE users SET balance = balance - ?, credits = ? WHERE id=?", (cost, new_credits, user_data['user_id']))
+    else:
+        db.execute("UPDATE users SET credits = ? WHERE id=?", (new_credits, user_data['user_id']))
+    db.commit()
+
+    # If player gets too many credits (> 3), Alex Jones triggers!
+    alex_jones_triggered = new_credits > 3
+    return jsonify({
+        'success': True,
+        'credits_remaining': new_credits,
+        'alex_jones_face_melt': alex_jones_triggered,
+        'message': 'CREDITS OVERFLOW! ALEX JONES IS COMING!' if alex_jones_triggered else f'+{amount} Credits acquired!'
+    })
+
+
+@app.route('/api/game/alex-jones-melt-face', methods=['POST'])
+def alex_jones_melt_face():
+    """Triggered after Alex Jones melts the player's face: incinerates illegal credits and marks melted face."""
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+
+    db = get_db()
+    # Incinerate credits to 0 and record face melt penalty
+    db.execute("UPDATE users SET credits = 0 WHERE id=?", (user_data['user_id'],))
+    db.commit()
+
+    return jsonify({
+        'success': True,
+        'credits_remaining': 0,
+        'melted': True,
+        'message': 'Face melted by Alex Jones! Illegal credits incinerated to 0!'
+    })
+
+
 @app.route('/api/game/consume', methods=['POST'])
 def consume_item():
     user_data = verify_token(request)

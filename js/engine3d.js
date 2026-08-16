@@ -339,9 +339,12 @@ class Engine3D {
         // 5. Render Top Right HUD (Timer, Trash Collected, Messages & Navigation)
         this._renderTopHUD(ctx, w, h);
 
-        // 6. Render Doom Status Bar HUD
+        // 6. Render Doom Status Bar HUD & Dynamic Status/Timer Bars (Happiness, Hunger, Animals, Buffs)
         if (this.game && this.game.hud) {
             this.game.hud.renderDoomStatusBar(ctx, w, h, this.game);
+            this.game.hud.renderStatusAndTimerBars(ctx, w, h, 84, true);
+            this.game.hud.renderNotifications(ctx, w, h);
+            this.game.hud.renderInventoryUI(ctx, w, h);
         }
     }
 

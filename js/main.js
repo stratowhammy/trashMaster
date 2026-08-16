@@ -4014,8 +4014,11 @@ class Game {
             window.chaosMode = false;
             const chaosToggle = document.getElementById('chaos-toggle');
             if (chaosToggle) chaosToggle.checked = false;
+            if (result && result.today_games_count !== undefined) {
+                window.todayGamesCount = result.today_games_count;
+            }
             await window.refreshGameState();
-            window.renderStore();
+            if (window.renderStore) window.renderStore();
 
             if (result && result.multiplier && result.multiplier > 1) {
                 alert(`🎱 Magic 8-Ball Activated! Your score was multiplied by ${result.multiplier}x!`);

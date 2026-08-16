@@ -614,6 +614,11 @@ def sync_game():
         except Exception:
             pass
 
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    cursor.execute("SELECT COUNT(*) AS count FROM gameplay_logs WHERE user_id = ? AND play_date = ?", (user_data['user_id'], today_str))
+    today_row = cursor.fetchone()
+    today_games_count = today_row['count'] if today_row else 0
+
     return jsonify({
         'word_game_state': {
             'collected_letters': json.loads(word_game['collected_letters'] or '{}'),
@@ -648,6 +653,7 @@ def sync_game():
         'max_streak': int(user['max_streak']),
         'streak_qualified': streak_qualified,
         'last_active_date': user['last_active_date'],
+        'today_games_count': today_games_count,
         'inventory': inventory,
         'stats': {
             'stat_max_single_trash': user['stat_max_single_trash'] or 0,
@@ -934,62 +940,6 @@ def spend_credit():
     cursor.execute("SELECT credits FROM users WHERE id=?", (user_data['user_id'],))
     updated = cursor.fetchone()
     return jsonify({'success': True, 'credits_remaining': int(updated['credits'] or 0)})
-
-
-@app.route('/api/game/buy-credit', methods=['POST'])
-def buy_credit():
-    """Purchase or acquire extra starting credits."""
-    user_data = verify_token(request)
-    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
-
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT credits, balance FROM users WHERE id=?", (user_data['user_id'],))
-    user = cursor.fetchone()
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-
-    amount = int(request.json.get('amount', 1))
-    cost = int(request.json.get('cost', 0))
-    balance = user['balance'] or 0
-
-    if cost > 0 and balance < cost:
-        return jsonify({'error': f'Not enough cash. Need ${cost:,}'}), 400
-
-    new_credits = (user['credits'] or 0) + amount
-    if cost > 0:
-        db.execute("UPDATE users SET balance = balance - ?, credits = ? WHERE id=?", (cost, new_credits, user_data['user_id']))
-    else:
-        db.execute("UPDATE users SET credits = ? WHERE id=?", (new_credits, user_data['user_id']))
-    db.commit()
-
-    # If player gets too many credits (> 3), Alex Jones triggers!
-    alex_jones_triggered = new_credits > 3
-    return jsonify({
-        'success': True,
-        'credits_remaining': new_credits,
-        'alex_jones_face_melt': alex_jones_triggered,
-        'message': 'CREDITS OVERFLOW! ALEX JONES IS COMING!' if alex_jones_triggered else f'+{amount} Credits acquired!'
-    })
-
-
-@app.route('/api/game/alex-jones-melt-face', methods=['POST'])
-def alex_jones_melt_face():
-    """Triggered after Alex Jones melts the player's face: incinerates illegal credits and marks melted face."""
-    user_data = verify_token(request)
-    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
-
-    db = get_db()
-    # Incinerate credits to 0 and record face melt penalty
-    db.execute("UPDATE users SET credits = 0 WHERE id=?", (user_data['user_id'],))
-    db.commit()
-
-    return jsonify({
-        'success': True,
-        'credits_remaining': 0,
-        'melted': True,
-        'message': 'Face melted by Alex Jones! Illegal credits incinerated to 0!'
-    })
 
 
 @app.route('/api/game/consume', methods=['POST'])
@@ -1406,6 +1356,11 @@ def end_round():
     # Process gameplay tracking timestamp, daily streak, and lid reward generation
     streak_info = process_gameplay_log(db, user_data['user_id'], round_num=total_rounds_played)
 
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    cursor.execute("SELECT COUNT(*) AS count FROM gameplay_logs WHERE user_id = ? AND play_date = ?", (user_data['user_id'], today_str))
+    today_row = cursor.fetchone()
+    today_games_count = today_row['count'] if today_row else 1
+
     db.commit()
     
     return jsonify({
@@ -1425,7 +1380,8 @@ def end_round():
         'lids': streak_info['total_lids'] if streak_info else 0,
         'lids_awarded': streak_info['lids_awarded'] if streak_info else 0,
         'retroactive_payout': streak_info['retroactive_payout'] if streak_info else False,
-        'current_streak': streak_info['current_streak'] if streak_info else 0
+        'current_streak': streak_info['current_streak'] if streak_info else 0,
+        'today_games_count': today_games_count
     })
 
 @app.route('/api/game/streak-status', methods=['GET'])

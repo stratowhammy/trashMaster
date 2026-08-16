@@ -1344,6 +1344,17 @@ class Game {
         if (this.medicationAlertActive) {
             this.medicationAlertActive = false;
             this.medsTakenCount = (this.medsTakenCount || 0) + 1;
+
+            // If screen was previously inverted/rotated from a missed dose, restore back to normal!
+            const wasDistorted = this.medsMissed;
+            this.medsMissed = false;
+            const viewport = document.getElementById('game-viewport');
+            if (viewport) {
+                viewport.style.filter = '';
+                viewport.style.transform = '';
+                viewport.style.transformOrigin = '';
+            }
+
             if (this.medicationSchedule) {
                 const activeEv = this.medicationSchedule.find(e => e.triggered && !e.completed);
                 if (activeEv) activeEv.completed = true;
@@ -1352,7 +1363,10 @@ class Game {
                 window.soundManager.playPillSwallowSFX();
             }
             if (this.hud) {
-                this.hud.showFollowerNotification(`💊 Took Medication (${this.medsTakenCount}/3)! Mind is crystal clear! ✨`, true);
+                const msg = wasDistorted 
+                    ? `💊 Took Medication (${this.medsTakenCount}/3)! Vision & screen restored to normal! ✨`
+                    : `💊 Took Medication (${this.medsTakenCount}/3)! Mind is crystal clear! ✨`;
+                this.hud.showFollowerNotification(msg, true);
                 if (this.trashManager) {
                     this.trashManager.totalPoints += 150;
                     this.hud.updateScore(this.trashManager.totalPoints);

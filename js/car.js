@@ -30,7 +30,7 @@ class Car {
             const tile = gameMap.getTile(tx, ty);
 
             // Encountered island shore or landmass boundary! Turn around & pick a random water direction
-            if (tile === TileType.SIDEWALK || tile === TileType.BUILDING || tile === TileType.BUILDING_DOOR) {
+            if (tile === TileType.SIDEWALK || tile === TileType.BUILDING || tile === TileType.BUILDING_DOOR || tile === TileType.LAKE) {
                 const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.707, 0.707], [-0.707, 0.707], [0.707, -0.707], [-0.707, -0.707]];
                 this.dir = dirs[Math.floor(Math.random() * dirs.length)];
                 return;

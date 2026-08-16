@@ -29,6 +29,17 @@ class TrashManager {
 
     spawnInitial(gameMap, count) {
         this.items = [];
+
+        // Check if custom map data has pre-placed trash fields
+        const customTrash = (gameMap && (gameMap.trash || gameMap.trashItems || (gameMap.data && gameMap.data.trash)));
+        if (customTrash && customTrash.length > 0) {
+            for (const t of customTrash) {
+                const item = new TrashItem(t.tileX, t.tileY, t.type !== undefined ? t.type : Math.floor(Math.random() * 4));
+                this.items.push(item);
+            }
+            return;
+        }
+
         let placed = 0;
         let attempts = 0;
         const maxAttempts = count * 10;

@@ -512,7 +512,7 @@ class MapBuilder3D {
         const roofBuckets = [];
 
         const getFloorMatKey = (tileType, x, y) => {
-            if (window.pirateMode || tileType === (window.TileType ? TileType.WATER : 99) || tileType === 99) {
+            if (window.pirateMode || tileType === (window.TileType ? TileType.LAKE : 11) || tileType === 11 || tileType === (window.TileType ? TileType.WATER : 99) || tileType === 99) {
                 return 'ocean_water';
             }
             if (gameMap.islandTiles && gameMap.islandTiles.has(`${x},${y}`)) {

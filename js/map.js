@@ -14,6 +14,7 @@ const TileType = {
     ROAD_DOWN: 8,
     ROAD_LEFT: 9,
     ROAD_RIGHT: 10,
+    LAKE: 11,
 };
 window.TileType = TileType;
 
@@ -76,7 +77,7 @@ const TILE_COLORS = {
     [TileType.ROAD]: '#4a4a4a', [TileType.SIDEWALK]: '#b0a89a',
     [TileType.GRASS]: '#4a8c3f', [TileType.BUILDING]: '#6b5b73',
     [TileType.BUILDING_DOOR]: '#8b7355', [TileType.CROSSWALK]: '#d4d4d4',
-    [TileType.PARK_PATH]: '#c8b890',
+    [TileType.PARK_PATH]: '#c8b890', [TileType.LAKE]: '#0f5a9e',
     [TileType.ROAD_UP]: '#4a4a4a', [TileType.ROAD_DOWN]: '#4a4a4a',
     [TileType.ROAD_LEFT]: '#4a4a4a', [TileType.ROAD_RIGHT]: '#4a4a4a',
 };
@@ -84,7 +85,7 @@ const TILE_DETAIL_COLORS = {
     [TileType.ROAD]: '#3d3d3d', [TileType.SIDEWALK]: '#9e978a',
     [TileType.GRASS]: '#3d7a33', [TileType.BUILDING]: '#5a4d62',
     [TileType.BUILDING_DOOR]: '#7a6348', [TileType.CROSSWALK]: '#ffffff',
-    [TileType.PARK_PATH]: '#b8a880',
+    [TileType.PARK_PATH]: '#b8a880', [TileType.LAKE]: '#0a3d6b',
     [TileType.ROAD_UP]: '#3d3d3d', [TileType.ROAD_DOWN]: '#3d3d3d',
     [TileType.ROAD_LEFT]: '#3d3d3d', [TileType.ROAD_RIGHT]: '#3d3d3d',
 };
@@ -415,6 +416,15 @@ class BaseMap {
         const t = this.tiles[wy][wx];
         if (t === undefined) return false;
         
+        // Lake tile check: acts like a building/obstacle for regular walking, but ducky can swim over!
+        if (t === TileType.LAKE) {
+            const isDucky = window.game && window.game.player && (
+                window.game.player.characterClass === 'duck' || 
+                (window.currentUserAvatar || localStorage.getItem('trashMasterAvatar') || '').toLowerCase().includes('duck')
+            );
+            return isDucky;
+        }
+
         if (curTX === undefined || curTY === undefined) {
             if (t === TileType.BUILDING) return false;
             if (t === TileType.BUILDING_DOOR) {
@@ -1128,6 +1138,16 @@ class BaseMap {
                 ctx.fillRect(sx+2,sy+2,s-4,1);
                 ctx.fillRect(sx+2,sy+s-3,s-4,1);
                 break;
+            case TileType.LAKE: {
+                ctx.fillStyle = TILE_COLORS[TileType.LAKE];
+                ctx.fillRect(sx, sy, s, s);
+                // Sparkling ripples
+                const wave = Math.sin((performance.now() / 600) + (tx * 0.8) + (ty * 1.1));
+                ctx.fillStyle = 'rgba(120, 210, 255, 0.3)';
+                ctx.fillRect(sx + 6, sy + 14 + wave * 4, s - 12, 3);
+                ctx.fillRect(sx + 14, sy + 38 - wave * 3, s - 28, 2.5);
+                break;
+            }
         }
     }
 
@@ -1809,6 +1829,10 @@ class CustomMap extends BaseMap {
         if (data.trees) this.trees = data.trees;
         if (data.objects) this.objects = data.objects;
         if (data.npcs) this.npcs = data.npcs;
+        if (data.trash) {
+            this.trash = data.trash;
+            this.trashItems = data.trash;
+        }
         if (data.openDoors) this.openDoors = new Set(data.openDoors);
         if (data.parkBlocks) this.parkBlocks = data.parkBlocks;
 

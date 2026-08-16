@@ -720,6 +720,9 @@ class HUD {
             ctx.textAlign = 'left';
         }
         ctx.restore();
+
+        // Render Medication Alert Banner / Status in 2D Mode
+        this.renderMedicationAlert(ctx, canvasWidth, canvasHeight);
     }
 
     renderGameOver(ctx, canvasWidth, canvasHeight) {
@@ -1064,8 +1067,8 @@ class HUD {
 
         ctx.restore();
 
-        // Render Medication Alert Banner / Status
-        this.renderMedicationAlert(ctx, canvasWidth, canvasHeight);
+        // Render Medication Alert Banner / Status in 3D Mode
+        this.renderMedicationAlert(ctx, w, h);
     }
 
     renderMedicationAlert(ctx, w, h) {

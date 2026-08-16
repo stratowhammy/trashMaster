@@ -29,7 +29,8 @@ class SoundManager {
             gunshot: true,
             cash: true,
             choir: true,
-            dialog: true
+            dialog: true,
+            ear_piercing: true
         };
 
         this.NOTES = {
@@ -101,11 +102,19 @@ class SoundManager {
     // ── SFX Toggles Controls ──
     setSFXToggle(key, enabled) {
         this.sfxToggles[key] = !!enabled;
+        // If ear-piercing is disabled while it's actively playing, stop it immediately
+        if (key === 'ear_piercing' && !enabled && this.earPiercingGain) {
+            this.stopEarPiercingLoop();
+        }
     }
 
     setAllSFXToggles(enabled) {
         for (const k in this.sfxToggles) {
             this.sfxToggles[k] = !!enabled;
+        }
+        // If all SFX are disabled and ear-piercing is playing, stop it
+        if (!enabled && this.earPiercingGain) {
+            this.stopEarPiercingLoop();
         }
     }
 
@@ -558,6 +567,75 @@ class SoundManager {
         osc2.stop(now + 0.85);
     }
 
+    startEarPiercingLoop() {
+        if (this.isMuted) return;
+        if (!this.isSFXEnabled('ear_piercing')) return;
+        if (this.earPiercingGain) return; // already playing
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const osc3 = this.ctx.createOscillator();
+        const gainNode = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(3600, now);
+
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(3628, now); // 28Hz dissonant beating screech
+
+        osc3.type = 'square';
+        osc3.frequency.setValueAtTime(1800, now);
+
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(1400, now);
+        filter.Q.setValueAtTime(4.0, now);
+
+        gainNode.gain.setValueAtTime(0.01, now);
+        gainNode.gain.linearRampToValueAtTime(0.28, now + 0.3);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        osc3.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.masterGain);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc3.start(now);
+
+        this.earPiercingOscs = [osc1, osc2, osc3];
+        this.earPiercingGain = gainNode;
+    }
+
+    stopEarPiercingLoop() {
+        if (!this.earPiercingGain || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        try {
+            this.earPiercingGain.gain.linearRampToValueAtTime(0.001, now + 0.15);
+            const oscs = this.earPiercingOscs;
+            const gn = this.earPiercingGain;
+            this.earPiercingGain = null;
+            this.earPiercingOscs = null;
+            setTimeout(() => {
+                if (oscs) {
+                    oscs.forEach(o => {
+                        try { o.stop(); o.disconnect(); } catch(e) {}
+                    });
+                }
+                if (gn) {
+                    try { gn.disconnect(); } catch(e) {}
+                }
+            }, 160);
+        } catch(e) {
+            this.earPiercingGain = null;
+            this.earPiercingOscs = null;
+        }
+    }
+
     playTone(freq, type = 'sine', duration = 0.2, startTime = 0, gainLevel = 0.15) {
         if (!this.ctx || this.isMuted || typeof freq !== 'number' || !isFinite(freq) || freq <= 0) return;
 
@@ -700,6 +778,8 @@ class SoundManager {
             this.playCucarachaSoundtrack();
         } else if (this.currentTrack === 'dahgbad') {
             this.playDahgbadSoundtrack();
+        } else if (this.currentTrack === 'ear_piercing' || this.currentTrack === 'earpiercing' || this.currentTrack === 'screech') {
+            this.startEarPiercingLoop();
         } else {
             this.restartSequence();
         }
@@ -1177,10 +1257,121 @@ class SoundManager {
         }, stepTime * 1000);
     }
 
+    startGoldRushMusic() {
+        if (this.currentTrack === 'gold_rush') return;
+        this.previousTrackBeforeGoldRush = this.currentTrack || window.selectedMusicTrack || 'game';
+        this.stop();
+        this._initAudio();
+        this.currentTrack = 'gold_rush';
+        this.currentStep = 0;
+
+        const bpm = 126; // High energy funky tempo
+        const stepTime = (60 / bpm) / 4; // 16th note steps
+
+        // Funky Dramatic chords (E minor 9, A dominant 13, C major 7 #11, B7 alt)
+        const funkChords = [
+            ['E3', 'G3', 'B3', 'D4', 'FS4'],
+            ['A3', 'C4', 'E4', 'G4', 'B4'],
+            ['C4', 'E4', 'G4', 'B4', 'D5'],
+            ['B3', 'DS4', 'FS4', 'A4', 'C5']
+        ];
+
+        // Slap Bass / Synth Bass sequence patterns (syncopated funky groover)
+        const funkBass = [
+            'E2', '-', 'E2', 'G2', '-', 'A2', '-', 'AS2', 'B2', '-', 'D3', '-', 'E3', '-', 'D3', 'B2',
+            'A2', '-', 'A2', 'C3', '-', 'D3', '-', 'DS3', 'E3', '-', 'G3', '-', 'A3', '-', 'G3', 'E3',
+            'C2', '-', 'C2', 'E2', '-', 'G2', '-', 'A2', 'B2', '-', 'D3', '-', 'E3', '-', 'D3', 'B2',
+            'B1', '-', 'B1', 'DS2', '-', 'FS2', '-', 'A2', 'B2', '-', 'DS3', '-', 'FS3', '-', 'A3', 'DS3'
+        ];
+
+        this.sequenceInterval = setInterval(() => {
+            if (this.currentTrack !== 'gold_rush') return;
+            const now = this.ctx ? this.ctx.currentTime : 0;
+            const step = this.currentStep % 64;
+            const barIndex = Math.floor(step / 16);
+            const stepInBar = step % 16;
+
+            // Dramatic Brassy Funk Chords on syncopated upbeats
+            if (stepInBar === 0 || stepInBar === 3 || stepInBar === 6 || stepInBar === 10 || stepInBar === 14) {
+                const chord = funkChords[barIndex];
+                if (chord) {
+                    chord.forEach((note, idx) => {
+                        const freq = this.NOTES[note];
+                        if (freq) {
+                            // Brassy synth stab with filter decay
+                            this.playTone(freq, idx % 2 === 0 ? 'sawtooth' : 'triangle', stepTime * 1.8, now, 0.16);
+                        }
+                    });
+                }
+            }
+
+            // Funky Slap Bassline
+            const bassNote = funkBass[step];
+            if (bassNote && bassNote !== '-' && this.NOTES[bassNote]) {
+                const isHighPop = bassNote.includes('3');
+                this.playTone(this.NOTES[bassNote], isHighPop ? 'triangle' : 'sawtooth', stepTime * 1.6, now, isHighPop ? 0.32 : 0.38);
+            }
+
+            // Punchy Four-on-the-floor + Funk Syncopated Kicks
+            if (stepInBar === 0 || stepInBar === 6 || stepInBar === 10 || stepInBar === 12) {
+                this.playLofiKick(now);
+            }
+
+            // Snappy Funk Snare on 4 and 12, plus ghost snare on 15
+            if (stepInBar === 4 || stepInBar === 12) {
+                this.playLofiSnare(now);
+            } else if (stepInBar === 15) {
+                // Ghost snare
+                if (!this.isMuted && !this.isMusicMuted && this.ctx) {
+                    const noise = this.ctx.createBufferSource();
+                    const buf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.04), this.ctx.sampleRate);
+                    const data = buf.getChannelData(0);
+                    for (let i = 0; i < buf.length; i++) data[i] = Math.random() * 2 - 1;
+                    noise.buffer = buf;
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                    noise.connect(gain);
+                    gain.connect(this.masterGain);
+                    noise.start(now);
+                    noise.stop(now + 0.04);
+                }
+            }
+
+            // 16th-note Hi-hats with open hats on offbeats
+            if (stepInBar % 2 === 0) {
+                const isOpenHat = (stepInBar === 2 || stepInBar === 6 || stepInBar === 10 || stepInBar === 14);
+                this.playLofiHat(now, isOpenHat);
+            }
+
+            this.currentStep++;
+        }, stepTime * 1000);
+    }
+
+    stopGoldRushMusic() {
+        if (this.currentTrack === 'gold_rush') {
+            this.stop();
+            const prev = this.previousTrackBeforeGoldRush || window.selectedMusicTrack || 'game';
+            this.playTrack(prev);
+        }
+    }
+
+    playGoldPickupSFX() {
+        if (!this.sfxToggles.trash || this.sfxMuted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const freqs = [880, 1108.73, 1318.51, 1760]; // Bright A major arpeggio
+        freqs.forEach((f, i) => {
+            this.playTone(f, 'sine', 0.12, now + i * 0.03, 0.22);
+        });
+    }
+
     stop() {
         if (this.sequenceInterval) {
             clearInterval(this.sequenceInterval);
             this.sequenceInterval = null;
+        }
+        if (typeof this.stopEarPiercingLoop === 'function') {
+            this.stopEarPiercingLoop();
         }
         this.currentTrack = null;
     }

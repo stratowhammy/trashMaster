@@ -808,9 +808,9 @@ input:checked + .slider:before {
 
 .sprite-options-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
 }
 
 .sprite-option-btn {
@@ -962,6 +962,56 @@ input:checked + .slider:before {
     transform: translateX(4px);
     border-color: #00ffcc !important;
     box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+}
+
+/* Floating Quick Controls Panel */
+#floating-quick-controls {
+    position: fixed;
+    right: 16px;
+    top: 72%;
+    bottom: auto;
+    transform: translateY(-50%);
+    z-index: 1005;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+    transition: all 0.2s ease;
+    pointer-events: auto;
+}
+
+#floating-quick-controls button {
+    width: 130px;
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 8px;
+    box-sizing: border-box;
+    cursor: pointer;
+    border-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    transition: all 0.2s ease;
+    font-family: 'Press Start 2P', monospace;
+}
+
+#floating-quick-controls button:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.2);
+}
+
+/* During the Round (In-Game): Move down to bottom right hand side */
+#floating-quick-controls.in-game {
+    top: auto !important;
+    bottom: 16px !important;
+    right: 16px !important;
+    transform: none !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+#floating-quick-controls.in-game button {
+    width: auto !important;
+    padding: 10px 14px !important;
 }
 
 

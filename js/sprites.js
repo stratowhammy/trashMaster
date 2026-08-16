@@ -10,6 +10,7 @@ const SPRITE_CONFIG = {
         { id: 'char4', name: 'Athlete',    src: 'assets/sprites/char4.png', color: '#cc3333' },
         { id: 'char5', name: 'Robot',      src: 'assets/sprites/char5.png', color: '#8899aa' },
         { id: 'char6', name: 'Superhero',  src: 'assets/sprites/char6.png', color: '#7733cc' },
+        { id: 'char7', name: 'GD Cube',    src: 'assets/sprites/char7.png', color: '#00ff99' },
     ],
     trash: [
         { id: 'trash1', name: 'Paper',       src: 'assets/sprites/trash1.png' },
@@ -49,7 +50,8 @@ const SPRITE_CONFIG = {
         { id: 'item_quinine', name: 'Quinine', src: 'assets/sprites/quinine.png' },
         { id: 'item_organizer', name: 'Organizer', src: 'assets/sprites/organizer.png' },
         { id: 'shroom', name: 'Wild Mushroom', src: 'assets/sprites/shroom.png', color: '#d946ef' },
-        { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/goose.png', color: '#ffaa00' },
+        { id: 'fast_food', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ff8800' },
+        { id: 'fast_food_sign', name: 'Fast Food Sign', src: 'assets/sprites/fast_food.png', color: '#ff8800' },
         { id: 'zippy_ds', name: "Zippy D's Sign", src: 'assets/sprites/ZippyDs.png', color: '#ffcc00' },
         { id: 'chinos_steaks', name: "Chino's Steaks Sign", src: 'assets/sprites/Chinos_Steaks.png', color: '#ff3333' },
         { id: 'rats_steaks', name: "Rats Steaks Sign", src: 'assets/sprites/Rats_Steaks.png', color: '#3399ff' },
@@ -91,88 +93,165 @@ const SPRITE_CONFIG = {
         { id: 'hospital', name: 'Hospital', src: 'assets/sprites/hospital.png', color: '#ff4444' },
         { id: 'pulp_mill', name: 'Pulp Mill', src: 'assets/sprites/organizer.png', color: '#a0522d' },
         { id: 'zoo', name: 'Zoo Animal', src: 'assets/sprites/animal.png', color: '#ffaa00' },
-        { id: 'cityhall', name: 'City Hall', src: 'assets/sprites/philly_city_hall.png' }
+        { id: 'cityhall', name: 'City Hall', src: 'assets/sprites/philly_city_hall.png' },
+        { id: 'leatherdaddy_frog', name: 'Leatherdaddy Frog', src: 'assets/sprites/leatherdaddy_frog.png', color: '#22c55e' },
+        { id: 'library', name: 'City Library', src: 'assets/sprites/library.png', color: '#60a5fa' },
+        { id: 'book_of_knowledge', name: 'Big Book of Knowledge', src: 'assets/sprites/book_of_knowledge.png', color: '#9333ea' },
+        { id: 'third_eye', name: 'Third Eye', src: 'assets/sprites/third_eye.png', color: '#06b6d4' }
     ]
 };
 
 function getBuildingVisualInfo(type) {
     if (!type || type === 'default' || type === 'normal') return null;
+    const t = String(type).toLowerCase().trim().replace(/[\s\-]+/g, '_');
 
-    switch (type) {
+    switch (t) {
+        // Facilities & Special Buildings
+        case 'library':
+        case 'city_library':
+        case 'book_library':
+            return { label: "CITY LIBRARY", spriteKey: 'library', icon: '📚', color: '#60a5fa', borderColor: '#93c5fd' };
+
         // Restaurants
+        case 'chinos':
+        case 'chino':
         case 'chinos_steaks':
+        case 'chino_steaks':
             return { label: "CHINO'S STEAKS", spriteKey: 'chinos_steaks', icon: '🥩', color: '#ff3333', borderColor: '#ff6666' };
+        case 'rats':
+        case 'rat':
         case 'rats_steaks':
+        case 'rat_steaks':
             return { label: "RATS STEAKS", spriteKey: 'rats_steaks', icon: '🥩', color: '#3399ff', borderColor: '#66b2ff' };
+        case 'zippy':
+        case 'zippys':
+        case 'zippyds':
         case 'zippy_ds':
             return { label: "ZIPPY D'S", spriteKey: 'zippy_ds', icon: '🌯', color: '#ffcc00', borderColor: '#ffe066' };
         case 'goose':
+        case 'wawa':
             return { label: "GOOSE", spriteKey: 'goose', icon: '🥪', color: '#ffaa00', borderColor: '#ffcc44' };
         case 'fast_food':
-            return { label: "FAST FOOD", spriteKey: 'goose', icon: '🍔', color: '#ffaa00', borderColor: '#ffcc44' };
+        case 'fastfood':
+        case 'fast_food_sign':
+        case 'fast_food_joint':
+            return { label: "FAST FOOD", spriteKey: 'fast_food', icon: '🍔', color: '#ff8800', borderColor: '#ffaa44' };
 
         // Infrastructure & Facilities
         case 'dump':
+        case 'city_dump':
+        case 'citydump':
             return { label: "CITY DUMP", spriteKey: 'dump', icon: '🗑️', color: '#00ff88', borderColor: '#44ffaa' };
         case 'airport':
+        case 'city_airport':
+        case 'flight_terminal':
             return { label: "AIRPORT", spriteKey: 'airport', icon: '✈️', color: '#00ccff', borderColor: '#66e0ff' };
         case 'black_market':
+        case 'blackmarket':
             return { label: "BLACK MARKET", spriteKey: 'black_market', icon: '☠️', color: '#ff0055', borderColor: '#ff4488' };
         case 'hospital':
+        case 'city_hospital':
+        case 'hospital_landmark':
             return { label: "HOSPITAL", spriteKey: 'hospital_landmark', icon: '🏥', color: '#ff4444', borderColor: '#ff8888' };
         case 'police':
+        case 'police_dept':
+        case 'police_badge':
+        case 'police_station':
+        case 'precinct':
             return { label: "POLICE DEPT", spriteKey: 'police_badge', icon: '👮', color: '#3388ff', borderColor: '#66a3ff' };
         case 'bank':
+        case 'first_bank':
             return { label: "FIRST BANK", spriteKey: 'treasure', icon: '🏦', color: '#ffd700', borderColor: '#ffe666' };
         case 'zoo':
+        case 'city_zoo':
             return { label: "CITY ZOO", spriteKey: 'animal', icon: '🦁', color: '#ffaa00', borderColor: '#ffcc44' };
         case 'pulp_mill':
+        case 'pulpmill':
             return { label: "PULP MILL", spriteKey: 'pulp_mill', icon: '🪵', color: '#e08a44', borderColor: '#f0aa77' };
+        case 'cityhall':
+        case 'city_hall':
+        case 'philly_city_hall':
+            return { label: "CITY HALL", spriteKey: 'philly_city_hall', icon: '🏛️', color: '#00ffcc', borderColor: '#66ffea' };
 
         // Philly Landmarks
-        case 'cityhall':
-            return { label: "CITY HALL", spriteKey: 'philly_city_hall', icon: '🏛️', color: '#00ffcc', borderColor: '#66ffea' };
         case 'art_museum':
+        case 'artmuseum':
+        case 'philly_art_museum':
             return { label: "ART MUSEUM", spriteKey: 'philly_art_museum', icon: '🎨', color: '#ff77bb', borderColor: '#ff99cc' };
         case 'liberty_bell':
+        case 'libertybell':
+        case 'philly_liberty_bell':
             return { label: "LIBERTY BELL", spriteKey: 'philly_liberty_bell', icon: '🔔', color: '#ffd700', borderColor: '#ffe57f' };
         case 'one_liberty':
+        case 'oneliberty':
+        case 'philly_one_liberty':
             return { label: "ONE LIBERTY", spriteKey: 'philly_one_liberty', icon: '🏙️', color: '#00d2ff', borderColor: '#66e3ff' };
         case 'franklin_institute':
+        case 'franklin_inst':
+        case 'franklin':
+        case 'philly_franklin_inst':
             return { label: "FRANKLIN INST", spriteKey: 'philly_franklin_inst', icon: '⚡', color: '#00ff88', borderColor: '#66ffb2' };
         case 'station':
+        case 'philly_station':
+        case '30th_st_station':
+        case '30th_street_station':
             return { label: "30TH ST STATION", spriteKey: 'philly_station', icon: '🚆', color: '#ffaa44', borderColor: '#ffc577' };
 
         // Dahgbad Landmarks
         case 'burj_khalifa':
+        case 'burjkhalifa':
             return { label: "BURJ KHALIFA", spriteKey: 'burj_khalifa', icon: '🏙️', color: '#00e5ff', borderColor: '#66efff' };
         case 'petra':
+        case 'petra_ruins':
             return { label: "PETRA", spriteKey: 'petra', icon: '🏛️', color: '#ff8844', borderColor: '#ffaa77' };
         case 'dome_of_rock':
+        case 'dome_of_the_rock':
+        case 'dome_rock':
             return { label: "DOME OF ROCK", spriteKey: 'dome_of_rock', icon: '🕌', color: '#ffd700', borderColor: '#ffe57f' };
         case 'pyramids':
+        case 'pyramid':
+        case 'great_pyramids':
             return { label: "PYRAMIDS", spriteKey: 'pyramids', icon: '🔺', color: '#ffaa00', borderColor: '#ffcc44' };
         case 'burj_al_arab':
+        case 'burjalarab':
             return { label: "BURJ AL ARAB", spriteKey: 'burj_al_arab', icon: '⛵', color: '#00bcd4', borderColor: '#4dd0e1' };
         case 'kingdom_centre':
+        case 'kingdom_center':
+        case 'kingdomcentre':
             return { label: "KINGDOM CENTRE", spriteKey: 'kingdom_centre', icon: '🏢', color: '#7c4dff', borderColor: '#b388ff' };
 
         // Cucaracha Landmarks
         case 'christ_redeemer':
+        case 'christredeemer':
             return { label: "CHRIST REDEEMER", spriteKey: 'christ_redeemer', icon: '🗽', color: '#00e676', borderColor: '#69f0ae' };
         case 'machu_picchu':
+        case 'machupicchu':
             return { label: "MACHU PICCHU", spriteKey: 'machu_picchu', icon: '⛰️', color: '#8d6e63', borderColor: '#bcaaa4' };
         case 'obelisco_ba':
+        case 'obelisco':
+        case 'obelisk':
             return { label: "OBELISCO", spriteKey: 'obelisco_ba', icon: '🏛️', color: '#29b6f6', borderColor: '#81d4fa' };
         case 'torre_entel':
+        case 'torreentel':
+        case 'torre':
             return { label: "TORRE ENTEL", spriteKey: 'torre_entel', icon: '🗼', color: '#ab47bc', borderColor: '#ce93d8' };
         case 'palacio_salvo':
+        case 'palaciosalvo':
+        case 'palacio':
             return { label: "PALACIO SALVO", spriteKey: 'palacio_salvo', icon: '🏰', color: '#ffa726', borderColor: '#ffcc80' };
         case 'congresso_nacional':
+        case 'congresso':
+        case 'congress':
             return { label: "CONGRESSO", spriteKey: 'congresso_nacional', icon: '🏛️', color: '#26a69a', borderColor: '#80cbc4' };
 
         default:
-            return null;
+            return {
+                label: t.replace(/_/g, ' ').toUpperCase(),
+                spriteKey: t,
+                icon: '🏢',
+                color: '#00ffcc',
+                borderColor: '#66ffea'
+            };
     }
 }
 window.getBuildingVisualInfo = getBuildingVisualInfo;
@@ -387,6 +466,39 @@ class SpriteManager {
             ctx.fillStyle = '#111'; // mouth line
             ctx.fillRect(52, 18, 4, 2);
 
+        } else if (sprite.id === 'char7') {
+            // Draw retro Geometry Dash Cube matching reference image
+            const drawOctagon = (cx, cy, r) => {
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI / 4) + (Math.PI / 8);
+                    const x = cx + r * Math.cos(angle);
+                    const y = cy + r * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+            };
+
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(4, 4, 56, 56);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(8, 8, 48, 48);
+
+            // 4 Green Triangular Corners
+            ctx.fillStyle = '#00ff99';
+            ctx.beginPath(); ctx.moveTo(8, 8); ctx.lineTo(24, 8); ctx.lineTo(8, 24); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(56, 8); ctx.lineTo(40, 8); ctx.lineTo(56, 24); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(8, 56); ctx.lineTo(24, 56); ctx.lineTo(8, 40); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(56, 56); ctx.lineTo(40, 56); ctx.lineTo(56, 40); ctx.closePath(); ctx.fill();
+
+            // Octagon Rings
+            ctx.fillStyle = '#000000'; drawOctagon(32, 32, 23); ctx.fill();
+            ctx.fillStyle = '#ffffff'; drawOctagon(32, 32, 19); ctx.fill();
+            ctx.fillStyle = '#000000'; drawOctagon(32, 32, 16); ctx.fill();
+            ctx.fillStyle = '#00ff99'; drawOctagon(32, 32, 13); ctx.fill();
+            ctx.fillStyle = '#000000'; drawOctagon(32, 32, 9); ctx.fill();
+            ctx.fillStyle = '#ffffff'; drawOctagon(32, 32, 6); ctx.fill();
         } else if (sprite.id === 'dragon_fire') {
             // Draw a retro 16-bit fire blast
             ctx.fillStyle = '#ea580c'; // outer orange flame
@@ -478,6 +590,9 @@ class SpriteManager {
     }
 
     getCharacterImage(id) {
+        if ((window.alexJonesCheat || (window.game && window.game.alexJonesModeActive)) && this.images['leatherdaddy_frog']) {
+            return this.images['leatherdaddy_frog'];
+        }
         return this.images[id] || null;
     }
 
@@ -486,6 +601,17 @@ class SpriteManager {
     }
 
     getImage(id) {
+        if ((window.alexJonesCheat || (window.game && window.game.alexJonesModeActive)) && this.images['leatherdaddy_frog']) {
+            const charSpriteIds = [
+                'char1', 'char2', 'char3', 'char4', 'char5', 'char6',
+                'char_truck', 'char_trashmaster', 'char_npc', 'char_pirate',
+                'char_dragon_master', 'item_organizer', 'organizer', 'cult_white_robe',
+                'ducky_left', 'ducky_right', 'police_badge', 'leatherdaddy_frog'
+            ];
+            if (charSpriteIds.includes(id)) {
+                return this.images['leatherdaddy_frog'];
+            }
+        }
         return this.images[id] || null;
     }
 

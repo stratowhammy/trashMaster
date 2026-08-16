@@ -276,23 +276,6 @@ class Game {
         if (btnBmSellLidAll) btnBmSellLidAll.addEventListener('click', () => this.sellLidsOnBlackMarket('all'));
         if (btnBmSellLidCustom) btnBmSellLidCustom.addEventListener('click', () => this.sellLidsOnBlackMarket('custom'));
 
-        if (bmLidInput && bmDispatchPreview) {
-            bmLidInput.addEventListener('input', () => {
-                const val = parseInt(bmLidInput.value, 10) || 0;
-                if (val <= 0) {
-                    bmDispatchPreview.innerHTML = '(0 Cops)';
-                    bmDispatchPreview.style.color = '#00ff88';
-                } else if (val <= 10) {
-                    bmDispatchPreview.innerHTML = '✅ Safe (0 Cops)';
-                    bmDispatchPreview.style.color = '#00ff88';
-                } else {
-                    const cops = Math.floor(val / 10);
-                    bmDispatchPreview.innerHTML = `🚨 ${cops} Cop${cops > 1 ? 's' : ''}!`;
-                    bmDispatchPreview.style.color = '#ff3333';
-                }
-            });
-        }
-
         if (btnBmBuyCannon) btnBmBuyCannon.addEventListener('click', () => this.buyContrabandItem('Cannonballs', 100, 10));
         if (btnBmBuyPortal) btnBmBuyPortal.addEventListener('click', () => this.buyContrabandItem('Portal Gun', 1000, 1));
         if (btnBmBuyTrashBomb) btnBmBuyTrashBomb.addEventListener('click', () => this.buyContrabandItem('Trash Bomb', 500, 1));
@@ -696,14 +679,8 @@ class Game {
                     }
                 }
 
-                if (e.shiftKey && (e.key === 'M' || e.key === 'm')) {
-                    if (this.medicationAlertActive) {
-                        this.takeMedication();
-                    } else if (window.playerInventory && window.playerInventory['Wild Mushrooms'] > 0) {
-                        this.eatShroom();
-                    } else {
-                        this.takeMedication();
-                    }
+                if (e.shiftKey && (e.key === 'M' || e.key === 'm' || e.code === 'KeyM')) {
+                    this.takeMedication();
                 }
 
                 if (window.isKey(e, 'harvestTree') || e.key === 'x' || e.key === 'X') {
@@ -867,6 +844,24 @@ class Game {
                     list.scrollTop = list.scrollHeight;
                 }
             }
+
+            // Dynamically show / hide library navigation option based on whether map has a library
+            const navSelect = document.getElementById('nav-location-select');
+            if (navSelect && this.gameMap && this.gameMap.buildings) {
+                const hasLibrary = this.gameMap.buildings.some(b => b && (b.type === 'library' || b.type === 'city_library'));
+                const libOption = navSelect.querySelector('option[value="library"]');
+                if (libOption) {
+                    libOption.style.display = hasLibrary ? '' : 'none';
+                    libOption.disabled = !hasLibrary;
+                }
+                if (!hasLibrary && navSelect.value === 'library') {
+                    navSelect.value = 'dump';
+                    if (this.navigationTarget === 'library') {
+                        this.navigationTarget = null;
+                    }
+                }
+            }
+
             if (dlg) dlg.classList.remove('hidden');
         }
     }
@@ -915,6 +910,10 @@ class Game {
     }
 
     triggerCultLeavingEvent() {
+        if (this.playerHasThirdEye || window.playerThirdEye) {
+            return; // In Cult Mode, having the Big Book of Knowledge (Third Eye) prevents all cult members from trying to leave!
+        }
+
         const dialog = document.getElementById('cult-leaving-dialog');
         const textEl = document.getElementById('cult-leaving-text');
         if (!dialog || !textEl) return;
@@ -1263,6 +1262,13 @@ class Game {
             return true;
         }
 
+        // Library (Big Book of Knowledge)
+        if (type === 'library' || type === 'city_library') {
+            if (document.exitPointerLock) document.exitPointerLock();
+            this.openLibraryDialog(bldg);
+            return true;
+        }
+
         // 7. Zoo
         if (type === 'zoo') {
             if (this.player && this.player.capturedAnimals && this.player.capturedAnimals.length > 0) {
@@ -1341,13 +1347,25 @@ class Game {
 
     takeMedication() {
         if (this.state !== GameState.PLAYING || this.isPaused) return false;
-        if (this.medicationAlertActive) {
+        if (this.noMedsActive) {
+            if (this.hud) {
+                this.hud.showFollowerNotification('💊 No medication required this round!', true);
+            }
+            return true;
+        }
+
+        // Allow taking medication if alert is active OR if player is currently in missed-meds / psychosis state
+        if (this.medicationAlertActive || this.medsMissed || this.medsMissedCount > 0) {
             this.medicationAlertActive = false;
             this.medsTakenCount = (this.medsTakenCount || 0) + 1;
 
             // If screen was previously inverted/rotated from a missed dose, restore back to normal!
             const wasDistorted = this.medsMissed;
             this.medsMissed = false;
+
+            if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
+                window.soundManager.stopEarPiercingLoop();
+            }
             const viewport = document.getElementById('game-viewport');
             if (viewport) {
                 viewport.style.filter = '';
@@ -1356,15 +1374,18 @@ class Game {
             }
 
             if (this.medicationSchedule) {
-                const activeEv = this.medicationSchedule.find(e => e.triggered && !e.completed);
-                if (activeEv) activeEv.completed = true;
+                this.medicationSchedule.forEach(e => {
+                    if (e.triggered && !e.completed) {
+                        e.completed = true;
+                    }
+                });
             }
             if (window.soundManager && typeof window.soundManager.playPillSwallowSFX === 'function') {
                 window.soundManager.playPillSwallowSFX();
             }
             if (this.hud) {
                 const msg = wasDistorted 
-                    ? `💊 Took Medication (${this.medsTakenCount}/3)! Vision & screen restored to normal! ✨`
+                    ? `💊 Took Medication (${this.medsTakenCount}/3)! Vision & mind restored to normal! ✨`
                     : `💊 Took Medication (${this.medsTakenCount}/3)! Mind is crystal clear! ✨`;
                 this.hud.showFollowerNotification(msg, true);
                 if (this.trashManager) {
@@ -1486,12 +1507,133 @@ class Game {
             this.mushroomTimer = 25;
             if (this.player) this.player.speedMultiplier = (this.player.speedMultiplier || 1.0) * 1.5;
             if (window.soundManager) window.soundManager.playEngageSFX();
-            this.hud.showFollowerNotification("✨ Ate MAGIC MUSHROOM! Trippy speed & extra slow motion! 🍄✨", true);
+
+            // 10% chance: Become the Geometry Dash cube!
+            if (Math.random() < 0.10) {
+                if (this.player) {
+                    this.player.spriteId = 'char7';
+                    this.player.characterClass = 'char7';
+                }
+                window.chosenSprite = 'char7';
+                window.playerChosenSprite = 'char7';
+                window.gdCubeUnlocked = true;
+                localStorage.setItem('gdCubeUnlocked', 'true');
+                if (window.syncGDCubeVisibility) window.syncGDCubeVisibility();
+                if (window.soundManager) window.soundManager.playDingSFX();
+                this.hud.showFollowerNotification("✨🍄 MAGIC MUSHROOM TRANSCENDENCE! You morphed into the GEOMETRY DASH CUBE! 🟩✨", true);
+            } else {
+                this.hud.showFollowerNotification("✨ Ate MAGIC MUSHROOM! Trippy speed & extra slow motion! 🍄✨", true);
+            }
         } else {
             // 25% Chance: Poison Mushroom (immediately end the round)
             this.hud.timeRemaining = 0;
             this.state = GameState.UI_OVERLAY;
             this._showSplashGameOver("POISONED!", "☠️ You ate a poisonous wild mushroom! Incapacitated immediately. Round ended! ☠️", false);
+        }
+    }
+
+    openLibraryDialog(bldg) {
+        const dialog = document.getElementById('library-dialog');
+        if (!dialog) return;
+        this.state = GameState.UI_OVERLAY;
+        this.isPaused = true;
+        dialog.classList.remove('hidden');
+
+        const statusEl = document.getElementById('library-third-eye-status');
+        const loreEl = document.getElementById('library-lore-text');
+        const readBtn = document.getElementById('btn-library-read');
+
+        if (this.playerHasThirdEye || window.playerThirdEye) {
+            if (statusEl) statusEl.style.display = 'block';
+            if (loreEl) loreEl.innerText = "The Big Book of Knowledge radiates divine cosmic light. Your Third Eye remains fully awakened and all truths are visible to your mind.";
+            if (readBtn) readBtn.innerText = "✨ Already Communed";
+        } else {
+            if (statusEl) statusEl.style.display = 'none';
+            if (loreEl) loreEl.innerText = "An ancient tome brimming with cosmic truths and forgotten wisdom. Choose 'Commune with the Tome' to awaken your Third Eye, or 'Leave' to step away unchanged.";
+            if (readBtn) readBtn.innerText = "🔮 Commune with the Tome";
+        }
+    }
+
+    closeLibraryDialog() {
+        const hadThirdEye = !!(this.playerHasThirdEye || window.playerThirdEye);
+        const dialog = document.getElementById('library-dialog');
+        if (dialog) dialog.classList.add('hidden');
+        this.state = GameState.PLAYING;
+        this.isPaused = false;
+        if (this.canvas) this.canvas.focus();
+
+        if (!hadThirdEye && this.hud) {
+            this.hud.showFollowerNotification("🚪 Left the library without communing. No Third Eye gained.", false);
+        }
+    }
+
+    readBigBookOfKnowledge() {
+        if (this.playerHasThirdEye || window.playerThirdEye) {
+            // Already communed: Channel cosmic energy again with animation, sound, and insight
+            if (window.soundManager) {
+                if (typeof window.soundManager.playChoirSFX === 'function') {
+                    window.soundManager.playChoirSFX();
+                } else if (typeof window.soundManager.playVictoriousEndSoundtrack === 'function') {
+                    window.soundManager.playVictoriousEndSoundtrack();
+                }
+            }
+
+            const loreEl = document.getElementById('library-lore-text');
+            if (loreEl) {
+                loreEl.innerHTML = "✨ <em>The tome resonates with your Third Eye! Cosmic wisdom surges through your mind once more.</em>";
+            }
+
+            const bookImg = document.getElementById('library-book-img');
+            if (bookImg) {
+                bookImg.style.transform = 'scale(1.18) rotate(4deg)';
+                setTimeout(() => {
+                    if (bookImg) bookImg.style.transform = 'scale(1.0) rotate(0deg)';
+                }, 300);
+            }
+
+            if (this.hud) {
+                this.hud.showFollowerNotification("✨ Re-communed with the tome! Cosmic insight resonated (+50 pts)!", true);
+                if (this.trashManager) {
+                    this.trashManager.totalPoints += 50;
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                }
+            }
+            return;
+        }
+
+        this.playerHasThirdEye = true;
+        window.playerThirdEye = true;
+
+        if (window.soundManager) {
+            if (typeof window.soundManager.playChoirSFX === 'function') {
+                window.soundManager.playChoirSFX();
+            } else if (typeof window.soundManager.playVictoriousEndSoundtrack === 'function') {
+                window.soundManager.playVictoriousEndSoundtrack();
+            }
+        }
+
+        const statusEl = document.getElementById('library-third-eye-status');
+        const loreEl = document.getElementById('library-lore-text');
+        const readBtn = document.getElementById('btn-library-read');
+
+        if (statusEl) statusEl.style.display = 'block';
+        if (loreEl) loreEl.innerText = "⚡ THE PAGES OPEN! Cosmic wisdom surges through your consciousness. Your THIRD EYE opens upon your forehead!";
+        if (readBtn) readBtn.innerText = "✨ Already Communed";
+
+        const bookImg = document.getElementById('library-book-img');
+        if (bookImg) {
+            bookImg.style.transform = 'scale(1.25)';
+            setTimeout(() => {
+                if (bookImg) bookImg.style.transform = 'scale(1.0)';
+            }, 350);
+        }
+
+        if (this.hud) {
+            this.hud.showFollowerNotification("👁️ AWAKENED! You communed with the tome and gained the THIRD EYE! ✨", true);
+            if (this.trashManager) {
+                this.trashManager.totalPoints += 250;
+                this.hud.updateScore(this.trashManager.totalPoints);
+            }
         }
     }
 
@@ -1590,7 +1732,7 @@ class Game {
                         if (this.hud) this.hud.showFollowerNotification(alertMsg, false);
                         this.updateBlackMarketDialogUI(`🚨 Sold ${count} Lids for +$${res.cash_earned.toLocaleString()}! <strong>POLICE RAID DISPATCHED ${cops} OFFICER(S)!</strong> 🚨`);
                     } else {
-                        const safeMsg = `🥫 Sold ${count} Lid(s) safely for +$${res.cash_earned.toLocaleString()}! (0 officers alerted)`;
+                        const safeMsg = `🥫 Sold ${count} Lid(s) for +$${res.cash_earned.toLocaleString()}!`;
                         if (this.hud) this.hud.showFollowerNotification(safeMsg, true);
                         if (window.soundManager) window.soundManager.playCashRegisterSFX();
                         this.updateBlackMarketDialogUI(`✅ ${safeMsg}`);
@@ -2260,23 +2402,27 @@ class Game {
 
         // ── Phase 3: Cult Mode — happiness decay + family miss timer ──
         if (window.cultMode) {
-            // Gradual happiness decay (1 point per 5s)
-            this.happinessDecayTimer = (this.happinessDecayTimer || 0) + dt;
-            if (this.happinessDecayTimer >= 5) {
-                this.happinessDecayTimer -= 5;
-                this.happiness = Math.max(0, (this.happiness || 100) - 1);
-            }
+            if (this.playerHasThirdEye || window.playerThirdEye) {
+                this.happiness = 100;
+            } else {
+                // Gradual happiness decay (1 point per 5s)
+                this.happinessDecayTimer = (this.happinessDecayTimer || 0) + dt;
+                if (this.happinessDecayTimer >= 5) {
+                    this.happinessDecayTimer -= 5;
+                    this.happiness = Math.max(0, (this.happiness || 100) - 1);
+                }
 
-            // Happiness hits 0: halve the posse
-            if ((this.happiness || 0) <= 0 && !this._happinessPenaltyTriggered) {
-                this._happinessPenaltyTriggered = true;
-                const totalF = this.getRoundTotalFollowers();
-                const toLose = Math.floor(totalF / 2);
-                for (let i = 0; i < toLose; i++) this._removeSequentialFollower();
-                this.hud.followerCount = this.getRoundTotalFollowers();
-                this.happiness = 50; // reset to 50
-                this._happinessPenaltyTriggered = false;
-                this.hud.showFollowerNotification('💔 Mass exodus! Unhappy followers left! (-50% Posse)', false);
+                // Happiness hits 0: halve the posse
+                if ((this.happiness || 0) <= 0 && !this._happinessPenaltyTriggered) {
+                    this._happinessPenaltyTriggered = true;
+                    const totalF = this.getRoundTotalFollowers();
+                    const toLose = Math.floor(totalF / 2);
+                    for (let i = 0; i < toLose; i++) this._removeSequentialFollower();
+                    this.hud.followerCount = this.getRoundTotalFollowers();
+                    this.happiness = 50; // reset to 50
+                    this._happinessPenaltyTriggered = false;
+                    this.hud.showFollowerNotification('💔 Mass exodus! Unhappy followers left! (-50% Posse)', false);
+                }
             }
 
             if (this.cultHappinessBufferTimer > 0) {
@@ -2333,6 +2479,37 @@ class Game {
         if (this.state === GameState.PLAYING && !this.isPaused && this.hud) {
             const curTimeLeft = this.hud.timeRemaining;
 
+            // ── Gold Rush Evaluation (at 45 seconds into round OR at 45s mark with < 40% avg) ──
+            const roundDuration = (this.hud && this.hud.gameDuration) ? this.hud.gameDuration : 120;
+            const elapsed = roundDuration - curTimeLeft;
+            const cheatCondition = window.goldRushCheat && (elapsed >= 45 || curTimeLeft <= 45);
+            const standardCondition = (curTimeLeft <= 45);
+
+            if (!this.goldRushTriggered && (cheatCondition || standardCondition) && curTimeLeft > 0) {
+                const stats = window.playerStats || {};
+                const totalRounds = stats.total_rounds_played || 0;
+                const cumTrash = stats.stat_cumulative_trash || 0;
+                let avgTrash = 150;
+                if (totalRounds > 0 && cumTrash > 0) {
+                    avgTrash = Math.max(1, Math.round(cumTrash / totalRounds));
+                }
+                const currentTrash = this.trashCollectedInRound || 0;
+                if (cheatCondition || currentTrash < 0.40 * avgTrash) {
+                    this.goldRushTriggered = true;
+                    this._triggerGoldRush();
+                } else if (standardCondition && !cheatCondition) {
+                    this.goldRushTriggered = true;
+                }
+            }
+
+            // Countdown active Gold Rush timer
+            if (this.goldRushActive) {
+                this.goldRushTimer -= dt;
+                if (this.goldRushTimer <= 0) {
+                    this._endGoldRush();
+                }
+            }
+
             // Check if any medication event should trigger
             if (!this.medicationAlertActive && this.medicationSchedule) {
                 for (const event of this.medicationSchedule) {
@@ -2357,11 +2534,41 @@ class Game {
                 if (this.medicationAlertTimer <= 0) {
                     this.medicationAlertActive = false;
                     this.medsMissed = true; // Missed meds! Psychosis effects active till end of round!
-                    if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
-                        window.soundManager.playPsychosisSFX();
-                    }
-                    if (this.hud) {
-                        this.hud.showFollowerNotification('😵‍💫 MISSED MEDICATION! Color inverted & screen rotated 90°! 💊❌', false);
+                    this.medsMissedCount = (this.medsMissedCount || 0) + 1;
+
+                    if (this.medsMissedCount === 1) {
+                        if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+                            window.soundManager.playPsychosisSFX();
+                        }
+                        if (this.hud) {
+                            this.hud.showFollowerNotification('😵‍💫 MISSED MEDICATION (1/3)! Color inverted & screen rotated 90°! 💊❌', false);
+                        }
+                    } else if (this.medsMissedCount === 2) {
+                        if (window.soundManager && typeof window.soundManager.startEarPiercingLoop === 'function') {
+                            window.soundManager.startEarPiercingLoop();
+                        }
+                        if (this.hud) {
+                            this.hud.showFollowerNotification('🔊 MISSED MEDS 2 TIMES! EAR-PIERCING PSYCHOSIS ACTIVATED! Take meds [Shift+M] now! 💊⚠️', false);
+                        }
+                    } else if (this.medsMissedCount >= 3) {
+                        if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
+                            window.soundManager.stopEarPiercingLoop();
+                        }
+                        if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+                            window.soundManager.playPsychosisSFX();
+                        }
+                        const viewport = document.getElementById('game-viewport');
+                        if (viewport) {
+                            viewport.style.filter = '';
+                            viewport.style.transform = '';
+                            viewport.style.transformOrigin = '';
+                        }
+                        if (typeof this.nullifyLevelAndReturnToStore === 'function') {
+                            this.nullifyLevelAndReturnToStore();
+                        } else if (window.showScreen) {
+                            window.showScreen('store-screen');
+                        }
+                        return;
                     }
                 }
             }
@@ -2668,6 +2875,11 @@ class Game {
         // Update player
         this.player.update(this.gameMap, dt);
 
+        // Geometry Dash Cube perk: Auto-collect trash without hitting Q
+        if (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')) {
+            this.pickupTrash();
+        }
+
         // Update traffic cars
         if (this.carManager) {
             this.carManager.update(dt, this);
@@ -2802,6 +3014,7 @@ class Game {
             this.hud.updateScore(this.trashManager.totalPoints);
             this.trashCollectedInWindow += followerPicked.length;
             this.trashCollectedInRound = (this.trashCollectedInRound || 0) + followerPicked.length;
+            this.trashCollectedByPosse = (this.trashCollectedByPosse || 0) + followerPicked.length;
             this.trashManager.spawnMore(this.gameMap, followerPicked.length);
         }
 
@@ -2836,6 +3049,7 @@ class Game {
                     this.hud.updateScore(this.trashManager.totalPoints);
                     this.trashCollectedInWindow += orgFollowerPicked.length;
                     this.trashCollectedInRound = (this.trashCollectedInRound || 0) + orgFollowerPicked.length;
+                    this.trashCollectedByPosse = (this.trashCollectedByPosse || 0) + orgFollowerPicked.length;
                     this.trashManager.spawnMore(this.gameMap, orgFollowerPicked.length);
                 }
             }
@@ -2870,6 +3084,7 @@ class Game {
                     this.hud.updateScore(this.trashManager.totalPoints);
                     this.trashCollectedInWindow += dragFollowerPicked.length;
                     this.trashCollectedInRound = (this.trashCollectedInRound || 0) + dragFollowerPicked.length;
+                    this.trashCollectedByPosse = (this.trashCollectedByPosse || 0) + dragFollowerPicked.length;
                     this.trashManager.spawnMore(this.gameMap, dragFollowerPicked.length);
                 }
             }
@@ -2927,32 +3142,40 @@ class Game {
         
         // International Travel Sickness Timer & Logic
         if (window.travelDestination) {
-            // Sickness slows down the player
-            this.player.speedMultiplier = this.sick ? 0.5 : 1.0;
-            
-            // Check if player has Quinine to cure sickness
-            if (this.sick) {
-                if (this.hasHealthInsurance) {
-                    this.sick = false;
-                    this.hud.showFollowerNotification("Health insurance covered your sickness!", true);
-                    this.player.speedMultiplier = 1.0;
-                } else if (window.playerInventory && window.playerInventory['Quinine'] > 0) {
-                    this.sick = false;
-                    window.playerInventory['Quinine'] -= 1;
-                    window.apiCall('/api/game/consume', 'POST', { item_name: 'Quinine' }).catch(e => console.error(e));
-                    this.hud.showFollowerNotification("Automatically consumed Quinine! Sickness cured.", true);
+            if (this.noMedsActive) {
+                this.sick = false;
+                if (this.player) {
+                    this.player.sick = false;
                     this.player.speedMultiplier = 1.0;
                 }
-            }
-            
-            if (!this.sick) {
-                this.sicknessTimer -= dt;
-                if (this.sicknessTimer <= 0) {
-                    this.sicknessTimer = 30.0;
-                    const chance = 0.25; // 25% chance for all countries
-                    if (Math.random() < chance) {
-                        this.sick = true;
-                        this.hud.showFollowerNotification("You've fallen sick! Movement speed halved. Buy Quinine!", false);
+            } else {
+                // Sickness slows down the player
+                this.player.speedMultiplier = this.sick ? 0.5 : 1.0;
+                
+                // Check if player has Quinine to cure sickness
+                if (this.sick) {
+                    if (this.hasHealthInsurance) {
+                        this.sick = false;
+                        this.hud.showFollowerNotification("Health insurance covered your sickness!", true);
+                        this.player.speedMultiplier = 1.0;
+                    } else if (window.playerInventory && window.playerInventory['Quinine'] > 0) {
+                        this.sick = false;
+                        window.playerInventory['Quinine'] -= 1;
+                        window.apiCall('/api/game/consume', 'POST', { item_name: 'Quinine' }).catch(e => console.error(e));
+                        this.hud.showFollowerNotification("Automatically consumed Quinine! Sickness cured.", true);
+                        this.player.speedMultiplier = 1.0;
+                    }
+                }
+                
+                if (!this.sick) {
+                    this.sicknessTimer -= dt;
+                    if (this.sicknessTimer <= 0) {
+                        this.sicknessTimer = 30.0;
+                        const chance = 0.25; // 25% chance for all countries
+                        if (Math.random() < chance) {
+                            this.sick = true;
+                            this.hud.showFollowerNotification("You've fallen sick! Movement speed halved. Buy Quinine!", false);
+                        }
                     }
                 }
             }
@@ -3154,15 +3377,17 @@ class Game {
         ctx.fillText('Choose Your Character', w / 2, 260);
 
         // Character cards
+        const isGdUnlocked = !!(window.gdCubeUnlocked || (typeof localStorage !== 'undefined' && localStorage.getItem('gdCubeUnlocked') === 'true'));
+        const availableChars = SPRITE_CONFIG.characters.filter(c => c.id !== 'char7' || isGdUnlocked);
         const cardW = 140;
         const cardH = 190;
         const cardGap = 20;
-        const totalW = SPRITE_CONFIG.characters.length * (cardW + cardGap) - cardGap;
+        const totalW = availableChars.length * (cardW + cardGap) - cardGap;
         const startX = (w - totalW) / 2;
         const startY = (h - cardH) / 2 + 80;
 
-        for (let i = 0; i < SPRITE_CONFIG.characters.length; i++) {
-            const char = SPRITE_CONFIG.characters[i];
+        for (let i = 0; i < availableChars.length; i++) {
+            const char = availableChars[i];
             const cx = startX + i * (cardW + cardGap);
             const cy = startY;
             const isHover = this.hoverCharIndex === i;
@@ -3223,11 +3448,12 @@ class Game {
         ctx.fillText('Collect trash • Earn followers • Beat the clock!', w / 2, startY + cardH + 60);
 
         // Store card positions for click detection
-        this._charCards = SPRITE_CONFIG.characters.map((_, i) => ({
+        this._charCards = availableChars.map((char, i) => ({
             x: startX + i * (cardW + cardGap),
             y: startY,
             w: cardW,
             h: cardH,
+            charId: char.id
         }));
     }
 
@@ -3261,7 +3487,7 @@ class Game {
                 clickY >= card.y && clickY <= card.y + card.h
             ) {
                 this.selectedCharIndex = i;
-                const chosen = SPRITE_CONFIG.characters[i].id;
+                const chosen = card.charId || 'char2';
                 window.chosenSprite = chosen;
                 window.playerChosenSprite = chosen;
                 if (window.apiCall) {
@@ -3281,8 +3507,15 @@ class Game {
             window.playerHasTruck = false; // Disable truck abroad
         }
 
+        // ── Knowledge Ho!: Check if activated via Store Terminal ──
+        this.knowledgeHoActive = !!window.knowledgeHoActive;
+
         this.gameMap = new GameMap();
         this.miniMap.buildStatic(this.gameMap);
+
+        if (this.knowledgeHoActive && this.hud) {
+            this.hud.showFollowerNotification('📚 Knowledge Ho! active! City Library summoned this round!', true);
+        }
         // Find a walkable spawn point — start on a road near center
         let spawnX = 5, spawnY = 5; // Default to first road intersection area
         // Search for a walkable road tile near center
@@ -3330,6 +3563,9 @@ class Game {
         this.truckChain = [];
         this.trashCollectedInTruck = 0;
         this.trashCollectedInRound = 0;
+        this.trashCollectedByPosse = 0;
+        this.posseMembersGained = 0;
+        this._thirdEyeTrashMultiplied = false;
         this.treesCarried = 0;
         this.activePortals = null;
         this.bottomlessPits = [];
@@ -3378,7 +3614,7 @@ class Game {
         }
 
         this.trashManager = new TrashManager();
-        let initialTrash = 150; // Spawn 25% more trash (was 120)
+        let initialTrash = 600; // 4x trash population on normal map (was 150)
         
         // Check Filthadelphia
         if (window.playerInventory && window.playerInventory['Filthadelphia'] > 0) {
@@ -3476,6 +3712,15 @@ class Game {
         else if (office.includes('president')) freeOrganizers = 8;
         
         organizersCount += freeOrganizers;
+
+        // Check if "no org" cheat was typed in the Store Terminal (removes organizers for just 1 round)
+        if (window.noOrgCheat) {
+            organizersCount = 0;
+            window.noOrgCheat = false;
+            if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
+                this.hud.showFollowerNotification("🚫 'no org' active: Organizers removed for this round!", true);
+            }
+        }
         
         for (let i = 0; i < organizersCount; i++) {
             this.organizers.push(new GameOrganizer(this, i));
@@ -3553,6 +3798,10 @@ class Game {
         this.trashCollectedInWindow = 0;
         this.playerNearTrash = false;
         
+        this.goldRushTriggered = false;
+        this.goldRushActive = false;
+        this.goldRushTimer = 0;
+
         this.mushroomTimer = 0;
         this.wingsTimer = 0;
         if (this.player) this.player.speedMultiplier = 1.0;
@@ -3623,6 +3872,8 @@ class Game {
         this.fastFoodSuspensionTimer = 0.0;
         this.hasHealthInsurance = false;
         this.insurancePaymentTimer = 10.0;
+        this.playerHasThirdEye = false;
+        window.playerThirdEye = false;
         
         this.internationalFollowersCollected = 0;
         this.sick = false;
@@ -3640,14 +3891,37 @@ class Game {
         this.medicationAlertTimer = 0;
         this.medicationAlertMaxDuration = 12.0;
         this.medsMissed = false;
+        this.medsMissedCount = 0;
         this.medsTakenCount = 0;
+        this.noMedsActive = false;
+        if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
+            window.soundManager.stopEarPiercingLoop();
+        }
+
+        // Check if "no meds" cheat was typed in the Store Terminal (removes meds requirement for just 1 round)
+        if (window.noMedsCheat) {
+            this.noMedsActive = true;
+            window.noMedsCheat = false;
+            if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
+                this.hud.showFollowerNotification("💊 'no meds' active: Medication requirements removed for this round!", true);
+            }
+        }
+
+        this.alexJonesModeActive = false;
+        if (window.alexJonesCheat) {
+            this.alexJonesModeActive = true;
+            window.alexJonesCheat = false;
+            if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
+                this.hud.showFollowerNotification("🐸 'alex jones' active: Everyone is a Leatherdaddy Frog!", true);
+            }
+        }
 
         const roundDur = (this.hud && this.hud.gameDuration) ? this.hud.gameDuration : 120;
         const medTime1 = roundDur - (roundDur * (0.15 + Math.random() * 0.18)); // Event 1 (~85% to 67% time left)
         const medTime2 = roundDur - (roundDur * (0.42 + Math.random() * 0.20)); // Event 2 (~58% to 38% time left)
         const medTime3 = roundDur - (roundDur * (0.70 + Math.random() * 0.18)); // Event 3 (~30% to 12% time left)
 
-        this.medicationSchedule = [
+        this.medicationSchedule = this.noMedsActive ? [] : [
             { triggerTime: medTime1, triggered: false, completed: false },
             { triggerTime: medTime2, triggered: false, completed: false },
             { triggerTime: medTime3, triggered: false, completed: false }
@@ -3690,6 +3964,11 @@ class Game {
             btnFpsToggle.innerHTML = '🕹️ 2D RETRO';
             btnFpsToggle.style.borderColor = '#ffaa00';
             btnFpsToggle.style.color = '#ffaa00';
+        }
+
+        const floatingControls = document.getElementById('floating-quick-controls');
+        if (floatingControls) {
+            floatingControls.classList.add('in-game');
         }
 
         this._resizeCanvas();
@@ -3929,6 +4208,7 @@ class Game {
         const dialogsToHide = [
             'cult-leaving-dialog',
             'fast-food-dialog',
+            'library-dialog',
             'instructions-dialog',
             'pirate-defeat-screen',
             'stranded-screen',
@@ -3952,6 +4232,10 @@ class Game {
 
         this.medsMissed = false;
         this.medicationAlertActive = false;
+        this.medsMissedCount = 0;
+        if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
+            window.soundManager.stopEarPiercingLoop();
+        }
         const vp = document.getElementById('game-viewport');
         if (vp) {
             vp.style.filter = '';
@@ -3969,6 +4253,12 @@ class Game {
         if (!window.apiCall) return; // Not logged in
         if (window.soundManager) window.soundManager.playVictoriousEndSoundtrack();
         
+        // Third Eye (Big Book of Knowledge): 3x trash collected at the end of the round
+        if ((this.playerHasThirdEye || window.playerThirdEye) && !this._thirdEyeTrashMultiplied) {
+            this._thirdEyeTrashMultiplied = true;
+            this.trashCollectedInRound = (this.trashCollectedInRound || 0) * 3;
+        }
+
         let earned = this.trashManager.totalPoints;
 
         if (window.flowersMode && window.targetParkId) {
@@ -3987,18 +4277,18 @@ class Game {
         const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
         try {
             const result = await window.apiCall('/api/game/end-round', 'POST', { 
-                earned, 
-                employee_cost: this.totalEmployeeCost,
-                employees_killed: this.employeesKilledThisRound,
-                followers: this.getRoundTotalFollowers(),
+                earned: earned || 0, 
+                employee_cost: this.totalEmployeeCost || 0,
+                employees_killed: this.employeesKilledThisRound || 0,
+                followers: typeof this.getRoundTotalFollowers === 'function' ? this.getRoundTotalFollowers() : 0,
                 trash_collected: this.trashCollectedInRound || 0,
                 handshakes: this.handshakesShaken || 0,
-                rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
+                rival_handshakes: (this.rivalCandidate && this.rivalCandidate.votes) || 0,
                 international_followers_collected: this.internationalFollowersCollected || 0,
                 cult_mode_active: !!window.cultMode,
                 dragon_mode_active: !!window.dragonMode,
-                sacrifice_dragon: sacrifice_dragon,
-                happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                sacrifice_dragon: !!sacrifice_dragon,
+                happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0) || 100.0,
                 cult_leaves_cumulative: this.cultLeavesCumulative || 0
             });
             if (result && result.dragon_lost) {
@@ -4008,10 +4298,15 @@ class Game {
                 alert(`💸 You could not pay the $1,000/ea round upkeep for your Organizers! You lost ${result.organizers_lost} Organizer(s).`);
             }
             window.employeesHired = 0;
-            // Reset Trashpickers & Chaos Mode at round end
+            // Reset Trashpickers, Chaos Mode & Gold Rush at round end
+            if (this.goldRushActive) {
+                this._endGoldRush();
+            }
             this.doubleTrashPickup = false;
             window.chaosCheatActive = false;
             window.chaosMode = false;
+            window.knowledgeHoActive = false;
+            this.knowledgeHoActive = false;
             const chaosToggle = document.getElementById('chaos-toggle');
             if (chaosToggle) chaosToggle.checked = false;
             if (result && result.today_games_count !== undefined) {
@@ -4129,7 +4424,41 @@ class Game {
         ctx.fillText("Posse members will follow it!", cx, cy + 160);
     }
 
+    _triggerGoldRush() {
+        this.goldRushActive = true;
+        this.goldRushTimer = 15.0;
+        if (this.trashManager) {
+            this.trashManager.triggerGoldRush(this.gameMap);
+        }
+        if (window.soundManager && typeof window.soundManager.startGoldRushMusic === 'function') {
+            window.soundManager.startGoldRushMusic();
+        }
+        if (this.hud) {
+            this.hud.showFollowerNotification("🏆 GOLD RUSH! 15s to grab all the gold trash! 💰", true);
+        }
+    }
+
+    _endGoldRush() {
+        this.goldRushActive = false;
+        this.goldRushTimer = 0;
+        if (this.trashManager) {
+            this.trashManager.endGoldRush();
+        }
+        if (window.soundManager && typeof window.soundManager.stopGoldRushMusic === 'function') {
+            window.soundManager.stopGoldRushMusic();
+        }
+        if (this.hud) {
+            this.hud.showFollowerNotification("⏳ Gold Rush ended!", false);
+        }
+    }
+
     _restartGame() {
+        if (this.goldRushActive) {
+            this._endGoldRush();
+        }
+        this.goldRushTriggered = false;
+        this.goldRushActive = false;
+        this.goldRushTimer = 0;
         this.medsMissed = false;
         this.medicationAlertActive = false;
         const vp = document.getElementById('game-viewport');
@@ -4296,59 +4625,30 @@ class Game {
                     ctx.fillText('🦁 ZOO [E]', screen.x, screen.y - 70);
                 }
             }
+
+            const libBldg = this.gameMap.buildings.find(b => b.type === 'library' || b.type === 'city_library');
+            if (libBldg && libBldg.doorTiles && libBldg.doorTiles.length > 0) {
+                const door = libBldg.doorTiles[0];
+                const cx = door.x * TILE_SIZE + TILE_SIZE / 2;
+                const cy = door.y * TILE_SIZE + TILE_SIZE / 2;
+                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 100, wrapped.y - 100, 200, 200)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    const libImg = this.spriteManager.getImage('library');
+                    if (libImg && (libImg.complete || libImg instanceof HTMLCanvasElement)) {
+                        ctx.drawImage(libImg, screen.x - 32, screen.y - 64, 64, 64);
+                    }
+                    ctx.fillStyle = '#60a5fa';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('📚 CITY LIBRARY [E]', screen.x, screen.y - 70);
+                }
+            }
         }
 
-        // Draw Philadelphia Landmark buildings (visible at all times)
-        if (this.spriteManager) {
-            const landmarks = {
-                'cityhall': { img: 'philly_city_hall', label: 'CITY HALL' },
-                'art_museum': { img: 'philly_art_museum', label: 'ART MUSEUM' },
-                'liberty_bell': { img: 'philly_liberty_bell', label: 'LIBERTY BELL' },
-                'one_liberty': { img: 'philly_one_liberty', label: 'ONE LIBERTY' },
-                'franklin_institute': { img: 'philly_franklin_inst', label: 'FRANKLIN INST.' },
-                'station': { img: 'philly_station', label: '30TH ST STATION' },
-                'airport': { img: 'airport', label: 'AIRPORT' },
-                'hospital': { img: 'hospital_landmark', label: 'HOSPITAL' },
-                // Dahgbad Landmarks
-                'burj_khalifa': { img: 'burj_khalifa', label: 'BURJ KHALIFA' },
-                'petra': { img: 'petra', label: 'PETRA' },
-                'dome_of_rock': { img: 'dome_of_rock', label: 'DOME OF THE ROCK' },
-                'pyramids': { img: 'pyramids', label: 'PYRAMIDS' },
-                'burj_al_arab': { img: 'burj_al_arab', label: 'BURJ AL ARAB' },
-                'kingdom_centre': { img: 'kingdom_centre', label: 'KINGDOM CENTRE' },
-                // Cucaracha Landmarks
-                'christ_redeemer': { img: 'christ_redeemer', label: 'CHRIST REDEEMER' },
-                'machu_picchu': { img: 'machu_picchu', label: 'MACHU PICCHU' },
-                'obelisco_ba': { img: 'obelisco_ba', label: 'OBELISCO' },
-                'torre_entel': { img: 'torre_entel', label: 'TORRE ENTEL' },
-                'palacio_salvo': { img: 'palacio_salvo', label: 'PALACIO SALVO' },
-                'congresso_nacional': { img: 'congresso_nacional', label: 'CONGRESSO NACIONAL' }
-            };
-
-            for (const bldg of this.gameMap.buildings) {
-                if (!bldg || bldg.tiles.length === 0) continue;
-                const config = landmarks[bldg.type];
-                if (!config) continue;
-
-                let cx = 0, cy = 0;
-                for (const t of bldg.tiles) { cx += t.x; cy += t.y; }
-                cx = (cx / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
-                cy = (cy / bldg.tiles.length) * TILE_SIZE + TILE_SIZE / 2;
-
-                const wrapped = nearestWrap(cx, cy, this.camera.getCenterX(), this.camera.getCenterY());
-                if (!this.camera.isVisible(wrapped.x - 120, wrapped.y - 120, 240, 240)) continue;
-                const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
-
-                const img = this.spriteManager.getImage(config.img);
-                if (img) {
-                    ctx.drawImage(img, screen.x - 64, screen.y - 64, 128, 128);
-                }
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 8px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(config.label, screen.x, screen.y - 70);
-            }
+        // ── Render Building Logos, Badges, & Door Addresses in 2D Retro Mode ──
+        if (this.gameMap && typeof this.gameMap.renderAddresses === 'function') {
+            this.gameMap.renderAddresses(ctx, this.camera);
         }
 
         if (window.pirateMode && this.pirateModeManager) {
@@ -4356,7 +4656,6 @@ class Game {
         }
 
         if (window.frenzyMode) {
-            this.gameMap.renderAddresses(ctx, this.camera);
             this.pirateManager.render(ctx, this.camera, this.spriteManager);
         }
         
@@ -4567,7 +4866,6 @@ class Game {
 
         if (window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized) {
             if (window.crimeMode) {
-                this.gameMap.renderAddresses(ctx, this.camera);
                 this.npcManager.render(ctx, this.camera, this.spriteManager);
             }
             if (this.crimeManager) {
@@ -4834,6 +5132,49 @@ class Game {
         }
     }
 
+    getRoundTrophyInfo(totalTrash) {
+        const stats = window.playerStats || {};
+        const totalRounds = stats.total_rounds_played || 0;
+        const cumTrash = stats.stat_cumulative_trash || 0;
+        
+        let avgTrash = 150;
+        if (totalRounds > 0 && cumTrash > 0) {
+            avgTrash = Math.max(1, Math.round(cumTrash / totalRounds));
+        }
+
+        const bronzeGoal = Math.round(avgTrash * 1.25);
+        const silverGoal = Math.round(avgTrash * 1.50);
+        const goldGoal = Math.round(avgTrash * 2.00);
+        const platinumGoal = Math.round(avgTrash * 2.50);
+
+        let trophyLevel = 0;
+        let trophyColorName = '';
+
+        if (totalTrash >= platinumGoal) {
+            trophyLevel = 4; // Platinum (250%)
+            trophyColorName = 'Platinum';
+        } else if (totalTrash >= goldGoal) {
+            trophyLevel = 3; // Gold (200%)
+            trophyColorName = 'Gold';
+        } else if (totalTrash >= silverGoal) {
+            trophyLevel = 2; // Silver (150%)
+            trophyColorName = 'Silver';
+        } else if (totalTrash >= bronzeGoal) {
+            trophyLevel = 1; // Bronze (125%)
+            trophyColorName = 'Bronze';
+        }
+
+        return {
+            avgTrash,
+            bronzeGoal,
+            silverGoal,
+            goldGoal,
+            platinumGoal,
+            trophyLevel,
+            trophyColorName
+        };
+    }
+
     async _showSplashGameOver(title, message, isPirateDefeat) {
         if (this.poisonPoliceChaseTimer > 0) {
             window.poisonPoliceChaseTimeRemaining = this.poisonPoliceChaseTimer;
@@ -4879,6 +5220,16 @@ class Game {
         }
         const screenEl = document.getElementById('pirate-defeat-screen');
 
+        // Third Eye (Big Book of Knowledge): 3x trash collected at the end of the round
+        if ((this.playerHasThirdEye || window.playerThirdEye) && !this._thirdEyeTrashMultiplied) {
+            this._thirdEyeTrashMultiplied = true;
+            this.trashCollectedInRound = (this.trashCollectedInRound || 0) * 3;
+        }
+
+        const totalTrash = this.trashCollectedInRound || 0;
+        const trophyInfo = this.getRoundTrophyInfo(totalTrash);
+        const catColor = '#4caf50';
+
         const gifEl = document.getElementById('defeat-gif');
         const trophyCanvas = document.getElementById('endRoundTrophyCanvas');
         if (gifEl && trophyCanvas) {
@@ -4889,49 +5240,44 @@ class Game {
                 gifEl.style.display = 'none';
                 trophyCanvas.style.display = 'block';
                 
-                // Draw trophy based on trash collected in round
-                const totalTrash = this.trashCollectedInRound || 0;
-                let trophyLevel = 0; // 0 means silhouette (no trophy)
-                let catColor = '#4caf50'; // Default green for trash
-                let trophyColorName = '';
-                
-                if (totalTrash >= 2500) {
-                    trophyLevel = 5; // Diamond
-                    trophyColorName = 'Diamond';
-                } else if (totalTrash >= 1750) {
-                    trophyLevel = 4; // Platinum
-                    trophyColorName = 'Platinum';
-                } else if (totalTrash >= 1000) {
-                    trophyLevel = 3; // Gold
-                    trophyColorName = 'Gold';
-                } else if (totalTrash >= 500) {
-                    trophyLevel = 2; // Silver
-                    trophyColorName = 'Silver';
-                } else if (totalTrash >= 300) {
-                    trophyLevel = 1; // Bronze
-                    trophyColorName = 'Bronze';
-                }
-                
-                if (trophyLevel > 0) {
+                if (trophyInfo.trophyLevel > 0) {
                     if (typeof window.drawTrophy === 'function') {
-                        window.drawTrophy(trophyCanvas, trophyLevel, catColor);
+                        window.drawTrophy(trophyCanvas, trophyInfo.trophyLevel, catColor);
                     }
                     if (msgEl) {
                         const currentMsg = msgEl.innerText || '';
-                        msgEl.innerText = `${currentMsg}\n\nYou earned a ${trophyColorName} trophy for the round! Although this doesn't go into the trophy case, you can take a snapshot for your gallery.`;
+                        let goalVal = trophyInfo.bronzeGoal;
+                        if (trophyInfo.trophyLevel === 2) goalVal = trophyInfo.silverGoal;
+                        else if (trophyInfo.trophyLevel === 3) goalVal = trophyInfo.goldGoal;
+                        else if (trophyInfo.trophyLevel === 4) goalVal = trophyInfo.platinumGoal;
+
+                        msgEl.innerText = `${currentMsg}\n\n🏆 You earned a ${trophyInfo.trophyColorName} trophy for the round! (${goalVal} trash goal reached | Avg: ${trophyInfo.avgTrash})\nAlthough this doesn't go into the trophy case, you can take a snapshot for your gallery.`;
                     }
                 } else {
                     if (typeof window.drawSilhouetteTrophy === 'function') {
                         window.drawSilhouetteTrophy(trophyCanvas, 1);
+                    }
+                    if (msgEl) {
+                        const currentMsg = msgEl.innerText || '';
+                        msgEl.innerText = `${currentMsg}\n\nNext Trophy: Bronze (${trophyInfo.bronzeGoal} trash needed | 125% of Avg ${trophyInfo.avgTrash})`;
                     }
                 }
             }
         }
 
         // Render trash cans count based on trashCollectedInRound
-        const totalTrash = this.trashCollectedInRound || 0;
         const roundTrashCount = document.getElementById('round-trash-count');
         if (roundTrashCount) roundTrashCount.innerText = totalTrash;
+
+        const roundPosseTrash = document.getElementById('round-posse-trash-count');
+        if (roundPosseTrash) roundPosseTrash.innerText = this.trashCollectedByPosse || 0;
+
+        const roundOrganizers = document.getElementById('round-organizers-count');
+        const orgCount = this.organizers ? this.organizers.length : (window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0);
+        if (roundOrganizers) roundOrganizers.innerText = orgCount;
+
+        const roundPosseGained = document.getElementById('round-posse-gained-count');
+        if (roundPosseGained) roundPosseGained.innerText = `+${this.posseMembersGained || 0}`;
 
         const cansCanvas = document.getElementById('trashCansCountCanvas');
         if (cansCanvas) {
@@ -5068,22 +5414,26 @@ class Game {
                             const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
                             const result = await window.apiCall('/api/game/end-round', 'POST', {
                                 earned: 0,
-                                employee_cost: this.totalEmployeeCost,
-                                employees_killed: this.employeesKilledThisRound,
-                                lose_truck: hadTruck,
-                                followers: this.getRoundTotalFollowers(),
+                                employee_cost: this.totalEmployeeCost || 0,
+                                employees_killed: this.employeesKilledThisRound || 0,
+                                lose_truck: !!hadTruck,
+                                followers: typeof this.getRoundTotalFollowers === 'function' ? this.getRoundTotalFollowers() : 0,
+                                trash_collected: this.trashCollectedInRound || 0,
                                 handshakes: this.handshakesShaken || 0,
                                 dragon_mode_active: !!window.dragonMode,
-                                sacrifice_dragon: sacrifice_dragon,
-                                happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                                sacrifice_dragon: !!sacrifice_dragon,
+                                happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0) || 100.0,
                                 cult_leaves_cumulative: this.cultLeavesCumulative || 0
                             });
                             if (result && result.dragon_lost) {
                                 alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
                             }
+                            if (result && result.today_games_count !== undefined) {
+                                window.todayGamesCount = result.today_games_count;
+                            }
                             window.employeesHired = 0;
                             await window.refreshGameState();
-                            window.renderStore();
+                            if (window.renderStore) window.renderStore();
                             
                             // Hide defeat screen, show store screen
                             if (screenEl) screenEl.classList.add('hidden');
@@ -5187,7 +5537,7 @@ class Game {
 
             const fillHeight = height * 0.7 * fraction;
             const fillY = y + height * 0.9 - fillHeight;
-            
+
             ctx.fillStyle = '#16a34a';
             ctx.fillRect(x, fillY, width, fillHeight);
             
@@ -5216,9 +5566,22 @@ class Game {
         this.state = GameState.UI_OVERLAY;
         if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
 
+        const totalTrash = this.trashCollectedInRound || 0;
+        const trophyInfo = this.getRoundTrophyInfo(totalTrash);
+
         const msgEl = document.getElementById('defeat-message');
         if (msgEl) {
-            msgEl.innerText = "You were run over by a red car! All earnings this round were lost.";
+            let trophyMsg = "";
+            if (trophyInfo.trophyLevel > 0) {
+                let goalVal = trophyInfo.bronzeGoal;
+                if (trophyInfo.trophyLevel === 2) goalVal = trophyInfo.silverGoal;
+                else if (trophyInfo.trophyLevel === 3) goalVal = trophyInfo.goldGoal;
+                else if (trophyInfo.trophyLevel === 4) goalVal = trophyInfo.platinumGoal;
+                trophyMsg = `\n\n🏆 You earned a ${trophyInfo.trophyColorName} trophy! (${goalVal} trash goal | Avg: ${trophyInfo.avgTrash})`;
+            } else {
+                trophyMsg = `\n\nNext Trophy: Bronze (${trophyInfo.bronzeGoal} trash needed | 125% of Avg ${trophyInfo.avgTrash})`;
+            }
+            msgEl.innerText = `You were run over by a red car! All earnings this round were lost.${trophyMsg}`;
         }
 
         // Hide game canvas and show defeat screen
@@ -5230,6 +5593,55 @@ class Game {
             if (screenEl) screenEl.classList.remove('hidden');
         }
         const screenEl = document.getElementById('pirate-defeat-screen');
+
+        const gifEl = document.getElementById('defeat-gif');
+        const trophyCanvas = document.getElementById('endRoundTrophyCanvas');
+        if (gifEl && trophyCanvas) {
+            gifEl.style.display = 'none';
+            trophyCanvas.style.display = 'block';
+            if (trophyInfo.trophyLevel > 0) {
+                if (typeof window.drawTrophy === 'function') {
+                    window.drawTrophy(trophyCanvas, trophyInfo.trophyLevel, '#4caf50');
+                }
+            } else {
+                if (typeof window.drawSilhouetteTrophy === 'function') {
+                    window.drawSilhouetteTrophy(trophyCanvas, 1);
+                }
+            }
+        }
+
+        // Render trash counts and posse breakdown
+        const roundTrashCount = document.getElementById('round-trash-count');
+        if (roundTrashCount) roundTrashCount.innerText = totalTrash;
+
+        const roundPosseTrash = document.getElementById('round-posse-trash-count');
+        if (roundPosseTrash) roundPosseTrash.innerText = this.trashCollectedByPosse || 0;
+
+        const roundOrganizers = document.getElementById('round-organizers-count');
+        const orgCount = this.organizers ? this.organizers.length : (window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0);
+        if (roundOrganizers) roundOrganizers.innerText = orgCount;
+
+        const roundPosseGained = document.getElementById('round-posse-gained-count');
+        if (roundPosseGained) roundPosseGained.innerText = `+${this.posseMembersGained || 0}`;
+
+        const cansCanvas = document.getElementById('trashCansCountCanvas');
+        if (cansCanvas) {
+            const cctx = cansCanvas.getContext('2d');
+            cctx.fillStyle = '#000';
+            cctx.fillRect(0, 0, cansCanvas.width, cansCanvas.height);
+
+            const cansCount = totalTrash / 10;
+            const canW = 20;
+            const canH = 26;
+            const gap = 6;
+            const startX = 10;
+            const startY = 7;
+
+            for (let i = 0; i < Math.ceil(cansCount); i++) {
+                const fraction = Math.min(1.0, cansCount - i);
+                this.drawTrashCan(cctx, startX + i * (canW + gap), startY, canW, canH, fraction);
+            }
+        }
 
         // Draw pixel art to defeat canvas: player run over by car
         const artCanvas = document.getElementById('defeatArtCanvas');
@@ -5271,22 +5683,26 @@ class Game {
                         const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
                         const result = await window.apiCall('/api/game/end-round', 'POST', {
                             earned: 0,
-                            employee_cost: this.totalEmployeeCost,
-                            employees_killed: this.employeesKilledThisRound,
+                            employee_cost: this.totalEmployeeCost || 0,
+                            employees_killed: this.employeesKilledThisRound || 0,
                             lose_truck: false, 
-                            followers: this.getRoundTotalFollowers(),
+                            followers: typeof this.getRoundTotalFollowers === 'function' ? this.getRoundTotalFollowers() : 0,
+                            trash_collected: this.trashCollectedInRound || 0,
                             handshakes: this.handshakesShaken || 0,
                             dragon_mode_active: !!window.dragonMode,
-                            sacrifice_dragon: sacrifice_dragon,
-                            happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                            sacrifice_dragon: !!sacrifice_dragon,
+                            happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0) || 100.0,
                             cult_leaves_cumulative: this.cultLeavesCumulative || 0
                         });
                         if (result && result.dragon_lost) {
                             alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
                         }
+                        if (result && result.today_games_count !== undefined) {
+                            window.todayGamesCount = result.today_games_count;
+                        }
                         window.employeesHired = 0;
                         await window.refreshGameState();
-                        window.renderStore();
+                        if (window.renderStore) window.renderStore();
                     } catch (e) {
                         console.error("Return from defeat error:", e);
                     }
@@ -5297,6 +5713,8 @@ class Game {
                 this._restartGame();
             });
         }
+
+        this._setupDefeatSnapshotButton();
     }
 
     async _triggerArrestDefeat(isMafiaArrest = false) {
@@ -5314,6 +5732,8 @@ class Game {
         if (gifEl) gifEl.style.display = 'block';
 
         const isPoliticsArrest = window.politicsMode;
+        const totalTrash = this.trashCollectedInRound || 0;
+        const trophyInfo = this.getRoundTrophyInfo(totalTrash);
 
         if (isPoliticsArrest) {
             if (titleEl) titleEl.innerText = "BUSTED BY THE POLICE";
@@ -5342,25 +5762,11 @@ class Game {
             if (gifEl) gifEl.style.display = 'none';
             if (trophyCanvas) {
                 trophyCanvas.style.display = 'block';
-                const totalTrash = this.trashCollectedInRound || 0;
-                let trophyLevel = 0;
-                let catColor = '#4caf50';
+                const catColor = '#4caf50';
                 
-                if (totalTrash >= 2500) {
-                    trophyLevel = 5; // Diamond
-                } else if (totalTrash >= 1750) {
-                    trophyLevel = 4; // Platinum
-                } else if (totalTrash >= 1000) {
-                    trophyLevel = 3; // Gold
-                } else if (totalTrash >= 500) {
-                    trophyLevel = 2; // Silver
-                } else if (totalTrash >= 300) {
-                    trophyLevel = 1; // Bronze
-                }
-                
-                if (trophyLevel > 0) {
+                if (trophyInfo.trophyLevel > 0) {
                     if (typeof window.drawTrophy === 'function') {
-                        window.drawTrophy(trophyCanvas, trophyLevel, catColor);
+                        window.drawTrophy(trophyCanvas, trophyInfo.trophyLevel, catColor);
                     }
                 } else {
                     if (typeof window.drawSilhouetteTrophy === 'function') {
@@ -5370,7 +5776,50 @@ class Game {
             }
             if (artContainer) artContainer.style.display = "block";
             if (msgEl) {
-                msgEl.innerText = "You were arrested by the police! All earnings this round were lost.";
+                let trophyMsg = "";
+                if (trophyInfo.trophyLevel > 0) {
+                    let goalVal = trophyInfo.bronzeGoal;
+                    if (trophyInfo.trophyLevel === 2) goalVal = trophyInfo.silverGoal;
+                    else if (trophyInfo.trophyLevel === 3) goalVal = trophyInfo.goldGoal;
+                    else if (trophyInfo.trophyLevel === 4) goalVal = trophyInfo.platinumGoal;
+                    trophyMsg = `\n\n🏆 You earned a ${trophyInfo.trophyColorName} trophy! (${goalVal} trash goal | Avg: ${trophyInfo.avgTrash})`;
+                } else {
+                    trophyMsg = `\n\nNext Trophy: Bronze (${trophyInfo.bronzeGoal} trash needed | 125% of Avg ${trophyInfo.avgTrash})`;
+                }
+                msgEl.innerText = `You were arrested by the police! All earnings this round were lost.${trophyMsg}`;
+            }
+        }
+
+        // Render trash counts and posse breakdown
+        const roundTrashCount = document.getElementById('round-trash-count');
+        if (roundTrashCount) roundTrashCount.innerText = totalTrash;
+
+        const roundPosseTrash = document.getElementById('round-posse-trash-count');
+        if (roundPosseTrash) roundPosseTrash.innerText = this.trashCollectedByPosse || 0;
+
+        const roundOrganizers = document.getElementById('round-organizers-count');
+        const orgCount = this.organizers ? this.organizers.length : (window.playerInventory ? (window.playerInventory['Organizer'] || 0) : 0);
+        if (roundOrganizers) roundOrganizers.innerText = orgCount;
+
+        const roundPosseGained = document.getElementById('round-posse-gained-count');
+        if (roundPosseGained) roundPosseGained.innerText = `+${this.posseMembersGained || 0}`;
+
+        const cansCanvas = document.getElementById('trashCansCountCanvas');
+        if (cansCanvas) {
+            const cctx = cansCanvas.getContext('2d');
+            cctx.fillStyle = '#000';
+            cctx.fillRect(0, 0, cansCanvas.width, cansCanvas.height);
+
+            const cansCount = totalTrash / 10;
+            const canW = 20;
+            const canH = 26;
+            const gap = 6;
+            const startX = 10;
+            const startY = 7;
+
+            for (let i = 0; i < Math.ceil(cansCount); i++) {
+                const fraction = Math.min(1.0, cansCount - i);
+                this.drawTrashCan(cctx, startX + i * (canW + gap), startY, canW, canH, fraction);
             }
         }
 
@@ -5435,25 +5884,29 @@ class Game {
                         const sacrifice_dragon = window.dragonMode ? confirm("Do you sacrifice 5 followers at the altar of the Burninator?") : false;
                         const result = await window.apiCall('/api/game/end-round', 'POST', {
                             earned: 0,
-                            employee_cost: this.totalEmployeeCost,
-                            employees_killed: this.employeesKilledThisRound,
-                            lose_truck: isMafiaArrest || isPoliticsArrest, 
+                            employee_cost: this.totalEmployeeCost || 0,
+                            employees_killed: this.employeesKilledThisRound || 0,
+                            lose_truck: !!(isMafiaArrest || isPoliticsArrest), 
                             followers: 0,
+                            trash_collected: this.trashCollectedInRound || 0,
                             handshakes: this.handshakesShaken || 0,
-                            rival_handshakes: this.rivalCandidate ? this.rivalCandidate.votes : 0,
-                            mafia_arrest: isMafiaArrest,
-                            politics_arrest: isPoliticsArrest,
+                            rival_handshakes: (this.rivalCandidate && this.rivalCandidate.votes) || 0,
+                            mafia_arrest: !!isMafiaArrest,
+                            politics_arrest: !!isPoliticsArrest,
                             dragon_mode_active: !!window.dragonMode,
-                            sacrifice_dragon: sacrifice_dragon,
-                            happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0),
+                            sacrifice_dragon: !!sacrifice_dragon,
+                            happiness: parseFloat(this.happiness !== undefined ? this.happiness : 100.0) || 100.0,
                             cult_leaves_cumulative: this.cultLeavesCumulative || 0
                         });
                         if (result && result.dragon_lost) {
                             alert("🐉 Burninator has left your posse because you did not make the 5 follower sacrifice!");
                         }
+                        if (result && result.today_games_count !== undefined) {
+                            window.todayGamesCount = result.today_games_count;
+                        }
                         window.employeesHired = 0;
                         await window.refreshGameState();
-                        window.renderStore();
+                        if (window.renderStore) window.renderStore();
                     } catch (e) {
                         console.error("Return from defeat error:", e);
                     }
@@ -6008,6 +6461,9 @@ class Game {
     }
 
     _removeSequentialFollower() {
+        if (this.playerHasThirdEye || window.playerThirdEye) {
+            return; // Third Eye: Eternal loyalty, followers never leave the posse!
+        }
         const organizersCount = this.organizers ? this.organizers.length : 0;
         const dragonsCount = this.dragons ? this.dragons.length : 0;
         if (this.followerManager.followers.length > 0) {
@@ -6040,6 +6496,7 @@ class Game {
 
     _getNavDisplayName(targetType) {
         const t = (targetType || '').toLowerCase().trim();
+        if (t === 'library' || t === 'city_library' || t === 'city library') return "CITY LIBRARY";
         if (t === 'zippy_ds' || t === 'zippy ds' || t === 'zippy') return "ZIPPY D'S";
         if (t === 'goose') return "GOOSE";
         if (t === 'chinos_steaks' || t === 'chinos' || t === 'chinos steaks' || t === "chino's" || t === "chino's steaks") return "CHINO'S STEAKS";
@@ -6055,6 +6512,7 @@ class Game {
         return this.gameMap.buildings.find(b => {
             if (!b || !b.type) return false;
             const bt = b.type.toLowerCase();
+            if (t === 'library' || t === 'city library' || t === 'city_library') return bt === 'library' || bt === 'city_library';
             if (t === 'pulp mill' || t === 'pulp_mill') return bt === 'pulp_mill' || bt === 'pulp mill';
             if (t === 'black market' || t === 'black_market') return bt === 'black_market' || bt === 'black market';
             if (t === 'zippy_ds' || t === 'zippy ds' || t === 'zippy') return bt === 'zippy_ds';
@@ -6276,8 +6734,11 @@ class GameOrganizer {
         this.x = game.player.x + (Math.random() - 0.5) * TILE_SIZE * 3;
         this.y = game.player.y + (Math.random() - 0.5) * TILE_SIZE * 3;
         this.speed = 4.5;
+        // Randomly assign a normal character sprite (char1 - char6) to each organizer
+        const normalSprites = ['char1', 'char2', 'char3', 'char4', 'char5', 'char6'];
+        this.spriteId = (window.alexJonesCheat || (this.game && this.game.alexJonesModeActive)) ? 'leatherdaddy_frog' : normalSprites[Math.floor(Math.random() * normalSprites.length)];
         this.followerManager = new FollowerManager();
-        this.followerManager.initialize(game.player.spriteId);
+        this.followerManager.initialize(this.spriteId);
         
         this.targetTrash = null;
         this.direction = 'down';
@@ -6364,6 +6825,7 @@ class GameOrganizer {
                     
                     this.game.trashCollectedInWindow++;
                     this.game.trashCollectedInRound = (this.game.trashCollectedInRound || 0) + 1;
+                    this.game.trashCollectedByPosse = (this.game.trashCollectedByPosse || 0) + 1;
                     this.game.hud.updateScore(this.game.trashManager.totalPoints);
                     this.game.trashManager.spawnMore(this.game.gameMap, 1);
                     
@@ -6520,56 +6982,42 @@ class GameOrganizer {
             }
         }
 
-        if (window.cultMode) {
-            const img = this.game.spriteManager.getCharacterImage('cult_white_robe');
-            if (img && (img.complete || img instanceof HTMLCanvasElement)) {
-                let bobY = 0;
-                if (this.moving) {
-                    bobY = Math.sin(this.animTimer * 0.8) * 1.5;
-                }
-                ctx.save();
-                const drawSize = 64;
-                if (this.direction === 'left') {
-                    ctx.translate(screen.x, screen.y + bobY);
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
-                } else {
-                    ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2 + bobY, drawSize, drawSize);
-                }
-                ctx.restore();
-                
-                ctx.save();
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '6px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 36);
-                ctx.restore();
-                
-                this.followerManager.render(ctx, camera, this.game.spriteManager);
-                return;
+        const activeSpriteId = window.cultMode ? 'cult_white_robe' : (this.spriteId || 'char1');
+        const img = this.game.spriteManager ? this.game.spriteManager.getCharacterImage(activeSpriteId) : null;
+        const drawSize = 64;
+
+        if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+            let bobY = 0;
+            if (this.moving) {
+                bobY = Math.sin(this.animTimer * 0.8) * 1.5;
             }
+            ctx.save();
+            if (this.direction === 'left') {
+                ctx.translate(screen.x, screen.y + bobY);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+            } else {
+                ctx.drawImage(img, screen.x - drawSize / 2, screen.y - drawSize / 2 + bobY, drawSize, drawSize);
+            }
+            ctx.restore();
+        } else {
+            ctx.save();
+            // Fallback body
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(screen.x - 20, screen.y - 22, 40, 44);
+            ctx.fillStyle = '#ffdbac';
+            ctx.beginPath();
+            ctx.arc(screen.x, screen.y - 30, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         }
 
+        // Distinct ORG label
         ctx.save();
-        // Body (Blue shirt) - matching 64px height, centered
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillRect(screen.x - 20, screen.y - 22, 40, 44);
-        
-        // Head
-        ctx.fillStyle = '#ffdbac';
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y - 30, 12, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Hair/Cap (distinct gold/orange cap)
         ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(screen.x - 10, screen.y - 42, 20, 6);
-
-        // Label
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.font = 'bold 6px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 48);
+        ctx.fillText(`ORG ${this.index + 1}`, screen.x, screen.y - 36);
         ctx.restore();
 
         // Render its followers
@@ -6901,6 +7349,39 @@ window.addEventListener('DOMContentLoaded', () => {
         canvas.focus();
     });
 
+    // ── Library & Big Book of Knowledge Event Listeners ──
+    const btnReadBookImg = document.getElementById('btn-read-knowledge-book');
+    if (btnReadBookImg) {
+        btnReadBookImg.addEventListener('click', () => {
+            if (window.game && typeof window.game.readBigBookOfKnowledge === 'function') {
+                window.game.readBigBookOfKnowledge();
+            }
+        });
+    }
+
+    const btnLibRead = document.getElementById('btn-library-read');
+    if (btnLibRead) {
+        btnLibRead.addEventListener('click', () => {
+            if (window.game && typeof window.game.readBigBookOfKnowledge === 'function') {
+                window.game.readBigBookOfKnowledge();
+            }
+        });
+    }
+
+    const btnLibLeave = document.getElementById('btn-library-leave');
+    if (btnLibLeave) {
+        btnLibLeave.addEventListener('click', () => {
+            if (window.game && typeof window.game.closeLibraryDialog === 'function') {
+                window.game.closeLibraryDialog();
+            } else {
+                const dlg = document.getElementById('library-dialog');
+                if (dlg) dlg.classList.add('hidden');
+                if (window.game) window.game.state = GameState.PLAYING;
+            }
+            canvas.focus();
+        });
+    }
+
     const btnMafiaVotesYes = document.getElementById('btn-mafia-votes-yes');
     if (btnMafiaVotesYes) {
         btnMafiaVotesYes.addEventListener('click', () => {
@@ -7056,6 +7537,7 @@ class GameDragon {
                 
                 this.game.trashCollectedInWindow++;
                 this.game.trashCollectedInRound = (this.game.trashCollectedInRound || 0) + 1;
+                this.game.trashCollectedByPosse = (this.game.trashCollectedByPosse || 0) + 1;
                 this.game.hud.updateScore(this.game.trashManager.totalPoints);
                 this.game.trashManager.spawnMore(this.game.gameMap, 1);
                 this.targetTrash = null;

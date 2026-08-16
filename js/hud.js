@@ -209,6 +209,43 @@ class HUD {
         ctx.fillStyle = (this.trashInWindow >= 7) ? '#0f8' : (this.trashInWindow >= 5 ? '#ffcc00' : '#f44');
         ctx.fillText(`Trash: ${this.trashInWindow || 0}/7`, scoreX - 5, scoreY + 40);
 
+        // ── Gold Rush Banner (Top-Center) ──
+        if (window.game && window.game.goldRushActive) {
+            const grTimer = Math.max(0, window.game.goldRushTimer || 0);
+            const bannerW = 340;
+            const bannerH = 46;
+            const bannerX = canvasWidth / 2 - bannerW / 2;
+            const bannerY = 14;
+            const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 150);
+
+            ctx.save();
+            // Pulsing gold background
+            ctx.fillStyle = `rgba(30, 20, 0, ${0.88 + 0.1 * pulse})`;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 8);
+            else ctx.rect(bannerX, bannerY, bannerW, bannerH);
+            ctx.fill();
+
+            // Golden glowing border
+            ctx.strokeStyle = pulse > 0.5 ? '#ffd700' : '#ffea70';
+            ctx.lineWidth = 2.5;
+            if (ctx.roundRect) ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 8);
+            else ctx.strokeRect(bannerX, bannerY, bannerW, bannerH);
+            ctx.stroke();
+
+            // Text
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 11px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('🏆 GOLD RUSH! 🏆', canvasWidth / 2, bannerY + 8);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 9px "Press Start 2P", monospace';
+            ctx.fillText(`GRAB GOLD TRASH: ${Math.ceil(grTimer)}s`, canvasWidth / 2, bannerY + 27);
+            ctx.restore();
+        }
+
         // ── Player Avatar & Posse Card (top-left) ──
         const pCardX = 20;
         const pCardY = 20;
@@ -260,69 +297,6 @@ class HUD {
         ctx.fillStyle = '#64748b';
         ctx.font = '5px "Press Start 2P", monospace';
         ctx.fillText('[TAB] Match', pCardX + 125, pCardY + 26);
-
-        // ── Map GPS Coordinates Box (top-left, below Player Card) ──
-        if (window.game && window.game.gameMap) {
-            const gpsX = pCardX - 10;
-            const gpsY = pCardY + pCardH + 4;
-            const gpsW = pCardW;
-            const gpsH = 34;
-
-            ctx.fillStyle = 'rgba(10, 15, 25, 0.85)';
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(gpsX, gpsY, gpsW, gpsH, 6);
-            else ctx.rect(gpsX, gpsY, gpsW, gpsH);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
-            ctx.lineWidth = 1;
-            if (ctx.roundRect) ctx.roundRect(gpsX, gpsY, gpsW, gpsH, 6);
-            else ctx.strokeRect(gpsX, gpsY, gpsW, gpsH);
-            ctx.stroke();
-
-            const getBldgCoords = (type) => {
-                if (!window.game || !window.game.gameMap || !window.game.gameMap.buildings) return '??,??';
-                const b = window.game.gameMap.buildings.find(bldg => {
-                    if (!bldg || !bldg.type) return false;
-                    const bt = bldg.type.toLowerCase();
-                    if (type === 'pulp_mill') return bt === 'pulp_mill' || bt === 'pulp mill';
-                    if (type === 'goose') return bt === 'goose' || bt === 'fast_food';
-                    if (type === 'zippy_ds') return bt === 'zippy_ds' || bt === 'zippy ds';
-                    if (type === 'chinos_steaks') return bt === 'chinos_steaks' || bt === 'chinos';
-                    if (type === 'rats_steaks') return bt === 'rats_steaks' || bt === 'rats';
-                    return bt === type;
-                });
-                if (!b) return '??,??';
-                let tx = 0, ty = 0;
-                if (b.doorTiles && b.doorTiles.length > 0) {
-                    tx = b.doorTiles[0].x;
-                    ty = b.doorTiles[0].y;
-                } else if (b.tiles && b.tiles.length > 0) {
-                    tx = b.tiles[0].x;
-                    ty = b.tiles[0].y;
-                } else {
-                    tx = Math.floor(b.x / TILE_SIZE);
-                    ty = Math.floor(b.y / TILE_SIZE);
-                }
-                return `${wrapTileX(tx)},${wrapTileY(ty)}`;
-            };
-
-            const playerTX = window.game.player ? wrapTileX(Math.floor(window.game.player.x / TILE_SIZE)) : 0;
-            const playerTY = window.game.player ? wrapTileY(Math.floor(window.game.player.y / TILE_SIZE)) : 0;
-            const dumpCoord = getBldgCoords('dump');
-            const hospCoord = getBldgCoords('hospital');
-            const airpCoord = getBldgCoords('airport');
-            const pulpCoord = getBldgCoords('pulp_mill');
-
-            ctx.textAlign = 'left';
-            ctx.fillStyle = '#00ffcc';
-            ctx.font = '6px "Press Start 2P", monospace';
-            ctx.fillText(`📍 YOU: (${playerTX}, ${playerTY})`, gpsX + 6, gpsY + 11);
-
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '5.5px "Press Start 2P", monospace';
-            ctx.fillText(`🗑️DUMP:${dumpCoord}  🏥HOSP:${hospCoord}`, gpsX + 6, gpsY + 22);
-            ctx.fillText(`✈️AIRP:${airpCoord}  🪵PULP:${pulpCoord}`, gpsX + 6, gpsY + 31);
-        }
 
         // ── Politics/El Presidente Mode Votes Display (top-left, below Player Card) ──
         if ((window.politicsMode || window.elPresidenteElection) && window.game) {
@@ -828,6 +802,11 @@ class HUD {
     }
 
     renderDoomStatusBar(ctx, w, h, game) {
+        const canvasWidth = w || (ctx && ctx.canvas ? ctx.canvas.width : window.innerWidth);
+        const canvasHeight = h || (ctx && ctx.canvas ? ctx.canvas.height : window.innerHeight);
+        w = canvasWidth;
+        h = canvasHeight;
+
         const barH = 78;
         const barY = h - barH;
 
@@ -971,66 +950,12 @@ class HUD {
         ctx.fillStyle = '#22c55e';
         ctx.font = 'bold 9px "Press Start 2P", monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(`$${this.score || 0}`, currX + 8, panelY + 14);
+        ctx.fillText(`💵 CASH: $${(this.score || 0).toLocaleString()}`, currX + 8, panelY + 18);
 
         ctx.fillStyle = '#38bdf8';
-        ctx.font = '7px "Press Start 2P", monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + p3W - 8, panelY + 14);
-
-        // Small Coordinates Box under the Posse count
-        const getBldgCoords = (type) => {
-            if (!game || !game.gameMap || !game.gameMap.buildings) return '??,??';
-            const b = game.gameMap.buildings.find(bldg => {
-                if (!bldg || !bldg.type) return false;
-                const bt = bldg.type.toLowerCase();
-                if (type === 'pulp_mill') return bt === 'pulp_mill' || bt === 'pulp mill';
-                return bt === type;
-            });
-            if (!b) return '??,??';
-            let tx = 0, ty = 0;
-            if (b.doorTiles && b.doorTiles.length > 0) {
-                tx = b.doorTiles[0].x;
-                ty = b.doorTiles[0].y;
-            } else if (b.tiles && b.tiles.length > 0) {
-                tx = b.tiles[0].x;
-                ty = b.tiles[0].y;
-            } else {
-                tx = Math.floor(b.x / TILE_SIZE);
-                ty = Math.floor(b.y / TILE_SIZE);
-            }
-            return `${wrapTileX(tx)},${wrapTileY(ty)}`;
-        };
-
-        const playerTX = (game && game.player) ? wrapTileX(Math.floor(game.player.x / TILE_SIZE)) : 0;
-        const playerTY = (game && game.player) ? wrapTileY(Math.floor(game.player.y / TILE_SIZE)) : 0;
-
-        const dumpCoord = getBldgCoords('dump');
-        const hospCoord = getBldgCoords('hospital');
-        const airpCoord = getBldgCoords('airport');
-        const pulpCoord = getBldgCoords('pulp_mill');
-
-        const boxX = currX + 6;
-        const boxY = panelY + 22;
-        const boxW = p3W - 12;
-        const boxH = panelH - 26;
-
-        ctx.fillStyle = '#030712';
-        ctx.fillRect(boxX, boxY, boxW, boxH);
-        ctx.strokeStyle = '#1e3a8a';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(boxX, boxY, boxW, boxH);
-
-        // Coordinates Text inside box
+        ctx.font = 'bold 8px "Press Start 2P", monospace';
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#00ffcc';
-        ctx.font = '6px "Press Start 2P", monospace';
-        ctx.fillText(`📍 YOU: (${playerTX}, ${playerTY})`, boxX + 5, boxY + 10);
-
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '5.5px "Press Start 2P", monospace';
-        ctx.fillText(`🗑️DUMP:${dumpCoord}  🏥HOSP:${hospCoord}`, boxX + 5, boxY + 22);
-        ctx.fillText(`✈️AIRP:${airpCoord}  🪵PULP:${pulpCoord}`, boxX + 5, boxY + 34);
+        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + 8, panelY + 36);
 
         currX += p3W + 8;
 
@@ -1072,7 +997,15 @@ class HUD {
     }
 
     renderMedicationAlert(ctx, w, h) {
-        if (!window.game) return;
+        if (!window.game || window.game.noMedsActive) {
+            this.medicationBtnBounds = null;
+            return;
+        }
+
+        const canvasWidth = w || (ctx && ctx.canvas ? ctx.canvas.width : window.innerWidth);
+        const canvasHeight = h || (ctx && ctx.canvas ? ctx.canvas.height : window.innerHeight);
+        w = canvasWidth;
+        h = canvasHeight;
 
         if (window.game.medicationAlertActive) {
             ctx.save();

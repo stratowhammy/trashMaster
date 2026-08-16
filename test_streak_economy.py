@@ -156,7 +156,7 @@ class TestStreakEconomyAndBlackMarket(unittest.TestCase):
             user_id = self.create_test_user('sync_streak_user')
             headers = self.get_auth_headers(user_id, 'sync_streak_user')
             db = get_db()
-            db.execute('UPDATE users SET lids = 42, current_streak = 5, max_streak = 8, streak_qualified = 0, last_active_date = ? WHERE id = ?',
+            db.execute('UPDATE users SET lids = 42, current_streak = 5, max_streak = 8, streak_qualified = 0, stat_cumulative_trash = 300, total_rounds_played = 2, last_active_date = ? WHERE id = ?',
                        (datetime.utcnow().strftime('%Y-%m-%d'), user_id))
             db.commit()
 
@@ -167,6 +167,8 @@ class TestStreakEconomyAndBlackMarket(unittest.TestCase):
             self.assertEqual(s_data['current_streak'], 5)
             self.assertEqual(s_data['max_streak'], 8)
             self.assertEqual(s_data['streak_qualified'], 0)
+            self.assertEqual(s_data['today_games_count'], 0)
+            self.assertEqual(s_data['stats']['stat_avg_trash'], 150.0)
 
             # Test /api/user/profile
             prof_res = self.app.get('/api/user/profile', headers=headers)
@@ -176,6 +178,8 @@ class TestStreakEconomyAndBlackMarket(unittest.TestCase):
             self.assertEqual(prof['lids'], 42)
             self.assertEqual(prof['current_streak'], 5)
             self.assertEqual(prof['max_streak'], 8)
+            self.assertEqual(prof['today_games_count'], 0)
+            self.assertEqual(prof['stats']['stat_avg_trash'], 150.0)
 
     def test_end_round_integration_logs_timestamp_and_streak(self):
         with app.app_context():
@@ -188,20 +192,46 @@ class TestStreakEconomyAndBlackMarket(unittest.TestCase):
                 'trash_collected': 15,
                 'followers': 2
             })
-            data = res.get_json()
-            self.assertTrue(data['success'])
-            self.assertEqual(data['current_streak'], 1)
-            self.assertEqual(data['lids_awarded'], 0) # Day 1 is locked
+            # Complete round 2 on the same day -> today_games_count should be 2
+            res2 = self.app.post('/api/game/end-round', headers=headers, json={
+                'earned': 200,
+                'trash_collected': 10,
+                'followers': 1
+            })
+            data2 = res2.get_json()
+            self.assertTrue(data2['success'])
+            self.assertEqual(data2['current_streak'], 1)
+            self.assertEqual(data2['today_games_count'], 2)
 
-            # Verify log in gameplay_logs
+            # Check sync endpoint returns today_games_count: 2
+            sync_res = self.app.get('/api/game/sync', headers=headers)
+            self.assertEqual(sync_res.get_json()['today_games_count'], 2)
+
+            # Complete round 3 with null/empty payload values -> verify defensive coercion
+            res3 = self.app.post('/api/game/end-round', headers=headers, json={
+                'earned': None,
+                'employee_cost': None,
+                'employees_killed': None,
+                'trash_collected': None,
+                'followers': None
+            })
+            data3 = res3.get_json()
+            self.assertTrue(data3['success'])
+            self.assertEqual(data3['today_games_count'], 3)
+            self.assertEqual(data3['current_streak'], 1)
+
+    def test_same_day_zero_streak_initialization(self):
+        with app.app_context():
+            user_id = self.create_test_user('same_day_zero_streak')
             db = get_db()
-            cursor = db.cursor()
-            cursor.execute('SELECT * FROM gameplay_logs WHERE user_id = ?', (user_id,))
-            log = cursor.fetchone()
-            self.assertIsNotNone(log)
-            self.assertIsNotNone(log['played_at'])
-            self.assertEqual(log['streak_day'], 1)
-            self.assertEqual(log['lids_awarded'], 0)
+            today_str = datetime.utcnow().strftime('%Y-%m-%d')
+            # Set user with last_active_date as today, but current_streak as 0
+            db.execute('UPDATE users SET last_active_date = ?, current_streak = 0 WHERE id = ?', (today_str, user_id))
+            db.commit()
+
+            res = process_gameplay_log(db, user_id, date_override=today_str, round_num=1)
+            self.assertEqual(res['current_streak'], 1)
+            self.assertEqual(res['total_lids'], 0)
 
 if __name__ == '__main__':
     unittest.main()

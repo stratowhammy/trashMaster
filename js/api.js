@@ -65,6 +65,15 @@ function showScreen(screenId) {
         btnReturnStore.style.display = (screenId === 'game-layer') ? 'inline-block' : 'none';
     }
 
+    const floatingControls = document.getElementById('floating-quick-controls');
+    if (floatingControls) {
+        if (screenId === 'game-layer') {
+            floatingControls.classList.add('in-game');
+        } else {
+            floatingControls.classList.remove('in-game');
+        }
+    }
+
     const gameViewport = document.getElementById('game-viewport');
     const gameCanvas3d = document.getElementById('gameCanvas3d');
     const gameCanvas = document.getElementById('gameCanvas');
@@ -83,6 +92,9 @@ function showScreen(screenId) {
         if (gameViewport) gameViewport.classList.add('hidden');
         if (gameCanvas) gameCanvas.classList.add('hidden');
         if (gameCanvas3d) gameCanvas3d.classList.add('hidden');
+        if (screenId === 'store-screen' || screenId === 'store-items-screen') {
+            if (typeof updateStoreUI === 'function') updateStoreUI();
+        }
         if (window.soundManager && (screenId === 'store-screen' || screenId === 'store-items-screen' || screenId === 'login-screen')) {
             window.soundManager.playTrack('store');
         }
@@ -162,6 +174,38 @@ function initUI() {
             btn.classList.add('active');
         });
     });
+
+    // Modal sprite options handler
+    const dialogSpriteBtns = document.querySelectorAll('#sprite-select-dialog .sprite-option-btn');
+    dialogSpriteBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const sprite = btn.getAttribute('data-sprite');
+            if (sprite) {
+                window.chosenSprite = sprite;
+                window.playerChosenSprite = sprite;
+                if (window.game && window.game.player) {
+                    window.game.player.spriteId = sprite;
+                }
+                const dlg = document.getElementById('sprite-select-dialog');
+                if (dlg) dlg.classList.add('hidden');
+                await apiCall('/api/game/set-chosen-sprite', 'POST', { sprite_id: sprite }).catch(console.error);
+            }
+        });
+    });
+
+    window.syncGDCubeVisibility = function() {
+        const isUnlocked = localStorage.getItem('gdCubeUnlocked') === 'true' || window.gdCubeUnlocked;
+        document.querySelectorAll('.sprite-option-btn[data-sprite="char7"]').forEach(btn => {
+            if (isUnlocked) {
+                btn.classList.remove('hidden');
+                btn.style.display = '';
+            } else {
+                btn.classList.add('hidden');
+                btn.style.display = 'none';
+            }
+        });
+    };
+    window.syncGDCubeVisibility();
 
     if (btnDoRegister) {
         btnDoRegister.addEventListener('click', async () => {
@@ -285,13 +329,35 @@ function initUI() {
                         terminalHistory.innerHTML += `\n> ${cmd}`;
                         const cmdLower = cmd.toLowerCase();
                         if (cmdLower === 'eggs') {
-                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc;">🥚 EXECUTABLE TERMINAL COMMANDS:</span>\n<span style="color: #ffff00;">- eggs</span> : List all executable terminal commands\n<span style="color: #ffff00;">- ducky</span> : Activate Rubber Ducky mode!\n<span style="color: #ffff00;">- dragon ho!</span> : Activate Dragon Ho! cheat\n<span style="color: #ffff00;">- chaos / chaos mode / chaos ho!</span> : Unlock Chaos Mode\n<span style="color: #ffff00;">- clear</span> : Clear terminal history\n<span style="color: #ffff00;">- help</span> : Display terminal command list`;
+                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc;">🥚 EXECUTABLE TERMINAL COMMANDS:</span>\n<span style="color: #ffff00;">- eggs</span> : List all executable terminal commands\n<span style="color: #ffff00;">- npesta</span> : Unlock Geometry Dash Cube as a playable character!\n<span style="color: #ffff00;">- knowledge ho!</span> : Guaranteed City Library on your next round!\n<span style="color: #ffff00;">- ducky</span> : Activate Rubber Ducky mode!\n<span style="color: #ffff00;">- dragon ho!</span> : Activate Dragon Ho! cheat\n<span style="color: #ffff00;">- gold rush ho!</span> : Auto-activate Gold Rush at 45 seconds!\n<span style="color: #ffff00;">- no org</span> : Remove Organizers for 1 round\n<span style="color: #ffff00;">- no meds</span> : Remove medication requirement for 1 round\n<span style="color: #ffff00;">- alex jones</span> : Leatherdaddy Frog sprites for everyone!\n<span style="color: #ffff00;">- chaos / chaos mode / chaos ho!</span> : Unlock Chaos Mode\n<span style="color: #ffff00;">- clear</span> : Clear terminal history\n<span style="color: #ffff00;">- help</span> : Display terminal command list`;
+                        } else if (cmdLower === 'npesta') {
+                            window.gdCubeUnlocked = true;
+                            localStorage.setItem('gdCubeUnlocked', 'true');
+                            if (window.syncGDCubeVisibility) window.syncGDCubeVisibility();
+                            if (window.soundManager) window.soundManager.playDingSFX();
+                            terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Geometry Dash Cube is now available as a selectable character!</span>`;
+                        } else if (cmdLower === 'knowledge ho!' || cmdLower === 'knowledge ho' || cmdLower === 'knowledge_ho') {
+                            window.knowledgeHoActive = true;
+                            if (window.soundManager) window.soundManager.playAngelicChoirSFX();
+                            terminalHistory.innerHTML += `\n<span style="color: #60a5fa; text-shadow: 0 0 5px #60a5fa;">📚 KNOWLEDGE HO! Activated! The City Library & Big Book of Knowledge are guaranteed to spawn on your next round!</span>`;
                         } else if (cmdLower === 'ducky') {
                             window.duckyModeActive = true;
                             terminalHistory.innerHTML += `\n<span style="color: #ffff00; text-shadow: 0 0 5px #ffff00;">🦆 QUACK! Ducky Mode Activated! Rubber Ducky power engaged!</span>`;
                         } else if (cmdLower === 'dragon ho!') {
                             window.dragonHoCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #ffff00;">Dragon Ho! Activated!</span>`;
+                        } else if (cmdLower === 'gold rush ho!' || cmdLower === 'gold rush ho' || cmdLower === 'gold rush') {
+                            window.goldRushCheat = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #ffd700; text-shadow: 0 0 5px #ffd700;">🏆 GOLD RUSH HO! Activated! Gold Rush will automatically trigger at 45 seconds into the round!</span>`;
+                        } else if (cmdLower === 'no org' || cmdLower === 'no_org' || cmdLower === 'noorg') {
+                            window.noOrgCheat = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #ffaa00; text-shadow: 0 0 5px #ffaa00;">🚫 NO ORG Activated! Organizers removed for the next round!</span>`;
+                        } else if (cmdLower === 'no meds' || cmdLower === 'no_meds' || cmdLower === 'nomeds') {
+                            window.noMedsCheat = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc; text-shadow: 0 0 5px #00ffcc;">💊 NO MEDS Activated! Medication and sickness requirements removed for the next round!</span>`;
+                        } else if (cmdLower === 'alex jones' || cmdLower === 'alex_jones' || cmdLower === 'alexjones') {
+                            window.alexJonesCheat = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #22c55e; text-shadow: 0 0 5px #22c55e;">🐸 ALEX JONES ACTIVATED! The water turned everyone into Leatherdaddy Frogs!</span>`;
                         } else if (cmdLower === 'chaos' || cmdLower === 'chaos mode' || cmdLower === 'chaos ho!') {
                             window.chaosCheatActive = true;
                             updateModeToggles();
@@ -638,18 +704,101 @@ function initUI() {
     const btnSoundMenu = document.getElementById('btn-sound-menu');
     const dlgSoundOptions = document.getElementById('sound-options-dialog');
     const btnSoundOptionsClose = document.getElementById('btn-sound-options-close');
+    const soundtrackSelect = document.getElementById('soundtrack-select');
     const sliderMusicVolume = document.getElementById('slider-music-volume');
     const musicVolumeText = document.getElementById('music-volume-text');
     const btnToggleMusic = document.getElementById('btn-toggle-music');
     const btnSfxAllOn = document.getElementById('btn-sfx-all-on');
     const btnSfxAllOff = document.getElementById('btn-sfx-all-off');
 
+    const sfxKeys = ['click', 'trash', 'splat', 'ding', 'handshake', 'gunshot', 'cash', 'choir', 'dialog', 'ear-piercing'];
+
+    const syncSoundOptionsUI = () => {
+        if (soundtrackSelect && window.soundManager) {
+            soundtrackSelect.value = window.selectedMusicTrack || window.soundManager.currentTrack || 'lofi';
+        }
+        if (sliderMusicVolume && window.soundManager) {
+            sliderMusicVolume.value = window.soundManager.musicVolumePercent || 100;
+            if (musicVolumeText) musicVolumeText.innerText = (window.soundManager.musicVolumePercent || 100) + '%';
+        }
+        if (btnToggleMusic && window.soundManager) {
+            btnToggleMusic.innerText = window.soundManager.isMusicMuted ? 'Unmute Music' : 'Mute Music';
+            btnToggleMusic.style.background = window.soundManager.isMusicMuted ? '#662222' : '#225544';
+        }
+        sfxKeys.forEach(key => {
+            const el = document.getElementById(`sfx-${key}`);
+            const smKey = key.replace('-', '_');
+            if (el && window.soundManager && window.soundManager.sfxToggles) {
+                el.checked = (window.soundManager.sfxToggles[smKey] !== false);
+            }
+        });
+    };
+
     const openSoundOptions = () => {
+        syncSoundOptionsUI();
         if (dlgSoundOptions) dlgSoundOptions.classList.remove('hidden');
     };
     const closeSoundOptions = () => {
         if (dlgSoundOptions) dlgSoundOptions.classList.add('hidden');
     };
+
+    if (soundtrackSelect) {
+        soundtrackSelect.addEventListener('change', (e) => {
+            const track = e.target.value;
+            window.selectedMusicTrack = track;
+            if (window.soundManager) {
+                window.soundManager.playTrack(track);
+            }
+        });
+    }
+
+    if (sliderMusicVolume) {
+        sliderMusicVolume.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            if (musicVolumeText) musicVolumeText.innerText = val + '%';
+            if (window.soundManager) window.soundManager.setMusicVolume(val);
+        });
+    }
+
+    if (btnToggleMusic) {
+        btnToggleMusic.addEventListener('click', () => {
+            if (window.soundManager) {
+                const isMuted = window.soundManager.toggleMusicMute();
+                btnToggleMusic.innerText = isMuted ? 'Unmute Music' : 'Mute Music';
+                btnToggleMusic.style.background = isMuted ? '#662222' : '#225544';
+            }
+        });
+    }
+
+    sfxKeys.forEach(key => {
+        const el = document.getElementById(`sfx-${key}`);
+        const smKey = key.replace('-', '_');
+        if (el) {
+            el.addEventListener('change', (e) => {
+                if (window.soundManager) window.soundManager.setSFXToggle(smKey, e.target.checked);
+            });
+        }
+    });
+
+    if (btnSfxAllOn) {
+        btnSfxAllOn.addEventListener('click', () => {
+            if (window.soundManager) window.soundManager.setAllSFXToggles(true);
+            sfxKeys.forEach(key => {
+                const el = document.getElementById(`sfx-${key}`);
+                if (el) el.checked = true;
+            });
+        });
+    }
+
+    if (btnSfxAllOff) {
+        btnSfxAllOff.addEventListener('click', () => {
+            if (window.soundManager) window.soundManager.setAllSFXToggles(false);
+            sfxKeys.forEach(key => {
+                const el = document.getElementById(`sfx-${key}`);
+                if (el) el.checked = false;
+            });
+        });
+    }
 
     if (btnAudioSettings) btnAudioSettings.addEventListener('click', openSoundOptions);
     if (btnSoundMenu) btnSoundMenu.addEventListener('click', openSoundOptions);
@@ -675,7 +824,7 @@ function initUI() {
         if (window.keybindManager) window.keybindManager.resetKeybinds();
     });
 
-    // ── 3D FPS / 2D Retro Perspective Toggle Listener ──
+    // ── 3D FPS / 3D Aerial / 2D Retro Perspective Toggle Listener ──
     const btnFpsToggle = document.getElementById('btn-fps-toggle');
     if (btnFpsToggle) {
         btnFpsToggle.addEventListener('click', () => {
@@ -690,19 +839,37 @@ function initUI() {
                     }
                 }
                 if (window.game.engine3D) {
-                    window.game.engine3D.enabled = !window.game.engine3D.enabled;
-                    const is3D = window.game.engine3D.enabled;
-                    btnFpsToggle.innerHTML = is3D ? '🎮 3D FPS' : '🕹️ 2D RETRO';
-                    btnFpsToggle.style.borderColor = is3D ? '#00ffcc' : '#ffaa00';
-                    btnFpsToggle.style.color = is3D ? '#00ffcc' : '#ffaa00';
+                    const mode = typeof window.game.engine3D.cyclePerspective === 'function' 
+                        ? window.game.engine3D.cyclePerspective()
+                        : (window.game.engine3D.enabled ? '2d' : 'fps');
 
+                    const is3D = (mode === 'fps' || mode === 'aerial');
                     const canvas3d = document.getElementById('gameCanvas3d');
                     if (canvas3d) {
                         canvas3d.style.display = is3D ? 'block' : 'none';
                     }
 
-                    if (window.game.hud) {
-                        window.game.hud.showFollowerNotification(is3D ? 'Switched to 3D FPS Mode (Doom)' : 'Switched to 2D Top-Down Mode', true);
+                    if (mode === 'aerial') {
+                        btnFpsToggle.innerHTML = '👁️ 3D AERIAL';
+                        btnFpsToggle.style.borderColor = '#c084fc';
+                        btnFpsToggle.style.color = '#c084fc';
+                        if (window.game.hud) {
+                            window.game.hud.showFollowerNotification('👁️ THIRD EYE: Switched to 3D Aerial Vantage Point View!', true);
+                        }
+                    } else if (mode === 'fps') {
+                        btnFpsToggle.innerHTML = '🎮 3D FPS';
+                        btnFpsToggle.style.borderColor = '#00ffcc';
+                        btnFpsToggle.style.color = '#00ffcc';
+                        if (window.game.hud) {
+                            window.game.hud.showFollowerNotification('Switched to 3D FPS Mode (Doom)', true);
+                        }
+                    } else {
+                        btnFpsToggle.innerHTML = '🕹️ 2D RETRO';
+                        btnFpsToggle.style.borderColor = '#ffaa00';
+                        btnFpsToggle.style.color = '#ffaa00';
+                        if (window.game.hud) {
+                            window.game.hud.showFollowerNotification('Switched to 2D Top-Down Mode', true);
+                        }
                     }
                 }
             }
@@ -1016,7 +1183,7 @@ function initUI() {
                         // Re-spawn trash on the new map
                         if (window.game.trashManager) {
                             window.game.trashManager.items = [];
-                            window.game.trashManager.spawnInitial(window.game.gameMap, 80);
+                            window.game.trashManager.spawnInitial(window.game.gameMap, 320);
                         }
                         // Re-spawn NPCs on the new map
                         if (window.game.npcManager) {
@@ -1097,11 +1264,13 @@ function initUI() {
             if (window.game) {
                 window.game.navigationTarget = targetLoc;
                 let formattedName = targetLoc.toUpperCase();
-                if (targetLoc === 'zippy_ds') formattedName = "ZIPPY D'S";
+                if (targetLoc === 'library') formattedName = "CITY LIBRARY";
+                else if (targetLoc === 'zippy_ds') formattedName = "ZIPPY D'S";
                 else if (targetLoc === 'goose') formattedName = "GOOSE";
                 else if (targetLoc === 'chinos_steaks') formattedName = "CHINO'S STEAKS";
                 else if (targetLoc === 'rats_steaks') formattedName = "RATS STEAKS";
                 else if (targetLoc === 'pulp mill') formattedName = "PULP MILL";
+                else if (targetLoc === 'zoo') formattedName = "ZOO";
                 else if (targetLoc === 'black market') formattedName = "BLACK MARKET";
                 if (window.game.hud) {
                     window.game.hud.showFollowerNotification(`📍 Navigation set to ${formattedName}! Follow arrow.`, true);
@@ -1281,6 +1450,7 @@ async function refreshGameState() {
         completedMafiaJobs = data.completed_mafia_jobs || 0;
         window.completedMafiaJobs = completedMafiaJobs;
         playerStats = data.stats || {};
+        window.playerStats = playerStats;
         playerCredits = data.credits !== undefined ? data.credits : 3;
         window.playerCredits = playerCredits;
         internationalFollowers = data.international_followers || 0;
@@ -1498,6 +1668,7 @@ function updateStoreUI() {
 }
 
 function renderStore() {
+    updateStoreUI();
     const container = document.querySelector('.store-items');
     if (!container) return;
     container.innerHTML = '';
@@ -2150,7 +2321,7 @@ const TROPHY_CATEGORIES = [
         name: 'Single Game Trash',
         color: '#4caf50',
         badge: '🗑️',
-        thresholds: [300, 500, 1000, 1750, 2500],
+        thresholds: [25, 75, 150, 300, 500],
         names: ['Trash Collector', 'Garbage Patrol', 'Sanitation Officer', 'City Cleaner', 'Trash Overlord']
     },
     {
@@ -2158,7 +2329,7 @@ const TROPHY_CATEGORIES = [
         name: 'Cumulative Trash',
         color: '#8bc34a',
         badge: '📦',
-        thresholds: [50, 250, 1250, 6250, 31250],
+        thresholds: [50, 250, 1000, 5000, 25000],
         names: ['Litter Sweep', 'Clean Streets', 'Neighborhood Hero', 'Eco Warrior', 'Saviour of Philly']
     },
     {
@@ -2166,7 +2337,7 @@ const TROPHY_CATEGORIES = [
         name: 'Single Round Money',
         color: '#ffeb3b',
         badge: '💵',
-        thresholds: [500, 2500, 12500, 62500, 312500],
+        thresholds: [500, 2500, 10000, 50000, 250000],
         names: ['Pennies Count', 'Dollar Bill', 'Big Earner', 'Wealth Generator', 'Money Magnet']
     },
     {
@@ -2174,7 +2345,7 @@ const TROPHY_CATEGORIES = [
         name: 'Current Balance',
         color: '#ffc107',
         badge: '💰',
-        thresholds: [2000, 10000, 50000, 250000, 1250000],
+        thresholds: [1000, 5000, 25000, 100000, 500000],
         names: ['Thrifty Hustler', 'Local Business', 'Philly Tycoon', 'Billionaire Club', 'Infinite Wealth']
     },
     {
@@ -2182,7 +2353,7 @@ const TROPHY_CATEGORIES = [
         name: 'Single Round Followers',
         color: '#00bcd4',
         badge: '👥',
-        thresholds: [5, 15, 45, 135, 400],
+        thresholds: [5, 15, 35, 75, 150],
         names: ['Posse Spark', 'Crowd Puller', 'Local Leader', 'Trendsetter', 'Revolutionary']
     },
     {
@@ -2190,10 +2361,30 @@ const TROPHY_CATEGORIES = [
         name: 'Total Followers',
         color: '#009688',
         badge: '👑',
-        thresholds: [10, 40, 160, 640, 2560],
+        thresholds: [5, 15, 50, 150, 500],
         names: ['Small Crew', 'Active Movement', 'Rising Leader', 'Mass Movement', 'Philly Emperor']
     }
 ];
+
+function getTrophyStatValue(catKey) {
+    const stats = playerStats || window.playerStats || {};
+    switch (catKey) {
+        case 'max_single_trash':
+            return stats.stat_max_single_trash !== undefined ? stats.stat_max_single_trash : (stats.max_single_trash !== undefined ? stats.max_single_trash : 0);
+        case 'cumulative_trash':
+            return stats.stat_cumulative_trash !== undefined ? stats.stat_cumulative_trash : (stats.cumulative_trash !== undefined ? stats.cumulative_trash : 0);
+        case 'max_single_money':
+            return stats.stat_max_single_money !== undefined ? stats.stat_max_single_money : (stats.max_single_money !== undefined ? stats.max_single_money : 0);
+        case 'current_balance':
+            return (playerBalance !== undefined ? playerBalance : (window.playerBalance || 0));
+        case 'max_single_followers':
+            return stats.stat_max_single_followers !== undefined ? stats.stat_max_single_followers : (stats.max_single_followers !== undefined ? stats.max_single_followers : 0);
+        case 'total_followers':
+            return (playerMovementSize !== undefined ? playerMovementSize : (window.playerMovementSize !== undefined ? window.playerMovementSize : (stats.total_followers !== undefined ? stats.total_followers : (stats.movement_size || 0))));
+        default:
+            return stats[catKey] !== undefined ? stats[catKey] : (stats['stat_' + catKey] || 0);
+    }
+}
 
 function renderTrophyRoom() {
     const shelvesEl = document.getElementById('trophy-case-shelves');
@@ -2209,10 +2400,7 @@ function renderTrophyRoom() {
         title.innerText = cat.name.toUpperCase();
         shelfRow.appendChild(title);
 
-        let currentVal = playerStats[cat.key] || 0;
-        if (cat.key === 'current_balance') {
-            currentVal = playerBalance || 0;
-        }
+        const currentVal = getTrophyStatValue(cat.key);
 
         // Find the next locked achievement
         let nextIndex = -1;
@@ -2386,6 +2574,7 @@ window.apiCall = apiCall;
 window.refreshGameState = refreshGameState;
 window.showScreen = showScreen;
 window.renderStore = renderStore;
+window.updateStoreUI = updateStoreUI;
 window.buyBuilding = (buildingIdx, address, cost) => apiCall('/api/game/buy-building', 'POST', { building_idx: buildingIdx, address: address, cost: cost });
 window.addTenant = (buildingIdx) => apiCall('/api/game/add-tenant', 'POST', { building_idx: buildingIdx });
 
@@ -2803,6 +2992,9 @@ window.captureEndRoundSnapshot = function() {
     const artCanvas = document.getElementById('defeatArtCanvas');
     const cansCanvas = document.getElementById('trashCansCountCanvas');
     const roundTrashCount = document.getElementById('round-trash-count');
+    const roundPosseTrashCount = document.getElementById('round-posse-trash-count');
+    const roundOrganizersCount = document.getElementById('round-organizers-count');
+    const roundPosseGainedCount = document.getElementById('round-posse-gained-count');
     const defeatMessage = document.getElementById('defeat-message');
     const captionInput = document.getElementById('end-screen-caption-input');
     const sizeSelect = document.getElementById('end-screen-caption-size');
@@ -2813,7 +3005,7 @@ window.captureEndRoundSnapshot = function() {
     const fontColor = colorSelect ? colorSelect.value : '#00ffcc';
 
     const cWidth = 520;
-    const cHeight = customCaptionText ? 360 : 320;
+    const cHeight = customCaptionText ? 390 : 350;
     const canvas = document.createElement('canvas');
     canvas.width = cWidth;
     canvas.height = cHeight;
@@ -2864,7 +3056,7 @@ window.captureEndRoundSnapshot = function() {
 
     if (cansCanvas) {
         const canX = (cWidth - 320) / 2;
-        const canY = trashY + 10;
+        const canY = trashY + 8;
         ctx.fillStyle = '#000000';
         ctx.fillRect(canX, canY, 320, 40);
         ctx.drawImage(cansCanvas, canX, canY, 320, 40);
@@ -2873,10 +3065,39 @@ window.captureEndRoundSnapshot = function() {
         ctx.strokeRect(canX, canY, 320, 40);
     }
 
-    // 4. Message at bottom
-    const msgY = 248;
+    // 4. Posse Stats Breakdown
+    const posseY = trashY + 62;
+    const pTrash = roundPosseTrashCount ? roundPosseTrashCount.innerText : '0';
+    const orgs = roundOrganizersCount ? roundOrganizersCount.innerText : '0';
+    const pGained = roundPosseGainedCount ? roundPosseGainedCount.innerText : '0';
+
+    ctx.fillStyle = 'rgba(5, 15, 25, 0.85)';
+    ctx.fillRect(40, posseY - 10, cWidth - 80, 22);
+    ctx.strokeStyle = '#1a3344';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(40, posseY - 10, cWidth - 80, 22);
+
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#88aacc';
+    ctx.fillText('POSSE TRASH: ', 115, posseY + 4);
+    ctx.fillStyle = '#00ff88';
+    ctx.fillText(`${pTrash}`, 175, posseY + 4);
+
+    ctx.fillStyle = '#88aacc';
+    ctx.fillText('ORGS: ', 245, posseY + 4);
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillText(`${orgs}`, 285, posseY + 4);
+
+    ctx.fillStyle = '#88aacc';
+    ctx.fillText('GAINED: ', 360, posseY + 4);
+    ctx.fillStyle = '#00ffcc';
+    ctx.fillText(`${pGained}`, 415, posseY + 4);
+
+    // 5. Message at bottom
+    const msgY = posseY + 26;
     ctx.fillStyle = '#ff8888';
-    ctx.font = '9px "Press Start 2P", monospace';
+    ctx.font = '8.5px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     const msg = defeatMessage ? defeatMessage.innerText : '';
 
@@ -2889,16 +3110,16 @@ window.captureEndRoundSnapshot = function() {
         if (metrics.width > 440 && i > 0) {
             ctx.fillText(line, cWidth / 2, currY);
             line = words[i] + ' ';
-            currY += 15;
+            currY += 14;
         } else {
             line = testLine;
         }
     }
     ctx.fillText(line, cWidth / 2, currY);
 
-    // 5. Custom End Screen Caption rendered with chosen size and color!
+    // 6. Custom End Screen Caption rendered with chosen size and color!
     if (customCaptionText) {
-        currY += 25;
+        currY += 22;
         ctx.fillStyle = fontColor;
         ctx.font = `${fontSize}px "Press Start 2P", monospace`;
         ctx.textAlign = 'center';

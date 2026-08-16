@@ -198,7 +198,10 @@ class Follower {
             return;
         }
 
-        const activeSpriteId = window.cultMode ? 'cult_white_robe' : this.spriteId;
+        let activeSpriteId = window.cultMode ? 'cult_white_robe' : this.spriteId;
+        if (window.alexJonesCheat || (window.game && window.game.alexJonesModeActive)) {
+            activeSpriteId = 'leatherdaddy_frog';
+        }
         const img = spriteManager.getCharacterImage(activeSpriteId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
@@ -257,9 +260,10 @@ class FollowerManager {
     }
 
     initialize(playerSpriteId) {
-        // Set available sprites (all characters except the player's choice)
+        // Set available sprites (all characters except the player's choice, excluding locked char7)
+        const isGdUnlocked = !!(window.gdCubeUnlocked || (typeof localStorage !== 'undefined' && localStorage.getItem('gdCubeUnlocked') === 'true'));
         this.availableSprites = SPRITE_CONFIG.characters
-            .filter(c => c.id !== playerSpriteId)
+            .filter(c => c.id !== playerSpriteId && (c.id !== 'char7' || isGdUnlocked))
             .map(c => c.id);
     }
 
@@ -269,6 +273,10 @@ class FollowerManager {
         const follower = new Follower(x, y, spriteId, index);
         this.followers.push(follower);
 
+        if (window.game && window.game.state === GameState.PLAYING) {
+            window.game.posseMembersGained = (window.game.posseMembersGained || 0) + 1;
+        }
+
         if (window.travelDestination && window.game) {
             window.game.currentTripIntlFollowers = (window.game.currentTripIntlFollowers || 0) + 1;
         }
@@ -277,12 +285,18 @@ class FollowerManager {
     }
 
     removeFollower() {
+        if (window.playerThirdEye || (window.game && window.game.playerHasThirdEye)) {
+            return; // Third Eye: Eternal loyalty, followers never leave!
+        }
         if (this.followers.length > 0) {
             this.followers.pop();
         }
     }
 
     removeFollowerAt(index) {
+        if (window.playerThirdEye || (window.game && window.game.playerHasThirdEye)) {
+            return; // Third Eye: Eternal loyalty, followers never leave!
+        }
         if (index >= 0 && index < this.followers.length) {
             this.followers.splice(index, 1);
             for (let i = 0; i < this.followers.length; i++) {

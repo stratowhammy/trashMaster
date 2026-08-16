@@ -161,7 +161,8 @@ class NPC {
             return;
         }
 
-        const img = spriteManager.getCharacterImage(this.spriteId);
+        const activeSpriteId = (window.alexJonesCheat || (window.game && window.game.alexJonesModeActive)) ? 'leatherdaddy_frog' : this.spriteId;
+        const img = spriteManager.getCharacterImage(activeSpriteId);
         const isPirateSeaMap = !!window.pirateMode;
         const bobY = isPirateSeaMap ? Math.sin(Date.now() / 250 + (this.x || 0)) * 2.5 : 0;
 

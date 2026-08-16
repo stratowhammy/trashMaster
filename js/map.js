@@ -664,8 +664,17 @@ class BaseMap {
             ctx.shadowBlur = 12;
 
             // 1c. Draw Sprite Image
-            const spriteSize = 36;
-            let img = spriteMgr && spriteMgr.images ? spriteMgr.images[info.spriteKey] : null;
+            const spriteSize = 38;
+            let img = null;
+            if (spriteMgr) {
+                if (info.spriteKey) {
+                    img = spriteMgr.getImage(info.spriteKey) || spriteMgr.getCharacterImage(info.spriteKey) || (spriteMgr.images && spriteMgr.images[info.spriteKey]);
+                }
+                if (!img && bldg.type) {
+                    img = spriteMgr.getImage(bldg.type) || (spriteMgr.images && spriteMgr.images[bldg.type]);
+                }
+            }
+
             if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
                 ctx.drawImage(img, screenX - spriteSize / 2, floatY - spriteSize / 2 - 10, spriteSize, spriteSize);
             } else {
@@ -728,7 +737,16 @@ class BaseMap {
             let text = bldg.address;
             let color = this.openDoors.has(bldg.id) ? '#00ff88' : '#ffcc00';
 
-            if (window.crimeMode) {
+            if (bldg.type === 'library' || bldg.type === 'city_library') {
+                text = `CITY LIBRARY - ${bldg.address || 'ARCHIVES'}`;
+                color = '#60a5fa';
+            } else if (bldg.type === 'hospital') {
+                text = `HOSPITAL - ${bldg.address || 'CLINIC'}`;
+                color = '#ff4444';
+            } else if (bldg.type === 'black_market') {
+                text = `BLACK MARKET - ${bldg.address || 'VAULT'}`;
+                color = '#ff0055';
+            } else if (window.crimeMode) {
                 if (bldg.id === 0) {
                     text = `BANK - ${bldg.address}`;
                     color = '#ffd700';
@@ -1317,6 +1335,17 @@ class BaseMap {
             if (availableIds.length > 0) {
                 this.buildings[availableIds.pop()].type = 'zoo';
             }
+
+            // 10% chance to generate a City Library on this map (or 100% guaranteed if Knowledge Ho! is active)
+            const spawnLibrary = (window.knowledgeHoActive || (window.game && window.game.knowledgeHoActive)) ? true : (Math.random() < 0.10);
+            if (spawnLibrary && availableIds.length > 0) {
+                const libId = availableIds.pop();
+                const b = this.buildings.find(x => x.id === libId);
+                if (b) {
+                    b.type = 'library';
+                    b.address = "CITY LIBRARY";
+                }
+            }
             // Assign Chino's Steaks and Rats Steaks directly across from each other at an intersection
             this._assignChinosAndRats(availableIds);
 
@@ -1366,6 +1395,14 @@ class BaseMap {
             if (this.buildings.length > 2 && !this.buildings.some(b => b.type === 'black_market')) {
                 const availableBldg = this.buildings.find(b => b.type === 'default' || b.type === 'normal' || (!['dump', 'pulp_mill', 'chinos_steaks', 'rats_steaks', 'zippy_ds', 'goose', 'fast_food', 'bank', 'police', 'hospital', 'airport', 'zoo'].includes(b.type)));
                 if (availableBldg) availableBldg.type = 'black_market';
+            }
+            // If 10% roll succeeded, ensure library was assigned
+            if (spawnLibrary && this.buildings.length > 2 && !this.buildings.some(b => b.type === 'library' || b.type === 'city_library')) {
+                const availableBldg = this.buildings.find(b => b.type === 'default' || b.type === 'normal');
+                if (availableBldg) {
+                    availableBldg.type = 'library';
+                    availableBldg.address = "CITY LIBRARY";
+                }
             }
         }
     }

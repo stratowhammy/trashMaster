@@ -338,7 +338,8 @@ def process_gameplay_log(db, user_id, date_override=None, round_num=0):
         diff_days = (today_date - last_date).days
         if diff_days == 0:
             # Same day play
-            pass
+            if current_streak == 0:
+                current_streak = 1
         elif diff_days == 1:
             # Consecutive active day
             current_streak += 1
@@ -657,10 +658,17 @@ def sync_game():
         'inventory': inventory,
         'stats': {
             'stat_max_single_trash': user['stat_max_single_trash'] or 0,
+            'max_single_trash': user['stat_max_single_trash'] or 0,
             'stat_cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'stat_avg_trash': round((user['stat_cumulative_trash'] or 0) / (user['total_rounds_played'] or 1), 1) if (user['total_rounds_played'] or 0) > 0 else 0,
             'stat_max_single_money': user['stat_max_single_money'] or 0,
+            'max_single_money': user['stat_max_single_money'] or 0,
             'stat_cumulative_money': user['stat_cumulative_money'] or 0,
+            'cumulative_money': user['stat_cumulative_money'] or 0,
             'stat_max_single_followers': user['stat_max_single_followers'] or 0,
+            'max_single_followers': user['stat_max_single_followers'] or 0,
+            'total_followers': user['movement_size'] or 0,
             'total_rounds_played': user['total_rounds_played'] or 0
         }
     })
@@ -703,7 +711,10 @@ def buy_item():
         'trash bomb': 500,
         'bottomless pit': 750,
         'snacks': 1000,
-        'snack': 1000
+        'snack': 1000,
+        'knowledge ho!': 2500,
+        'knowledge ho': 2500,
+        'knowledge_ho': 2500
     }
     
     canonical_names = {
@@ -727,7 +738,10 @@ def buy_item():
         'trash bomb': 'Trash Bomb',
         'bottomless pit': 'Bottomless Pit',
         'snacks': 'Snacks',
-        'snack': 'Snacks'
+        'snack': 'Snacks',
+        'knowledge ho!': 'Knowledge Ho!',
+        'knowledge ho': 'Knowledge Ho!',
+        'knowledge_ho': 'Knowledge Ho!'
     }
 
     key = raw_item_name.lower()
@@ -1049,24 +1063,25 @@ def end_round():
     user_data = verify_token(request)
     if not user_data: return jsonify({'error': 'Unauthorized'}), 401
     
-    earned = int(request.json.get('earned', 0))
-    employee_cost = int(request.json.get('employee_cost', 0))
-    employees_killed = int(request.json.get('employees_killed', 0))
-    lose_truck = bool(request.json.get('lose_truck', False))
-    followers = int(request.json.get('followers', 0))
-    trash_collected = int(request.json.get('trash_collected', 0))
-    handshakes = int(request.json.get('handshakes', 0))
-    mafia_arrest = bool(request.json.get('mafia_arrest', False))
-    politics_arrest = bool(request.json.get('politics_arrest', False))
-    is_international = bool(request.json.get('is_international', False))
-    international_followers_collected = int(request.json.get('international_followers_collected', 0))
-    completed_mafia_jobs = int(request.json.get('completed_mafia_jobs', 0))
-    cult_mode_active = bool(request.json.get('cult_mode_active', False))
-    new_happiness = float(request.json.get('happiness', 100.0))
-    dragon_mode_active = bool(request.json.get('dragon_mode_active', False))
-    sacrifice_dragon = bool(request.json.get('sacrifice_dragon', False))
+    req_data = request.get_json(silent=True) or {}
+    earned = int(req_data.get('earned') or 0)
+    employee_cost = int(req_data.get('employee_cost') or 0)
+    employees_killed = int(req_data.get('employees_killed') or 0)
+    lose_truck = bool(req_data.get('lose_truck') or False)
+    followers = int(req_data.get('followers') or 0)
+    trash_collected = int(req_data.get('trash_collected') or 0)
+    handshakes = int(req_data.get('handshakes') or 0)
+    mafia_arrest = bool(req_data.get('mafia_arrest') or False)
+    politics_arrest = bool(req_data.get('politics_arrest') or False)
+    is_international = bool(req_data.get('is_international') or False)
+    international_followers_collected = int(req_data.get('international_followers_collected') or 0)
+    completed_mafia_jobs = int(req_data.get('completed_mafia_jobs') or 0)
+    cult_mode_active = bool(req_data.get('cult_mode_active') or False)
+    new_happiness = float(req_data.get('happiness') if req_data.get('happiness') is not None else 100.0)
+    dragon_mode_active = bool(req_data.get('dragon_mode_active') or False)
+    sacrifice_dragon = bool(req_data.get('sacrifice_dragon') or False)
     dragon_lost = False
-    cult_leaves_cumulative = request.json.get('cult_leaves_cumulative')
+    cult_leaves_cumulative = req_data.get('cult_leaves_cumulative')
     
     db = get_db()
     cursor = db.cursor()
@@ -1993,6 +2008,11 @@ def get_user_profile(username=None):
     elif user['made_man_status'] and user['made_man_status'] != 'none':
         player_title = f"Syndicate {user['made_man_status'].title()}"
 
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    cursor.execute("SELECT COUNT(*) AS count FROM gameplay_logs WHERE user_id = ? AND play_date = ?", (target_user_id, today_str))
+    today_row = cursor.fetchone()
+    today_games_count = today_row['count'] if today_row else 0
+
     profile_data = {
         'id': user['id'],
         'username': user['username'],
@@ -2016,12 +2036,20 @@ def get_user_profile(username=None):
         'max_streak': int(user['max_streak'] or 0) if 'max_streak' in user.keys() else 0,
         'last_active_date': user['last_active_date'] if 'last_active_date' in user.keys() else None,
         'streak_qualified': int(user['streak_qualified'] or 0) if 'streak_qualified' in user.keys() else 0,
+        'today_games_count': today_games_count,
         'stats': {
             'stat_cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'stat_avg_trash': round((user['stat_cumulative_trash'] or 0) / (user['total_rounds_played'] or 1), 1) if (user['total_rounds_played'] or 0) > 0 else 0,
             'stat_max_single_trash': user['stat_max_single_trash'] or 0,
+            'max_single_trash': user['stat_max_single_trash'] or 0,
             'stat_cumulative_money': user['stat_cumulative_money'] or 0,
+            'cumulative_money': user['stat_cumulative_money'] or 0,
             'stat_max_single_money': user['stat_max_single_money'] or 0,
+            'max_single_money': user['stat_max_single_money'] or 0,
             'stat_max_single_followers': user['stat_max_single_followers'] or 0,
+            'max_single_followers': user['stat_max_single_followers'] or 0,
+            'total_followers': user['movement_size'] or 0,
             'total_rounds_played': user['total_rounds_played'] or 0
         },
         'inventory': inventory,

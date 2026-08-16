@@ -41,6 +41,9 @@ class Engine3D {
         this.playerLight.position.set(0, 2.0, 0);
         this.scene.add(this.playerLight);
 
+        // Perspective / Camera Mode: 'fps' or 'aerial' (Unlocked via Big Book of Knowledge)
+        this.cameraMode = 'fps';
+
         // Subsystems
         this.mapBuilder = new MapBuilder3D(this.scene);
         this.billboardManager = new BillboardManager3D(this.scene, game.spriteManager);
@@ -183,8 +186,25 @@ class Engine3D {
         const headBob = isMoving ? Math.sin(performance.now() / 100) * 0.08 : 0;
         const jumpElev = (player.jumpHeight || 0) * 0.05;
 
-        this.camera.position.set(player3dX, 1.8 + headBob + jumpElev, player3dZ);
-        this.playerLight.position.set(player3dX, 1.8 + jumpElev, player3dZ);
+        if (this.cameraMode === 'aerial') {
+            const aerialHeight = 22.0;
+            const aerialDist = 12.0;
+            const camX = player3dX + Math.sin(this.yaw) * aerialDist;
+            const camY = aerialHeight + jumpElev;
+            const camZ = player3dZ + Math.cos(this.yaw) * aerialDist;
+            this.camera.position.set(camX, camY, camZ);
+            this.camera.lookAt(player3dX, 1.2 + jumpElev, player3dZ);
+            this.playerLight.position.set(player3dX, camY, player3dZ);
+        } else {
+            this.camera.position.set(player3dX, 1.8 + headBob + jumpElev, player3dZ);
+            this.playerLight.position.set(player3dX, 1.8 + jumpElev, player3dZ);
+
+            // Update Camera Rotation (Yaw & Pitch)
+            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+            euler.x = this.pitch;
+            euler.y = this.yaw;
+            this.camera.quaternion.setFromEuler(euler);
+        }
 
         // Keep sky dome and sun light centered around player
         if (this.mapBuilder && this.mapBuilder.skyMesh) {
@@ -194,14 +214,10 @@ class Engine3D {
             this.sunLight.position.set(player3dX + 60, 120 + jumpElev, player3dZ + 40);
         }
 
-        // Update Camera Rotation (Yaw & Pitch)
-        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        euler.x = this.pitch;
-        euler.y = this.yaw;
-        this.camera.quaternion.setFromEuler(euler);
-
         // Update Viewmodel & Billboards
-        this.viewmodel.update(dt, isMoving, player.speed / 6.0, player.jumpHeight || 0);
+        if (this.cameraMode !== 'aerial') {
+            this.viewmodel.update(dt, isMoving, player.speed / 6.0, player.jumpHeight || 0);
+        }
         this.billboardManager.update(this.game, dt);
 
         // Update Crosshair Raycasting with Toroidal Distance
@@ -317,6 +333,7 @@ class Engine3D {
                         else if (type === 'airport') label = `[E] ENTER AIRPORT ✈️`;
                         else if (type === 'pulp_mill' || type === 'pulp mill') label = `[E] SELL TIMBER AT PULP MILL 🪵`;
                         else if (type === 'black_market') label = `[E] ENTER BLACK MARKET ☠️`;
+                        else if (type === 'library' || type === 'city_library') label = `[E] ENTER CITY LIBRARY (BIG BOOK OF KNOWLEDGE) 📚`;
                         else if (window.builderMode) {
                             const idx = this.game.gameMap.buildings.indexOf(bldg);
                             const alreadyOwned = this.game.ownedBuildings ? this.game.ownedBuildings.find(b => b.building_idx === idx) : null;
@@ -352,8 +369,10 @@ class Engine3D {
         // 1. Render 3D WebGL Scene
         this.renderer.render(this.scene, this.camera);
 
-        // 2. Render 2D FPS Viewmodel Hands onto screen
-        this.viewmodel.render(ctx, w, h);
+        // 2. Render 2D FPS Viewmodel Hands onto screen (only in first-person mode)
+        if (this.cameraMode !== 'aerial') {
+            this.viewmodel.render(ctx, w, h);
+        }
 
         // 3. Render Center Crosshair & Target Prompts
         this._renderCrosshair(ctx, w, h);
@@ -371,6 +390,30 @@ class Engine3D {
             this.game.hud.renderNotifications(ctx, w, h);
             this.game.hud.renderInventoryUI(ctx, w, h);
         }
+    }
+
+    cyclePerspective() {
+        const hasThirdEye = !!(window.playerThirdEye || (this.game && this.game.playerHasThirdEye));
+        if (!this.enabled) {
+            this.enabled = true;
+            this.cameraMode = 'fps';
+            return 'fps';
+        } else if (this.cameraMode === 'fps') {
+            if (hasThirdEye) {
+                this.cameraMode = 'aerial';
+                return 'aerial';
+            } else {
+                this.enabled = false;
+                this.cameraMode = 'fps';
+                return '2d';
+            }
+        } else if (this.cameraMode === 'aerial') {
+            this.enabled = false;
+            this.cameraMode = 'fps';
+            return '2d';
+        }
+        this.enabled = false;
+        return '2d';
     }
 
     _renderTopHUD(ctx, w, h) {

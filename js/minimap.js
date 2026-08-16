@@ -272,14 +272,30 @@ class MiniMap {
             }
         }
 
-        // Draw Dump, Black Market, Landmarks
+        // Draw Dump, Black Market, Library, Landmarks
         if (gameMap && gameMap.buildings) {
             for (const bldg of gameMap.buildings) {
-                if (['dump', 'pulp_mill', 'black_market', 'hospital'].includes(bldg.type)) {
+                if (['dump', 'pulp_mill', 'black_market', 'hospital', 'library'].includes(bldg.type)) {
                     const pos = getMinimapPos(bldg.x + bldg.width / 2, bldg.y + bldg.height / 2);
                     if (pos.visible) {
-                        ctx.fillStyle = bldg.type === 'dump' ? '#00ff88' : bldg.type === 'pulp_mill' ? '#8b5a2b' : bldg.type === 'black_market' ? '#ff0055' : '#ff3355';
+                        ctx.fillStyle = bldg.type === 'dump' ? '#00ff88' : bldg.type === 'pulp_mill' ? '#8b5a2b' : bldg.type === 'black_market' ? '#ff0055' : bldg.type === 'library' ? '#60a5fa' : '#ff3355';
                         ctx.fillRect(pos.x - 3, pos.y - 3, 6, 6);
+                    }
+                }
+            }
+        }
+
+        // Third Eye Cosmic Vision: Reveal all trash across the map on minimap
+        if (window.playerThirdEye || (window.game && window.game.playerHasThirdEye)) {
+            const items = Array.isArray(trashItems) ? trashItems : (trashItems && trashItems.trash ? trashItems.trash : (window.game && window.game.trashManager ? window.game.trashManager.trash : []));
+            if (items && items.length > 0) {
+                ctx.fillStyle = '#38bdf8';
+                for (const item of items) {
+                    if (item && item.x !== undefined && item.y !== undefined) {
+                        const pos = getMinimapPos(item.x, item.y);
+                        if (pos.visible) {
+                            ctx.fillRect(pos.x - 1, pos.y - 1, 3, 3);
+                        }
                     }
                 }
             }

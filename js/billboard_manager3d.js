@@ -23,6 +23,8 @@ class BillboardManager3D {
         this.floatingTextSprites = [];
         this.buildingBillboardMap = new Map();
         this.buildingTextures = new Map();
+        this.playerSprite = null;
+        this.thirdEyeSprite = null;
 
         this.TILE_SIZE_3D = 4;
     }
@@ -108,6 +110,50 @@ class BillboardManager3D {
 
         // 9. Synchronize Floating Restaurant & Specialized Building Sprites in 3D
         this._syncBuildingBillboards(game, mapW, mapH, S, time, player, p3dX, p3dZ);
+
+        // 10. Synchronize 3D Player Avatar & Third Eye Billboard in Aerial View
+        this._syncPlayerAvatar(game, mapW, mapH, S, time, player, p3dX, p3dZ);
+    }
+
+    _syncPlayerAvatar(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
+        const isAerial = (game.engine3D && game.engine3D.cameraMode === 'aerial');
+        if (!isAerial) {
+            if (this.playerSprite) this.playerSprite.visible = false;
+            if (this.thirdEyeSprite) this.thirdEyeSprite.visible = false;
+            return;
+        }
+
+        const jumpElev = (player.jumpHeight || 0) * 0.05;
+        const charKey = (window.alexJonesCheat || game.alexJonesModeActive) ? 'leatherdaddy_frog' : (player.characterClass || player.spriteId || 'char1');
+
+        if (!this.playerSprite) {
+            const tex = this._getTexture(charKey);
+            this.playerSprite = this._createSprite(tex, 2.4, 2.4);
+            this.billboardGroup.add(this.playerSprite);
+        } else {
+            const tex = this._getTexture(charKey);
+            if (this.playerSprite.material.map !== tex) {
+                this.playerSprite.material.map = tex;
+                this.playerSprite.material.needsUpdate = true;
+            }
+        }
+
+        this.playerSprite.visible = true;
+        this.playerSprite.position.set(p3dX, 1.2 + jumpElev, p3dZ);
+
+        // Third Eye floating overhead halo
+        if (window.playerThirdEye || game.playerHasThirdEye) {
+            if (!this.thirdEyeSprite) {
+                const eyeTex = this._getTexture('third_eye');
+                this.thirdEyeSprite = this._createSprite(eyeTex, 1.2, 1.2);
+                this.billboardGroup.add(this.thirdEyeSprite);
+            }
+            this.thirdEyeSprite.visible = true;
+            const eyeBob = Math.sin(time * 4) * 0.15;
+            this.thirdEyeSprite.position.set(p3dX, 2.4 + jumpElev + eyeBob, p3dZ);
+        } else if (this.thirdEyeSprite) {
+            this.thirdEyeSprite.visible = false;
+        }
     }
 
     _syncTrash(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
@@ -162,12 +208,39 @@ class BillboardManager3D {
                 sprite.material.map = this._getTexture(key);
                 sprite.material.needsUpdate = true;
             }
+
+            if (item.isGold) {
+                if (sprite.material.color.getHex() !== 0xffd700) {
+                    sprite.material.color.setHex(0xffd700);
+                }
+                sprite.scale.set(2.0, 2.0, 2.0);
+            } else {
+                if (sprite.material.color.getHex() !== 0xffffff) {
+                    sprite.material.color.setHex(0xffffff);
+                }
+                sprite.scale.set(1.6, 1.6, 1.6);
+            }
         }
     }
 
     _syncFollowers(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
-        if (!game.followerManager || !game.followerManager.followers) return;
-        const followers = game.followerManager.followers;
+        let followers = [];
+        if (game.followerManager && game.followerManager.followers) {
+            followers = followers.concat(game.followerManager.followers);
+        }
+        if (game.organizers) {
+            game.organizers.forEach(org => {
+                followers.push({
+                    x: org.x,
+                    y: org.y,
+                    moving: org.moving,
+                    spriteId: org.spriteId || 'char1'
+                });
+                if (org.followerManager && org.followerManager.followers) {
+                    followers = followers.concat(org.followerManager.followers);
+                }
+            });
+        }
 
         while (this.followerSprites.length < followers.length) {
             const defaultTex = this._getTexture('char2');
@@ -479,62 +552,95 @@ class BillboardManager3D {
         ctx.imageSmoothingEnabled = false;
 
         const spriteMgr = this.spriteManager || (window.game && window.game.spriteManager);
-        const img = spriteMgr && spriteMgr.images ? spriteMgr.images[info.spriteKey] : null;
+        let img = null;
+        if (spriteMgr) {
+            if (info && info.spriteKey) {
+                img = spriteMgr.getImage(info.spriteKey) || spriteMgr.getCharacterImage(info.spriteKey) || (spriteMgr.images && spriteMgr.images[info.spriteKey]);
+            }
+            if (!img && type) {
+                img = spriteMgr.getImage(type) || (spriteMgr.images && spriteMgr.images[type]);
+            }
+        }
 
-        const themeColor = info.color || '#00ffcc';
-        const borderColor = info.borderColor || '#ffffff';
+        const themeColor = (info && info.color) || '#00ffcc';
+        const borderColor = (info && info.borderColor) || '#ffffff';
 
-        // Outer neon glow box
-        ctx.fillStyle = 'rgba(8, 12, 24, 0.90)';
-        ctx.fillRect(8, 8, 240, 240);
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = 6;
-        ctx.strokeRect(8, 8, 240, 240);
+        const drawCanvasContent = () => {
+            ctx.clearRect(0, 0, 256, 256);
 
-        // Inner glowing border accent
-        ctx.strokeStyle = themeColor;
-        ctx.lineWidth = 2.5;
-        ctx.strokeRect(16, 16, 224, 224);
+            // Outer neon glow box
+            ctx.fillStyle = 'rgba(8, 12, 24, 0.92)';
+            ctx.fillRect(8, 8, 240, 240);
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 6;
+            ctx.strokeRect(8, 8, 240, 240);
 
-        // Draw Sprite Image in Center/Top
-        if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
-            try {
-                ctx.drawImage(img, 38, 24, 180, 150);
-            } catch (e) {
+            // Inner glowing border accent
+            ctx.strokeStyle = themeColor;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(16, 16, 224, 224);
+
+            // Re-check image
+            if (!img && spriteMgr) {
+                if (info && info.spriteKey) {
+                    img = spriteMgr.getImage(info.spriteKey) || spriteMgr.getCharacterImage(info.spriteKey) || (spriteMgr.images && spriteMgr.images[info.spriteKey]);
+                }
+                if (!img && type) {
+                    img = spriteMgr.getImage(type) || (spriteMgr.images && spriteMgr.images[type]);
+                }
+            }
+
+            // Draw Sprite Image in Center/Top
+            if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
+                try {
+                    ctx.drawImage(img, 38, 24, 180, 150);
+                } catch (e) {
+                    ctx.font = '80px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText((info && info.icon) || '🏢', 128, 100);
+                }
+            } else {
                 ctx.font = '80px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(info.icon || '🏢', 128, 100);
+                ctx.fillText((info && info.icon) || '🏢', 128, 100);
             }
-        } else {
-            ctx.font = '80px sans-serif';
+
+            // Nameplate Banner at Bottom
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.90)';
+            ctx.fillRect(16, 184, 224, 56);
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(16, 184, 224, 56);
+
+            // Text
+            ctx.fillStyle = themeColor;
+            let label = (info && info.label) || type.toUpperCase();
+            if (label.length > 14) {
+                ctx.font = 'bold 12px "Press Start 2P", monospace';
+            } else {
+                ctx.font = 'bold 14px "Press Start 2P", monospace';
+            }
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(info.icon || '🏢', 128, 100);
-        }
+            ctx.fillText(`${(info && info.icon) || '🏢'} ${label}`, 128, 212);
+        };
 
-        // Nameplate Banner at Bottom
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
-        ctx.fillRect(16, 184, 224, 56);
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(16, 184, 224, 56);
-
-        // Text
-        ctx.fillStyle = themeColor;
-        let label = info.label || type.toUpperCase();
-        if (label.length > 14) {
-            ctx.font = 'bold 12px "Press Start 2P", monospace';
-        } else {
-            ctx.font = 'bold 14px "Press Start 2P", monospace';
-        }
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${info.icon} ${label}`, 128, 212);
+        drawCanvasContent();
 
         const tex = new THREE.CanvasTexture(canvas);
         tex.magFilter = THREE.NearestFilter;
         tex.minFilter = THREE.NearestFilter;
+
+        // If image is still loading asynchronously, listen for load and refresh texture
+        if (img && !img.complete && typeof img.addEventListener === 'function') {
+            img.addEventListener('load', () => {
+                drawCanvasContent();
+                tex.needsUpdate = true;
+            });
+        }
+
         this.buildingTextures.set(type, tex);
         return tex;
     }

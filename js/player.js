@@ -9,8 +9,10 @@ class Player {
         const chosen = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
         this.spriteId = chosen;
         
-        // Base original speeds: Athlete=8, Standard=6. Default speed is now 0.8x of baseline.
-        this.rawBaselineSpeed = (chosen === 'char4') ? 8 : 6;
+        // Base original speeds: Athlete=8, GD Cube=7.5 (1.25x normal), Standard=6. Default speed is now 0.8x of baseline.
+        const isAthlete = (chosen === 'char4');
+        const isGDCube = (chosen === 'char7');
+        this.rawBaselineSpeed = isAthlete ? 8 : (isGDCube ? 7.5 : 6);
         this.walkSpeed = this.rawBaselineSpeed * 0.8;
         this.sprintSpeed = this.rawBaselineSpeed * 1.2;
         this.speed = this.walkSpeed;
@@ -149,7 +151,9 @@ class Player {
         }
 
         // Base speed is 0.8x baseline when walking, 1.2x baseline when sprinting
-        const rawBaseline = window.pirateMode ? 8.5 : ((this.spriteId === 'char4' || this.characterClass === 'char4') ? 8 : 6);
+        const isAthlete = (this.spriteId === 'char4' || this.characterClass === 'char4');
+        const isGDCube = (this.spriteId === 'char7' || this.characterClass === 'char7');
+        const rawBaseline = window.pirateMode ? 8.5 : (isAthlete ? 8 : (isGDCube ? 7.5 : 6));
         const sprintOrWalkMultiplier = this.isSprinting ? 1.2 : 0.8;
         this.speed = rawBaseline * sprintOrWalkMultiplier;
 
@@ -308,7 +312,9 @@ class Player {
         }
 
         let imgId = this.spriteId;
-        if (window.duckyModeActive) {
+        if (window.alexJonesCheat || (window.game && window.game.alexJonesModeActive)) {
+            imgId = 'leatherdaddy_frog';
+        } else if (window.duckyModeActive) {
             imgId = (this.direction === 'left' || this.lastFacingDir === 'left') ? 'ducky_left' : 'ducky_right';
         } else if (window.pirateMode) {
             imgId = this.onFoot ? (this.spriteId || 'char1') : 'pirate_ship_blue';
@@ -318,7 +324,7 @@ class Player {
             imgId = 'black_suv';
         }
         
-        const img = (window.duckyModeActive || (window.pirateMode && this.onFoot)) ? spriteManager.getCharacterImage(imgId) : spriteManager.getImage(imgId);
+        const img = (window.alexJonesCheat || (window.game && window.game.alexJonesModeActive) || window.duckyModeActive || (window.pirateMode && this.onFoot)) ? spriteManager.getCharacterImage(imgId) : spriteManager.getImage(imgId);
 
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
             let bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 1.5 : 0;
@@ -371,6 +377,32 @@ class Player {
             ctx.strokeStyle = this.isSprinting ? '#00ffff' : '#00aa88';
             ctx.lineWidth = 1;
             ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
+            ctx.restore();
+        }
+
+        // ── Mystical Third Eye Rendering (Above Forehead) ──
+        if (window.playerThirdEye || (window.game && window.game.playerHasThirdEye)) {
+            const eyeImg = spriteManager.getImage('third_eye');
+            const eyeBob = Math.sin(Date.now() / 250) * 3;
+            const eyeSize = 24;
+            const eyeY = screen.y - jHeight - drawSize / 2 - 16 + eyeBob;
+
+            ctx.save();
+            // Radiant cosmic glow aura
+            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+            ctx.fillStyle = `rgba(6, 182, 212, ${0.25 + 0.2 * pulse})`;
+            ctx.beginPath();
+            ctx.arc(screen.x, eyeY, 14 + pulse * 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (eyeImg && (eyeImg.complete || eyeImg instanceof HTMLCanvasElement)) {
+                ctx.drawImage(eyeImg, screen.x - eyeSize / 2, eyeY - eyeSize / 2, eyeSize, eyeSize);
+            } else {
+                ctx.fillStyle = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(screen.x, eyeY, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.restore();
         }
 

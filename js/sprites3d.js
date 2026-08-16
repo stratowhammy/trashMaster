@@ -19,6 +19,13 @@ class Sprites3D {
     }
 
     getTexture(key) {
+        if (window.alexJonesCheat || (window.game && window.game.alexJonesModeActive)) {
+            const charKeys = ['char1', 'char2', 'char3', 'char4', 'char5', 'char6', 'char7', 'char_trashmaster', 'char_npc', 'police', 'char_pirate', 'char_dragon_master', 'cult_white_robe', 'leatherdaddy_frog'];
+            if (charKeys.includes(key)) {
+                return this._getLeatherdaddyFrogTexture();
+            }
+        }
+
         if (this.cache.has(key)) {
             return this.cache.get(key);
         }
@@ -26,12 +33,14 @@ class Sprites3D {
         let canvas = null;
         switch (key) {
             // Characters (Head-on Front View)
+            case 'leatherdaddy_frog': return this._getLeatherdaddyFrogTexture();
             case 'char1': canvas = this._drawRanger(); break;
             case 'char2': canvas = this._drawStudent(); break;
             case 'char3': canvas = this._drawScientist(); break;
             case 'char4': canvas = this._drawAthlete(); break;
             case 'char5': canvas = this._drawRobot(); break;
             case 'char6': canvas = this._drawSuperhero(); break;
+            case 'char7': canvas = this._drawGDCube(); break;
             case 'char_trashmaster': canvas = this._drawTrashMaster(); break;
             case 'char_npc': canvas = this._drawCitizen(); break;
             case 'police': canvas = this._drawPolice(); break;
@@ -72,6 +81,7 @@ class Sprites3D {
             case 'shroom': canvas = this._drawShroom(); break;
             case 'flower': canvas = this._drawFlower(); break;
             case 'animal': canvas = this._drawAnimal(); break;
+            case 'third_eye': canvas = this._drawThirdEye(); break;
 
             default:
                 canvas = this._drawStudent();
@@ -83,6 +93,49 @@ class Sprites3D {
         texture.minFilter = THREE.NearestFilter;
         this.cache.set(key, texture);
         return texture;
+    }
+
+    _getLeatherdaddyFrogTexture() {
+        if (this.cache.has('leatherdaddy_frog')) {
+            return this.cache.get('leatherdaddy_frog');
+        }
+        const spriteMgr = (window.game && window.game.spriteManager) || window.spriteManager;
+        const img = spriteMgr && spriteMgr.images ? spriteMgr.images['leatherdaddy_frog'] : null;
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const renderFrog = () => {
+            ctx.clearRect(0, 0, 256, 256);
+            if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
+                ctx.drawImage(img, 0, 0, 256, 256);
+            } else {
+                // Retro frog fallback
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(40, 40, 176, 176);
+                ctx.fillStyle = '#111';
+                ctx.fillRect(60, 60, 40, 40);
+                ctx.fillRect(156, 60, 40, 40);
+            }
+        };
+
+        renderFrog();
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+
+        if (img && !img.complete && typeof img.addEventListener === 'function') {
+            img.addEventListener('load', () => {
+                renderFrog();
+                tex.needsUpdate = true;
+            });
+        }
+
+        this.cache.set('leatherdaddy_frog', tex);
+        return tex;
     }
 
     // ============================================================
@@ -449,6 +502,80 @@ class Sprites3D {
             ctx.fillRect(34, 11, 4, 3);
             ctx.fillStyle = '#0f172a'; // Black Cowl/Hair
             ctx.fillRect(22, 4, 20, 6);
+        });
+    }
+
+    _drawGDCube() {
+        return this._createCanvas(64, 64, (ctx, w, h) => {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath(); ctx.ellipse(32, 60, 22, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+            // Helper to draw regular octagon
+            const drawOctagon = (cx, cy, r) => {
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI / 4) + (Math.PI / 8);
+                    const x = cx + r * Math.cos(angle);
+                    const y = cy + r * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+            };
+
+            // Outer Black Rounded Square Border
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(4, 4, 56, 56);
+
+            // White Inner Background Square
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(8, 8, 48, 48);
+
+            // 4 Green Triangular Corners
+            ctx.fillStyle = '#00ff99';
+            // Top-left
+            ctx.beginPath(); ctx.moveTo(8, 8); ctx.lineTo(24, 8); ctx.lineTo(8, 24); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = '#000000'; ctx.lineWidth = 3; ctx.stroke();
+            // Top-right
+            ctx.beginPath(); ctx.moveTo(56, 8); ctx.lineTo(40, 8); ctx.lineTo(56, 24); ctx.closePath(); ctx.fill();
+            ctx.stroke();
+            // Bottom-left
+            ctx.beginPath(); ctx.moveTo(8, 56); ctx.lineTo(24, 56); ctx.lineTo(8, 40); ctx.closePath(); ctx.fill();
+            ctx.stroke();
+            // Bottom-right
+            ctx.beginPath(); ctx.moveTo(56, 56); ctx.lineTo(40, 56); ctx.lineTo(56, 40); ctx.closePath(); ctx.fill();
+            ctx.stroke();
+
+            // Outer Black Octagon Outline
+            ctx.fillStyle = '#000000';
+            drawOctagon(32, 32, 23);
+            ctx.fill();
+
+            // Outer White Octagon Ring
+            ctx.fillStyle = '#ffffff';
+            drawOctagon(32, 32, 19);
+            ctx.fill();
+
+            // Middle Black Octagon Outline
+            ctx.fillStyle = '#000000';
+            drawOctagon(32, 32, 16);
+            ctx.fill();
+
+            // Middle Green Octagon Ring
+            ctx.fillStyle = '#00ff99';
+            drawOctagon(32, 32, 13);
+            ctx.fill();
+
+            // Inner Black Octagon Outline
+            ctx.fillStyle = '#000000';
+            drawOctagon(32, 32, 9);
+            ctx.fill();
+
+            // Inner White Octagon Center
+            ctx.fillStyle = '#ffffff';
+            drawOctagon(32, 32, 6);
+            ctx.fill();
         });
     }
 
@@ -1136,6 +1263,38 @@ class Sprites3D {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(48, 38, 4, 6);
             ctx.fillRect(56, 38, 2, 6);
+        });
+    }
+
+    _drawThirdEye() {
+        return this._createCanvas(64, 64, (ctx, w, h) => {
+            // Radiant Aura
+            ctx.fillStyle = 'rgba(139, 92, 246, 0.4)';
+            ctx.beginPath(); ctx.arc(32, 32, 26, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.6)';
+            ctx.beginPath(); ctx.arc(32, 32, 20, 0, Math.PI * 2); ctx.fill();
+
+            // Eye Almond Shape
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath(); ctx.ellipse(32, 32, 22, 13, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath(); ctx.ellipse(32, 32, 20, 11, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath(); ctx.ellipse(32, 32, 18, 9, 0, 0, Math.PI * 2); ctx.fill();
+
+            // Glowing Cyan Iris
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath(); ctx.arc(32, 32, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#06b6d4';
+            ctx.beginPath(); ctx.arc(32, 32, 6, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#a5f3fc';
+            ctx.beginPath(); ctx.arc(32, 32, 4, 0, Math.PI * 2); ctx.fill();
+
+            // Pupil slit
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(31, 27, 2, 10);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(30, 29, 2, 2);
         });
     }
 }

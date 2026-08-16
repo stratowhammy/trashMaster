@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Trash Master — A 2D collection game where you clean up the city! Pick a character, collect trash, earn followers, and beat the clock.">
     <title>Trash Master — Clean Up the City!</title>
-    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/style.css?v=5">
     <script>
         function showError(message, stack) {
             const errDiv = document.createElement('div');
@@ -43,7 +43,7 @@
     <div id="ui-layer">
         <!-- Login Screen -->
         <div id="login-screen" class="screen">
-            <h1>Trash Master</h1>
+            <img src="assets/sprites/trashmaster1.png" alt="Trash Master Logo" class="trashmaster-logo" style="max-width: 380px; width: 90%; height: auto; margin: 0 auto 15px auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 10px rgba(0,255,204,0.4));" />
             <div class="panel">
                 <h2>Player Login</h2>
                 <input type="text" id="login-username" placeholder="Username">
@@ -58,7 +58,7 @@
 
         <!-- Registration Screen -->
         <div id="register-screen" class="screen hidden">
-            <h1>Trash Master</h1>
+            <img src="assets/sprites/trashmaster1.png" alt="Trash Master Logo" class="trashmaster-logo" style="max-width: 380px; width: 90%; height: auto; margin: 0 auto 15px auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 10px rgba(0,255,204,0.4));" />
             <div class="panel" style="max-width: 480px;">
                 <h2 style="color: #00ffcc;">Create New Account</h2>
                 <p style="font-size: 8px; color: #aaa; margin-bottom: 12px; line-height: 1.5;">Register a username and password to start playing. Your account keeps all inventory, achievements, stats, letter progress, and photo gallery snapshots!</p>
@@ -74,6 +74,7 @@
                     <button class="btn sprite-option-btn" data-sprite="char4">🏃 ATHLETE</button>
                     <button class="btn sprite-option-btn" data-sprite="char5">🤖 ROBOT</button>
                     <button class="btn sprite-option-btn" data-sprite="char6">⚡ SUPERHERO</button>
+                    <button class="btn sprite-option-btn hidden" data-sprite="char7" style="display: none;">🟩 GD CUBE</button>
                 </div>
 
                 <label style="font-size: 8px; color: #00ffcc; display: block; margin-bottom: 8px; text-align: left;">CHOOSE AVATAR STICKER:</label>
@@ -92,6 +93,7 @@
         <!-- Sprite Selection Modal -->
         <div id="sprite-select-dialog" class="modal-backdrop hidden">
             <div class="modal-window">
+                <img src="assets/sprites/trashmaster1.png" alt="Trash Master Logo" class="trashmaster-logo" style="max-width: 280px; width: 85%; height: auto; margin: 0 auto 12px auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 8px rgba(0,255,204,0.4));" />
                 <h2>CHOOSE YOUR PLAYER SPRITE</h2>
                 <p style="font-size: 11px; margin-bottom: 12px; color: #ccc;">Select the character sprite that will represent you throughout Trash Master:</p>
                 <div class="sprite-options-grid">
@@ -101,6 +103,7 @@
                     <button class="btn sprite-option-btn" data-sprite="char4">🏃 ATHLETE</button>
                     <button class="btn sprite-option-btn" data-sprite="char5">🤖 ROBOT</button>
                     <button class="btn sprite-option-btn" data-sprite="char6">⚡ SUPERHERO</button>
+                    <button class="btn sprite-option-btn hidden" data-sprite="char7" style="display: none;">🟩 GD CUBE</button>
                 </div>
             </div>
         </div>
@@ -135,6 +138,7 @@
                     <div id="trophy-case-shelves" class="trophy-shelves-container">
                         <!-- Shelves populated dynamically -->
                     </div>
+                    <div style="text-align: center; font-size: 22px; letter-spacing: 3px; color: #555; flex-shrink: 0;"><a href="https://youtu.be/59CpJqCbxXs?si=NdDByR-EIIYf1uct" target="_blank" rel="noopener noreferrer" style="text-decoration: none;">🚡 ❤️</a></div>
                 </div>
 
                 <!-- Column 2: Streak & Game Modes -->
@@ -355,6 +359,22 @@
                 <div id="trash-cans-container" style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 5px;">
                     <div style="font-family: 'Press Start 2P', monospace; font-size: 8px; color: #00ffcc;">Trash Collected: <span id="round-trash-count">0</span></div>
                     <canvas id="trashCansCountCanvas" width="320" height="40" style="width: 320px; height: 40px; image-rendering: pixelated; display: block; background: #000; border: 2px solid #333; border-radius: 4px;"></canvas>
+                </div>
+
+                <!-- Round Posse & Performance Stats Breakdown -->
+                <div id="round-posse-stats-container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 440px; background: rgba(5, 15, 25, 0.85); border: 1px solid #1a3344; border-radius: 6px; padding: 8px 10px; box-sizing: border-box; text-align: center; font-family: 'Press Start 2P', monospace; margin: 4px 0;">
+                    <div>
+                        <div style="font-size: 6px; color: #88aacc; margin-bottom: 4px;">POSSE TRASH</div>
+                        <div id="round-posse-trash-count" style="font-size: 9px; color: #00ff88; font-weight: bold;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 6px; color: #88aacc; margin-bottom: 4px;">ORGANIZERS</div>
+                        <div id="round-organizers-count" style="font-size: 9px; color: #ffcc00; font-weight: bold;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 6px; color: #88aacc; margin-bottom: 4px;">POSSE GAINED</div>
+                        <div id="round-posse-gained-count" style="font-size: 9px; color: #00ffcc; font-weight: bold;">0</div>
+                    </div>
                 </div>
                 <p id="defeat-message" style="font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ff8888; text-align: center; max-width: 400px; line-height: 1.8; margin: 10px 0;"></p>
 
@@ -651,6 +671,38 @@
         </div>
     </div>
 
+    <!-- Library / Big Book of Knowledge Dialog -->
+    <div id="library-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
+        <div id="library-card-box" style="background: radial-gradient(circle at center, #1e1035, #080312); border: 4px solid #9333ea; border-radius: 12px; padding: 25px; width: 460px; max-width: 90%; text-align: center; box-shadow: 0 0 35px rgba(147, 51, 234, 0.7); font-family: 'Press Start 2P', monospace; position: relative;">
+            <div style="font-size: 8px; color: #a855f7; margin-bottom: 8px; letter-spacing: 2px;">🏛️ GRAND CITY ARCHIVES</div>
+            <h2 style="color: #fbbf24; margin-bottom: 15px; font-size: 11px; text-shadow: 2px 2px #4c1d95;">THE BIG BOOK OF KNOWLEDGE</h2>
+            
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
+                <div id="btn-read-knowledge-book" style="cursor: pointer; padding: 12px; background: rgba(147, 51, 234, 0.15); border: 2px dashed #a855f7; border-radius: 10px; transition: transform 0.2s, box-shadow 0.2s; display: inline-block;">
+                    <img id="library-book-img" src="assets/sprites/book_of_knowledge.png" style="width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 0 15px rgba(6, 182, 212, 0.8));" alt="Big Book of Knowledge" />
+                    <div style="font-size: 6.5px; color: #38bdf8; margin-top: 8px; text-shadow: 1px 1px #000;">✨ CLICK TO COMMUNE WITH THE TOME ✨</div>
+                </div>
+            </div>
+
+            <div id="library-lore-text" style="color: #e2e8f0; font-size: 7.5px; line-height: 1.8; margin-bottom: 18px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 6px; border: 1px solid #4c1d95;">
+                An ancient tome brimming with cosmic truths and forgotten wisdom. Choose 'Commune with the Tome' to awaken your Third Eye, or 'Leave' to step away unchanged.
+            </div>
+
+            <div id="library-third-eye-status" style="display: none; margin-bottom: 18px; color: #00ffcc; font-size: 7.5px; line-height: 1.6; background: rgba(6, 182, 212, 0.2); padding: 10px; border-radius: 6px; border: 1px solid #06b6d4;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px;">
+                    <img src="assets/sprites/third_eye.png" style="width: 24px; height: 24px; image-rendering: pixelated;" />
+                    <span style="color: #fbbf24; font-weight: bold;">THIRD EYE AWAKENED!</span>
+                </div>
+                <div>All hidden items, secret trash nodes, 3D aerial view, and cosmic loyalty revealed!</div>
+            </div>
+
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-library-read" class="btn" style="background: linear-gradient(135deg, #7e22ce, #9333ea); border: 2px solid #e9d5ff; color: #ffffff; padding: 10px 18px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; border-radius: 6px;">🔮 Commune with the Tome</button>
+                <button id="btn-library-leave" class="btn" style="background: #334155; border: 2px solid #64748b; color: #ffffff; padding: 10px 18px; font-size: 8px; cursor: pointer; font-family: 'Press Start 2P', monospace; border-radius: 6px;">🚪 Leave</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Instructions / Mode Splash Dialog -->
     <div id="instructions-dialog" class="hidden" style="position: fixed; z-index: 1005; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0; pointer-events: auto;">
         <div class="dialog-box instruction-dialog-box" style="background: #111; border: 4px solid #ffaa00; padding: 25px; border-radius: 8px; text-align: center; width: 560px; max-width: 95%; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 30px rgba(255, 170, 0, 0.4); box-sizing: border-box;">
@@ -825,23 +877,19 @@
             <div id="bm-log" style="font-size: 8px; color: #ffaaaa; min-height: 24px; margin-bottom: 12px; line-height: 1.4;"></div>
 
             <!-- Sell Lids Section -->
-            <div style="font-size: 9px; color: #00ffcc; margin-bottom: 6px; text-align: left; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 4px; display: flex; justify-content: space-between;">
+            <div style="font-size: 9px; color: #00ffcc; margin-bottom: 8px; text-align: left; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 4px; display: flex; justify-content: space-between;">
                 <span>🥫 SELL LIDS ($250/EA)</span>
                 <span id="bm-lids-vault-tag" style="color: #ffcc00;">VAULT: <span id="bm-lids-count">0</span></span>
-            </div>
-            <div style="font-size: 7px; color: #ffaaaa; background: rgba(255, 50, 50, 0.1); border: 1px solid rgba(255, 50, 50, 0.3); border-radius: 4px; padding: 6px; margin-bottom: 8px; line-height: 1.5; text-align: left;">
-                ⚠️ <strong>LAW ENFORCEMENT RISK:</strong> Selling ≤10 Lids is SAFE (0 police). Selling &gt;10 Lids dispatches police officers (1 cop per 10 Lids sold: <span style="color:#00ffcc;">Floor(Lids/10)</span>)!
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px;">
                 <button id="btn-bm-sell-lid-1" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #008855; border: 2px solid #00ff88; color: #fff; cursor: pointer; border-radius: 4px;">1 LID<br><span style="font-size:6px; color:#aaffaa;">+$250</span></button>
                 <button id="btn-bm-sell-lid-5" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #008855; border: 2px solid #00ff88; color: #fff; cursor: pointer; border-radius: 4px;">5 LIDS<br><span style="font-size:6px; color:#aaffaa;">+$1,250</span></button>
-                <button id="btn-bm-sell-lid-10" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #0066aa; border: 2px solid #00ccff; color: #fff; cursor: pointer; border-radius: 4px;">10 LIDS<br><span style="font-size:6px; color:#88ffff;">SAFE +$2.5k</span></button>
-                <button id="btn-bm-sell-lid-all" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #aa0033; border: 2px solid #ff0055; color: #fff; cursor: pointer; border-radius: 4px;">SELL ALL<br><span style="font-size:6px; color:#ffaaaa;">DANGER!</span></button>
+                <button id="btn-bm-sell-lid-10" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #0066aa; border: 2px solid #00ccff; color: #fff; cursor: pointer; border-radius: 4px;">10 LIDS<br><span style="font-size:6px; color:#88ffff;">+$2,500</span></button>
+                <button id="btn-bm-sell-lid-all" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #aa0033; border: 2px solid #ff0055; color: #fff; cursor: pointer; border-radius: 4px;">SELL ALL<br><span style="font-size:6px; color:#ffaaaa;">ALL LIDS</span></button>
             </div>
             <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 14px; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 4px; border: 1px solid #333;">
-                <input type="number" id="bm-lid-input" min="1" placeholder="Custom Qty" style="width: 110px; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 6px; background: #111; color: #00ffcc; border: 1px solid #00ffcc; border-radius: 4px;">
+                <input type="number" id="bm-lid-input" min="1" placeholder="Custom Qty" style="width: 130px; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 6px; background: #111; color: #00ffcc; border: 1px solid #00ffcc; border-radius: 4px;">
                 <button id="btn-bm-sell-lid-custom" class="btn" style="flex: 1; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 6px; background: #442266; border: 2px solid #aa44ff; color: #fff; cursor: pointer; border-radius: 4px;">SELL CUSTOM QTY</button>
-                <span id="bm-dispatch-preview" style="font-size: 6px; color: #00ff88; min-width: 90px; text-align: right;">(0 Cops)</span>
             </div>
 
             <!-- Sell Shrooms Section -->
@@ -897,8 +945,10 @@
             <div style="background: #0d1a24; border: 2px solid #00ccff; border-radius: 6px; padding: 10px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-shrink: 0;">
                 <span style="font-size: 8px; color: #00ffcc;">NAVIGATE TO:</span>
                 <select id="nav-location-select" style="background: #050a10; border: 1px solid #00ffcc; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px; border-radius: 4px; cursor: pointer;">
+                    <option value="library">CITY LIBRARY 📚</option>
                     <option value="dump">DUMP 🗑️</option>
                     <option value="pulp mill">PULP MILL 🪵</option>
+                    <option value="zoo">ZOO 🦁</option>
                     <option value="hospital">HOSPITAL 🏥</option>
                     <option value="airport">AIRPORT ✈️</option>
                     <option value="zippy_ds">ZIPPY D'S 🌯</option>
@@ -919,8 +969,19 @@
         <div class="dialog-box" style="background: #0d0914; border: 4px solid #b55fe6; padding: 25px; border-radius: 8px; text-align: center; width: 480px; max-height: 90vh; overflow-y: auto; font-family: 'Press Start 2P', monospace; box-shadow: 0 0 25px rgba(181, 95, 230, 0.6); position: relative;">
             <h2 style="color: #b55fe6; font-size: 13px; margin-bottom: 15px; letter-spacing: 1px;">🔊 SOUND & AUDIO OPTIONS</h2>
             
-            <!-- Soundtrack Volume Section -->
+            <!-- Soundtrack Track Selector & Volume Section -->
             <div style="background: rgba(0,0,0,0.5); border: 2px solid #334466; padding: 15px; border-radius: 6px; margin-bottom: 18px; text-align: left;">
+                <div style="margin-bottom: 12px;">
+                    <label style="font-size: 8px; color: #00ffcc; display: block; margin-bottom: 6px;">🎶 MUSIC / AUDIO TRACK:</label>
+                    <select id="soundtrack-select" class="bgm-select" style="width: 100%; background: #111; border: 1px solid #b55fe6; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 6px; border-radius: 4px; cursor: pointer;">
+                        <option value="lofi">📻 8-Bit Lo-Fi Groove (Default)</option>
+                        <option value="cucaracha">⚡ Cucaracha Dubstep</option>
+                        <option value="dahgbad">🏜️ Dahgbad Desert Synth</option>
+                        <option value="chaos">🔥 Chaos Frenzy Beat</option>
+                        <option value="ear_piercing">🔊 Ear-Piercing Screech (Psychosis)</option>
+                    </select>
+                </div>
+
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <span style="font-size: 9px; color: #00ffcc;">🎵 SOUNDTRACK VOLUME</span>
                     <span id="music-volume-text" style="font-size: 9px; color: #ffd700;">100%</span>
@@ -970,6 +1031,9 @@
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #ccc;">
                         <input type="checkbox" id="sfx-dialog" checked /> Dialog Chime
                     </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #ff5577;">
+                        <input type="checkbox" id="sfx-ear-piercing" checked /> 🔊 Ear-Piercing Sound
+                    </label>
                 </div>
             </div>
 
@@ -992,46 +1056,46 @@
         </div>
     </div>
 
-    <!-- Fixed Audio, Keybinds, FPS Toggle & Pause Buttons (Bottom Right) -->
-    <div style="position: fixed; right: 20px; bottom: 20px; z-index: 1005; display: flex; gap: 10px; align-items: center;">
-        <button id="btn-fps-toggle" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #ffaa00; color: #ffaa00; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">🕹️ 2D RETRO</button>
-        <button id="btn-sound-menu" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #00ffcc; color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">SOUND</button>
-        <button id="btn-keybinds-menu" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #00ccff; color: #00ccff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">KEYS ⌨️</button>
-        <button id="btn-pause" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #ffcc00; color: #ffcc00; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">PAUSE</button>
-        <button id="btn-return-store" style="background: rgba(220, 38, 38, 0.88); border: 2px solid #ff4444; color: #ffffff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease; display: none;">RETURN TO STORE</button>
+    <!-- Fixed Audio, Keybinds, FPS Toggle & Pause Buttons (Controlled by CSS & in-game class) -->
+    <div id="floating-quick-controls">
+        <button id="btn-fps-toggle" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #ffaa00; color: #ffaa00;">🕹️ 2D RETRO</button>
+        <button id="btn-sound-menu" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #00ffcc; color: #00ffcc;">SOUND</button>
+        <button id="btn-keybinds-menu" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #00ccff; color: #00ccff;">KEYS ⌨️</button>
+        <button id="btn-pause" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #ffcc00; color: #ffcc00;">PAUSE</button>
+        <button id="btn-return-store" style="background: rgba(220, 38, 38, 0.92); border: 2px solid #ff4444; color: #ffffff; display: none;">RETURN TO STORE</button>
     </div>
 
     <!-- Game scripts loaded in dependency order -->
     <script src="js/keybinds.js?v=1"></script>
     <script src="8bit_lofi_soundtrack.js"></script>
-    <script src="js/audio.js?v=3"></script>
-    <script src="js/api.js?v=12"></script>
-    <script src="js/map.js?v=11"></script>
-    <script src="js/map_dahgbad.js?v=2"></script>
-    <script src="js/map_cucaracha.js?v=2"></script>
-    <script src="js/camera.js?v=3"></script>
-    <script src="js/sprites.js?v=10"></script>
-    <script src="js/player.js?v=4"></script>
-    <script src="js/follower.js?v=3"></script>
-    <script src="js/trash.js?v=3"></script>
-    <script src="js/minimap.js?v=11"></script>
-    <script src="js/hud.js?v=7"></script>
-    <script src="js/npc.js?v=6"></script>
-    <script src="js/pirate.js?v=4"></script>
-    <script src="js/car.js?v=6"></script>
-    <script src="js/crime.js?v=4"></script>
-    <script src="js/world_builder.js?v=1"></script>
-    <script src="js/map_browser.js?v=1"></script>
-    <script src="js/profile.js?v=1"></script>
+    <script src="js/audio.js?v=4"></script>
+    <script src="js/api.js?v=17"></script>
+    <script src="js/map.js?v=14"></script>
+    <script src="js/map_dahgbad.js?v=3"></script>
+    <script src="js/map_cucaracha.js?v=3"></script>
+    <script src="js/camera.js?v=4"></script>
+    <script src="js/sprites.js?v=15"></script>
+    <script src="js/player.js?v=7"></script>
+    <script src="js/follower.js?v=6"></script>
+    <script src="js/trash.js?v=6"></script>
+    <script src="js/minimap.js?v=14"></script>
+    <script src="js/hud.js?v=9"></script>
+    <script src="js/npc.js?v=8"></script>
+    <script src="js/pirate.js?v=6"></script>
+    <script src="js/car.js?v=8"></script>
+    <script src="js/crime.js?v=6"></script>
+    <script src="js/world_builder.js?v=3"></script>
+    <script src="js/map_browser.js?v=3"></script>
+    <script src="js/profile.js?v=3"></script>
 
     <!-- Three.js 3D WebGL Engine & FPS Components -->
     <script src="js/three.min.js"></script>
-    <script src="js/sprites3d.js?v=1"></script>
-    <script src="js/map_builder3d.js?v=2"></script>
-    <script src="js/billboard_manager3d.js?v=2"></script>
-    <script src="js/fps_viewmodel.js?v=2"></script>
-    <script src="js/engine3d.js?v=2"></script>
+    <script src="js/sprites3d.js?v=6"></script>
+    <script src="js/map_builder3d.js?v=4"></script>
+    <script src="js/billboard_manager3d.js?v=4"></script>
+    <script src="js/fps_viewmodel.js?v=4"></script>
+    <script src="js/engine3d.js?v=5"></script>
 
-    <script src="js/main.js?v=18"></script>
+    <script src="js/main.js?v=29"></script>
 </body>
 </html>

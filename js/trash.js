@@ -10,6 +10,7 @@ class TrashItem {
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
         this.type = type;    // 0-3 maps to trash1-trash4
         this.collected = false;
+        this.isGold = false;
         this.size = 18;
         this.bobOffset = Math.random() * Math.PI * 2;
         this.sparkleTimer = Math.random() * 100;
@@ -23,8 +24,10 @@ class TrashManager {
         this.totalPoints = 0;
         this.respawnTimer = 0;
         this.respawnInterval = 180; // frames (~3 seconds at 60fps)
-        this.maxTrashOnMap = 150;
+        this.maxTrashOnMap = 800;
         this.pickupEffects = [];    // Visual effects for pickup
+        this.goldRushActive = false;
+        this.originalItems = [];
     }
 
     spawnInitial(gameMap, count) {
@@ -165,11 +168,46 @@ class TrashManager {
         }
     }
 
+    triggerGoldRush(gameMap) {
+        if (!gameMap) return;
+        this.goldRushActive = true;
+        // Retain current uncollected original items
+        this.originalItems = this.items.filter(t => !t.isGold && !t.collected);
+
+        const goldItems = [];
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                const tile = gameMap.getTile(x, y);
+                const isRoadOrSidewalk = (
+                    tile === TileType.SIDEWALK ||
+                    tile === TileType.ROAD ||
+                    tile === TileType.CROSSWALK ||
+                    tile === TileType.PARK_PATH ||
+                    (tile >= TileType.ROAD_UP && tile <= TileType.ROAD_RIGHT)
+                );
+                if (isRoadOrSidewalk && gameMap.isWalkable(x, y)) {
+                    const item = new TrashItem(x, y, Math.floor(Math.random() * 4));
+                    item.isGold = true;
+                    goldItems.push(item);
+                }
+            }
+        }
+        this.items = this.originalItems.concat(goldItems);
+    }
+
+    endGoldRush() {
+        this.goldRushActive = false;
+        // Remove remaining uncollected gold items, leaving only the original uncollected items
+        this.items = this.items.filter(t => !t.isGold);
+        this.originalItems = [];
+    }
+
     checkPickup(entityX, entityY, pickupRadius, followerCount = 0, maxToPick = Infinity) {
         const picked = [];
         const isPriceFixing = window.game && window.game.priceFixingActive;
         const basePointValue = Math.max(1, Math.round(Math.sqrt(16 * followerCount)));
         const pointValue = isPriceFixing ? Math.round(basePointValue * 1.25) : basePointValue;
+        
         for (const item of this.items) {
             if (item.collected) continue;
             if (picked.length >= maxToPick) break;
@@ -177,6 +215,10 @@ class TrashManager {
             const wrapped = nearestWrap(item.x, item.y, entityX, entityY);
             const dx = entityX - wrapped.x;
             const dy = entityY - wrapped.y;
+            
+            // Fast bounding box check
+            if (Math.abs(dx) > pickupRadius || Math.abs(dy) > pickupRadius) continue;
+            
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < pickupRadius) {
@@ -187,7 +229,14 @@ class TrashManager {
                 let text = `+${pointValue}`;
                 let color = '#00ff88';
 
-                if (item.isIllegalDumpTrash) {
+                if (item.isGold) {
+                    actualPoints = Math.round(pointValue * 2.5) + 10;
+                    text = `+$${actualPoints} GOLD! 🏆`;
+                    color = '#ffd700';
+                    if (window.soundManager && typeof window.soundManager.playGoldPickupSFX === 'function') {
+                        window.soundManager.playGoldPickupSFX();
+                    }
+                } else if (item.isIllegalDumpTrash) {
                     actualPoints += 150;
                     text = `+$${actualPoints} Clean-up!`;
                     color = '#ffd700';
@@ -196,7 +245,7 @@ class TrashManager {
                 this.totalPoints += actualPoints;
                 picked.push(item);
 
-                if (window.soundManager) window.soundManager.playTrashPickupSFX();
+                if (!item.isGold && window.soundManager) window.soundManager.playTrashPickupSFX();
 
                 // Create pickup effect
                 this.pickupEffects.push({
@@ -231,29 +280,67 @@ class TrashManager {
             // Sparkle effect
             item.sparkleTimer += 0.05;
 
-            // Draw trash sprite
-            const trashImg = spriteManager.getTrashImage(`trash${item.type + 1}`);
             const drawSize = item.size;
 
-            if (trashImg && (trashImg.complete || trashImg instanceof HTMLCanvasElement)) {
-                ctx.drawImage(
-                    trashImg,
-                    screen.x - drawSize / 2,
-                    screen.y - drawSize / 2 + bobY,
-                    drawSize,
-                    drawSize
-                );
-            } else {
-                // Fallback
-                this._drawFallbackTrash(ctx, screen.x, screen.y + bobY, item.type);
-            }
+            if (item.isGold) {
+                const pulse = 1 + Math.sin(time * 6 + item.bobOffset) * 0.15;
+                ctx.save();
 
-            // Sparkle
-            if (Math.sin(item.sparkleTimer) > 0.8) {
-                ctx.fillStyle = 'rgba(255,255,200,0.8)';
+                // Radial golden aura
+                const grad = ctx.createRadialGradient(screen.x, screen.y + bobY, 2, screen.x, screen.y + bobY, 14 * pulse);
+                grad.addColorStop(0, 'rgba(255, 235, 100, 0.85)');
+                grad.addColorStop(0.5, 'rgba(255, 180, 0, 0.4)');
+                grad.addColorStop(1, 'rgba(255, 150, 0, 0)');
+                ctx.fillStyle = grad;
                 ctx.beginPath();
-                ctx.arc(screen.x + 6, screen.y - 6 + bobY, 2, 0, Math.PI * 2);
+                ctx.arc(screen.x, screen.y + bobY, 14 * pulse, 0, Math.PI * 2);
                 ctx.fill();
+
+                // Draw trash sprite with golden glow filter
+                ctx.filter = 'drop-shadow(0 0 6px #ffd700) brightness(1.35) sepia(1) hue-rotate(5deg) saturate(5)';
+                const trashImg = spriteManager.getTrashImage(`trash${item.type + 1}`);
+                if (trashImg && (trashImg.complete || trashImg instanceof HTMLCanvasElement)) {
+                    ctx.drawImage(
+                        trashImg,
+                        screen.x - (drawSize * pulse) / 2,
+                        screen.y - (drawSize * pulse) / 2 + bobY,
+                        drawSize * pulse,
+                        drawSize * pulse
+                    );
+                } else {
+                    this._drawFallbackTrash(ctx, screen.x, screen.y + bobY, item.type, true);
+                }
+                ctx.restore();
+
+                // Sparkle particles
+                if (Math.sin(item.sparkleTimer * 2) > 0.4) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(screen.x + (Math.sin(item.sparkleTimer) * 7), screen.y + bobY - 7, 3, 3);
+                    ctx.fillStyle = '#ffd700';
+                    ctx.fillRect(screen.x - (Math.cos(item.sparkleTimer) * 7), screen.y + bobY + 5, 2, 2);
+                }
+            } else {
+                // Regular trash item
+                const trashImg = spriteManager.getTrashImage(`trash${item.type + 1}`);
+                if (trashImg && (trashImg.complete || trashImg instanceof HTMLCanvasElement)) {
+                    ctx.drawImage(
+                        trashImg,
+                        screen.x - drawSize / 2,
+                        screen.y - drawSize / 2 + bobY,
+                        drawSize,
+                        drawSize
+                    );
+                } else {
+                    this._drawFallbackTrash(ctx, screen.x, screen.y + bobY, item.type, false);
+                }
+
+                // Normal Sparkle
+                if (Math.sin(item.sparkleTimer) > 0.8) {
+                    ctx.fillStyle = 'rgba(255,255,200,0.8)';
+                    ctx.beginPath();
+                    ctx.arc(screen.x + 6, screen.y - 6 + bobY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         }
 
@@ -269,12 +356,12 @@ class TrashManager {
         }
     }
 
-    _drawFallbackTrash(ctx, sx, sy, type) {
-        const colors = ['#e8e8e8', '#dd4444', '#aaddff', '#ffdd33'];
-        const size = 10;
+    _drawFallbackTrash(ctx, sx, sy, type, isGold = false) {
+        const colors = isGold ? ['#ffe066', '#ffd700', '#ffcc00', '#e6b800'] : ['#e8e8e8', '#dd4444', '#aaddff', '#ffdd33'];
+        const size = isGold ? 12 : 10;
         ctx.fillStyle = colors[type];
         ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = isGold ? '#b8860b' : '#333';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx - size / 2, sy - size / 2, size, size);
     }

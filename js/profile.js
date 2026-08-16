@@ -60,13 +60,13 @@ class ProfileManager {
 
     calculateTrophies(p) {
         const stats = (p && p.stats) || window.playerStats || {};
-        const cumTrash = stats.stat_cumulative_trash || 0;
-        const maxTrash = stats.stat_max_single_trash || 0;
-        const cumMoney = stats.stat_cumulative_money || 0;
+        const cumTrash = stats.stat_cumulative_trash !== undefined ? stats.stat_cumulative_trash : (stats.cumulative_trash || 0);
+        const maxTrash = stats.stat_max_single_trash !== undefined ? stats.stat_max_single_trash : (stats.max_single_trash || 0);
+        const cumMoney = stats.stat_cumulative_money !== undefined ? stats.stat_cumulative_money : (stats.cumulative_money || 0);
         const balance = (p && p.balance !== undefined) ? p.balance : (window.playerBalance || 0);
-        const moveSize = (p && p.movement_size !== undefined) ? p.movement_size : (window.playerMovementSize || 0);
+        const moveSize = (p && p.movement_size !== undefined) ? p.movement_size : (window.playerMovementSize || stats.total_followers || 0);
         const intl = (p && p.international_followers !== undefined) ? p.international_followers : (window.internationalFollowers || 0);
-        const rounds = stats.total_rounds_played || 0;
+        const rounds = stats.total_rounds_played !== undefined ? stats.total_rounds_played : 0;
         const buildingsCount = (p && p.buildings ? p.buildings.length : (window._serverOwnedBuildings ? window._serverOwnedBuildings.length : 0));
         const publishedMapsCount = (p && p.published_maps_count !== undefined) ? p.published_maps_count : (p && p.published_maps ? p.published_maps.length : 0);
         const madeMan = (p && p.made_man_status) || window.madeManStatus || 'none';
@@ -729,6 +729,7 @@ class ProfileManager {
             { label: 'TOTAL WEALTH', val: `$${((p.balance || 0) + (stats.stat_cumulative_money || 0)).toLocaleString()}`, icon: '💵', color: '#4ade80' },
             { label: 'VAULT LIDS', val: `${(p.lids !== undefined ? p.lids : (window.playerLids || 0)).toLocaleString()} lids`, icon: '🥫', color: '#00ffcc' },
             { label: 'DAILY STREAK', val: `${p.current_streak !== undefined ? p.current_streak : (window.playerStreak || 0)} days active`, icon: '🔥', color: '#ffaa00' },
+            { label: 'GAMES TODAY', val: `${p.today_games_count !== undefined ? p.today_games_count : (window.todayGamesCount || 0)} played`, icon: '📅', color: '#ffcc00' },
             { label: 'CURRENT POSSE', val: `${p.movement_size || 0} followers`, icon: '👥', color: '#facc15' },
             { label: 'INTL FOLLOWERS', val: `${p.international_followers || 0} followers`, icon: '✈️', color: '#fb923c' },
             { label: 'ROUNDS PLAYED', val: `${stats.total_rounds_played || 0} rounds`, icon: '🎮', color: '#c084fc' },

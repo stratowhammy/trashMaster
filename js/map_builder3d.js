@@ -616,33 +616,7 @@ class MapBuilder3D {
                 }
             }
 
-            // Place Landmark 3D Entrance Portals & Signboards for this chunk
-            if (gameMap.buildings) {
-                for (const bldg of gameMap.buildings) {
-                    if (!bldg || !bldg.doorTiles || bldg.doorTiles.length === 0) continue;
-                    const door = bldg.doorTiles[0];
-                    const dx = (door.x - mapW / 2) * S + S / 2 + offsetX;
-                    const dz = (door.y - mapH / 2) * S + S / 2 + offsetZ;
-
-                    let signLabel = '🚪 ENTRANCE';
-                    if (bldg.type === 'dump') signLabel = '🗑️ DUMP';
-                    else if (bldg.type === 'zoo') signLabel = '🦁 ZOO';
-                    else if (bldg.type === 'police') signLabel = '👮 POLICE';
-                    else if (bldg.type === 'bank') signLabel = '🏦 BANK';
-                    else if (bldg.type === 'zippy_ds') signLabel = '🌯 ZIPPY D\'S';
-                    else if (bldg.type === 'goose' || bldg.type === 'fast_food') signLabel = '🥪 GOOSE';
-                    else if (bldg.type === 'chinos_steaks') signLabel = '🥩 CHINO\'S STEAKS';
-                    else if (bldg.type === 'rats_steaks') signLabel = '🥩 RATS STEAKS';
-                    else if (bldg.type === 'airport') signLabel = '✈️ AIRPORT';
-                    else if (bldg.type === 'hospital') signLabel = '🏥 HOSPITAL';
-                    else if (bldg.type === 'pulp_mill') signLabel = '🪵 PULP MILL';
-                    else if (bldg.type === 'black_market') signLabel = '☠️ BLACK MARKET';
-
-                    const signSprite = this._createSignSprite(signLabel);
-                    signSprite.position.set(dx, this.DOOR_HEIGHT + 1.2, dz);
-                    this.mapMeshGroup.add(signSprite);
-                }
-            }
+            // Door portals & overhead billboards are dynamically managed and animated in BillboardManager3D
         });
 
         // 2. Create InstancedMesh for Floor Buckets

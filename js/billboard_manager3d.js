@@ -559,24 +559,32 @@ class BillboardManager3D {
                 this.buildingBillboardMap.set(bldg.id, sprite);
             }
 
-            // Calculate center of building in pixels
-            let sumX = 0, sumY = 0;
-            for (const t of bldg.tiles) {
-                sumX += t.x;
-                sumY += t.y;
+            // Calculate door position (or center if no door tiles)
+            let targetX, targetY;
+            if (bldg.doorTiles && bldg.doorTiles.length > 0) {
+                targetX = (bldg.doorTiles[0].x + 0.5) * TILE_SIZE;
+                targetY = (bldg.doorTiles[0].y + 0.5) * TILE_SIZE;
+            } else {
+                let sumX = 0, sumY = 0;
+                for (const t of bldg.tiles) {
+                    sumX += t.x;
+                    sumY += t.y;
+                }
+                targetX = (sumX / bldg.tiles.length + 0.5) * TILE_SIZE;
+                targetY = (sumY / bldg.tiles.length + 0.5) * TILE_SIZE;
             }
-            const bldgCenterX = (sumX / bldg.tiles.length + 0.5) * TILE_SIZE;
-            const bldgCenterY = (sumY / bldg.tiles.length + 0.5) * TILE_SIZE;
 
-            const pos = this._getToroidal3DPos(bldgCenterX, bldgCenterY, player, p3dX, p3dZ, S);
+            const pos = this._getToroidal3DPos(targetX, targetY, player, p3dX, p3dZ, S);
             if (pos.distSq > 480 * 480) {
                 sprite.visible = false;
                 continue;
             }
 
             sprite.visible = true;
-            const bob = Math.sin(time * 2.8 + bldg.id * 1.4) * 0.45;
-            sprite.position.set(pos.x, 9.2 + bob, pos.z);
+            const bob = Math.sin(time * 3.0 + bldg.id * 1.5) * 0.35;
+            // Float directly over the door header
+            sprite.position.set(pos.x, 5.8 + bob, pos.z);
+            sprite.scale.set(4.6, 4.6, 1.0);
         }
 
         // Hide inactive

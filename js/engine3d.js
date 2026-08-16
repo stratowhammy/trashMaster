@@ -65,43 +65,59 @@ class Engine3D {
     }
 
     _setupPointerLock() {
-        const clickTarget = (this.game && this.game.canvas) ? this.game.canvas : this.canvas;
+        const canvas3d = document.getElementById('gameCanvas3d') || this.canvas;
+        const mainCanvas = (this.game && this.game.canvas) ? this.game.canvas : null;
 
-        if (clickTarget) {
-            clickTarget.addEventListener('click', (e) => {
-                if (this.game && this.game.state === GameState.PLAYING && !this.game.isPaused) {
-                    if (!this.pointerLocked) {
-                        const rect = clickTarget.getBoundingClientRect();
-                        const clickX = (e.clientX - rect.left) * (clickTarget.width / rect.width);
-                        const clickY = (e.clientY - rect.top) * (clickTarget.height / rect.height);
-                        
-                        // Check 3D Messages Button click
-                        if (this.game.hud && this.game.hud.messagesBtnBounds) {
-                            const b = this.game.hud.messagesBtnBounds;
-                            if (clickX >= b.x && clickX <= b.x + b.width && clickY >= b.y && clickY <= b.y + b.height) {
-                                this.game.openMessagesLogDialog();
-                                return;
-                            }
-                        }
-                        // Check 3D Avatar Portrait click
-                        if (this.game.hud && this.game.hud.avatarPortraitBounds3D) {
-                            const ab = this.game.hud.avatarPortraitBounds3D;
-                            if (clickX >= ab.x && clickX <= ab.x + ab.width && clickY >= ab.y && clickY <= ab.y + ab.height) {
-                                if (window.profileManager) window.profileManager.toggleMultiplayerScoreboard();
-                                return;
-                            }
-                        }
-                        
-                        if (!document.pointerLockElement) {
-                            clickTarget.requestPointerLock();
-                        }
+        const handleCanvasClick = (e, targetElem) => {
+            // Pointer lock only applies when 3D FPS mode is actively enabled!
+            if (!this.enabled) return;
+            if (!this.game || this.game.state !== GameState.PLAYING || this.game.isPaused) return;
+            if (!targetElem || !targetElem.isConnected || targetElem.style.display === 'none') return;
+
+            if (!this.pointerLocked) {
+                const rect = targetElem.getBoundingClientRect();
+                const clickX = (e.clientX - rect.left) * (targetElem.width / (rect.width || 1));
+                const clickY = (e.clientY - rect.top) * (targetElem.height / (rect.height || 1));
+                
+                // Check 3D Messages Button click
+                if (this.game.hud && this.game.hud.messagesBtnBounds) {
+                    const b = this.game.hud.messagesBtnBounds;
+                    if (clickX >= b.x && clickX <= b.x + b.width && clickY >= b.y && clickY <= b.y + b.height) {
+                        this.game.openMessagesLogDialog();
+                        return;
                     }
                 }
-            });
+                // Check 3D Avatar Portrait click
+                if (this.game.hud && this.game.hud.avatarPortraitBounds3D) {
+                    const ab = this.game.hud.avatarPortraitBounds3D;
+                    if (clickX >= ab.x && clickX <= ab.x + ab.width && clickY >= ab.y && clickY <= ab.y + ab.height) {
+                        if (window.profileManager) window.profileManager.toggleMultiplayerScoreboard();
+                        return;
+                    }
+                }
+                
+                if (!document.pointerLockElement && typeof targetElem.requestPointerLock === 'function') {
+                    try {
+                        const lockPromise = targetElem.requestPointerLock();
+                        if (lockPromise && typeof lockPromise.catch === 'function') {
+                            lockPromise.catch(() => {});
+                        }
+                    } catch (err) {
+                        // Suppress pointer lock errors gracefully
+                    }
+                }
+            }
+        };
+
+        if (canvas3d) {
+            canvas3d.addEventListener('click', (e) => handleCanvasClick(e, canvas3d));
+        }
+        if (mainCanvas && mainCanvas !== canvas3d) {
+            mainCanvas.addEventListener('click', (e) => handleCanvasClick(e, mainCanvas));
         }
 
         document.addEventListener('pointerlockchange', () => {
-            this.pointerLocked = (document.pointerLockElement === clickTarget || document.pointerLockElement === this.canvas);
+            this.pointerLocked = !!(document.pointerLockElement && (document.pointerLockElement === canvas3d || document.pointerLockElement === mainCanvas || document.pointerLockElement === this.canvas));
         });
 
         // Mouse movement for mouselook

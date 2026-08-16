@@ -52,10 +52,15 @@ class WorldBuilder {
         this.mapH = 128;
         this.tileSize = 32;
 
-        this.camera = { x: 0, y: 0, zoom: 1 };
+        this.camera = { x: 50, y: 50, zoom: 0.8 };
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
         this.isMouseDown = false;
+
+        // Viewport scrollbar drag states
+        this.isDraggingHScroll = false;
+        this.isDraggingVScroll = false;
+        this.scrollDragStart = 0;
 
         this.currentTool = 'building';
         this.buildingPlopperMode = 'special';
@@ -135,6 +140,35 @@ class WorldBuilder {
         `;
 
         modal.innerHTML = `
+            <style>
+                #world-builder-overlay *::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                #world-builder-overlay *::-webkit-scrollbar-track {
+                    background: #0b111c;
+                    border-radius: 4px;
+                }
+                #world-builder-overlay *::-webkit-scrollbar-thumb {
+                    background: #1f3554;
+                    border-radius: 4px;
+                    border: 1px solid #2e507a;
+                }
+                #world-builder-overlay *::-webkit-scrollbar-thumb:hover {
+                    background: #00ffcc;
+                    border-color: #33ffdd;
+                    box-shadow: 0 0 6px rgba(0, 255, 204, 0.6);
+                }
+                #world-builder-overlay * {
+                    scrollbar-width: thin;
+                    scrollbar-color: #1f3554 #0b111c;
+                }
+                #builder-h-thumb:hover, #builder-v-thumb:hover {
+                    background: #00ffcc !important;
+                    box-shadow: 0 0 8px rgba(0,255,204,0.8);
+                }
+            </style>
+
             <!-- Top Navigation Bar -->
             <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:linear-gradient(180deg,#151c28,#0c1018); border-bottom:2px solid #2a3b5c; flex-shrink:0;">
                 <div style="display:flex; align-items:center; gap:12px;">
@@ -197,7 +231,7 @@ class WorldBuilder {
                                 <button class="btn bldg-cat-filter" data-cat="biomes" style="font-size:5.5px; padding:4px 6px;">🏜️ Biomes</button>
                             </div>
 
-                            <div id="special-buildings-list" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; max-height:300px; overflow-y:auto; background:#162032; padding:8px; border-radius:8px; margin-bottom:10px;">
+                            <div id="special-buildings-list" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; max-height:280px; overflow-y:auto; background:#162032; padding:8px; border-radius:8px; margin-bottom:10px;">
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
@@ -349,18 +383,27 @@ class WorldBuilder {
                     </div>
 
                     <!-- Viewport HUD Overlay -->
-                    <div style="position:absolute; bottom:16px; right:16px; background:rgba(10,16,26,0.85); padding:8px 14px; border-radius:8px; border:1px solid #2a3b5c; font-size:8px; color:#00ffcc; display:flex; gap:16px;">
+                    <div style="position:absolute; bottom:24px; right:28px; background:rgba(10,16,26,0.85); padding:8px 14px; border-radius:8px; border:1px solid #2a3b5c; font-size:8px; color:#00ffcc; display:flex; gap:16px; z-index:10; pointer-events:none;">
                         <span id="builder-coords">Tile: (0, 0)</span>
                         <span id="builder-stats">Buildings: 0 | Entities: 0 | Trash: 0</span>
                         <span>Zoom: <span id="builder-zoom-text">100%</span></span>
                     </div>
 
                     <!-- Zoom Controls -->
-                    <div style="position:absolute; top:16px; right:16px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="position:absolute; top:16px; right:28px; display:flex; flex-direction:column; gap:6px; z-index:10;">
                         <button id="btn-builder-zoom-in" class="btn secondary" style="width:36px; height:36px; padding:0; font-size:14px;">+</button>
                         <button id="btn-builder-zoom-out" class="btn secondary" style="width:36px; height:36px; padding:0; font-size:14px;">-</button>
                         <button id="btn-builder-zoom-reset" class="btn secondary" style="width:36px; height:36px; padding:0; font-size:8px;">1:1</button>
                     </div>
+
+                    <!-- Interactive Viewport Scrollbars (Canvas Nav) -->
+                    <div id="builder-h-scrollbar" style="position:absolute; bottom:0; left:0; right:14px; height:12px; background:rgba(8,12,20,0.92); border-top:1px solid #2a3b5c; z-index:20; cursor:pointer;">
+                        <div id="builder-h-thumb" style="position:absolute; top:2px; height:8px; background:#1f3554; border:1px solid #00ffcc; border-radius:4px; cursor:grab; min-width:24px; transition:background 0.15s ease;"></div>
+                    </div>
+                    <div id="builder-v-scrollbar" style="position:absolute; top:0; right:0; bottom:12px; width:14px; background:rgba(8,12,20,0.92); border-left:1px solid #2a3b5c; z-index:20; cursor:pointer;">
+                        <div id="builder-v-thumb" style="position:absolute; left:2px; width:10px; background:#1f3554; border:1px solid #00ffcc; border-radius:4px; cursor:grab; min-height:24px; transition:background 0.15s ease;"></div>
+                    </div>
+                    <div style="position:absolute; bottom:0; right:0; width:14px; height:12px; background:#080c14; border-top:1px solid #2a3b5c; border-left:1px solid #2a3b5c; z-index:20;"></div>
                 </div>
             </div>
         `;
@@ -375,6 +418,7 @@ class WorldBuilder {
         this.renderSpecialBuildingsList();
         this.updateTileOptions();
         this.renderEntityList();
+        this.initScrollbars();
         this.bindEvents();
     }
 
@@ -502,6 +546,138 @@ class WorldBuilder {
             });
             container.appendChild(btn);
         });
+    }
+
+    initScrollbars() {
+        const modal = this.container;
+        const hScrollbar = modal.querySelector('#builder-h-scrollbar');
+        const vScrollbar = modal.querySelector('#builder-v-scrollbar');
+        const hThumb = modal.querySelector('#builder-h-thumb');
+        const vThumb = modal.querySelector('#builder-v-thumb');
+
+        if (!hScrollbar || !vScrollbar || !hThumb || !vThumb) return;
+
+        hThumb.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            this.isDraggingHScroll = true;
+            this.scrollDragStart = e.clientX - hThumb.offsetLeft;
+        });
+
+        vThumb.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            this.isDraggingVScroll = true;
+            this.scrollDragStart = e.clientY - vThumb.offsetTop;
+        });
+
+        hScrollbar.addEventListener('mousedown', (e) => {
+            if (e.target === hThumb) return;
+            const rect = hScrollbar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const trackW = hScrollbar.clientWidth;
+            const thumbW = hThumb.clientWidth;
+            const maxThumbLeft = Math.max(1, trackW - thumbW);
+            const targetThumbLeft = Math.max(0, Math.min(maxThumbLeft, clickX - thumbW / 2));
+            const progress = targetThumbLeft / maxThumbLeft;
+
+            const worldW = this.mapW * this.tileSize * this.camera.zoom;
+            const vw = this.canvas.width;
+            const scrollRangeX = Math.max(1, worldW - vw + 100);
+            this.camera.x = 50 - progress * scrollRangeX;
+            this.render();
+        });
+
+        vScrollbar.addEventListener('mousedown', (e) => {
+            if (e.target === vThumb) return;
+            const rect = vScrollbar.getBoundingClientRect();
+            const clickY = e.clientY - rect.top;
+            const trackH = vScrollbar.clientHeight;
+            const thumbH = vThumb.clientHeight;
+            const maxThumbTop = Math.max(1, trackH - thumbH);
+            const targetThumbTop = Math.max(0, Math.min(maxThumbTop, clickY - thumbH / 2));
+            const progress = targetThumbTop / maxThumbTop;
+
+            const worldH = this.mapH * this.tileSize * this.camera.zoom;
+            const vh = this.canvas.height;
+            const scrollRangeY = Math.max(1, worldH - vh + 100);
+            this.camera.y = 50 - progress * scrollRangeY;
+            this.render();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (this.isDraggingHScroll) {
+                const trackW = hScrollbar.clientWidth;
+                const thumbW = hThumb.clientWidth;
+                const maxThumbLeft = Math.max(1, trackW - thumbW);
+                const rect = hScrollbar.getBoundingClientRect();
+                const newLeft = Math.max(0, Math.min(maxThumbLeft, e.clientX - rect.left - (thumbW / 2)));
+                const progress = newLeft / maxThumbLeft;
+
+                const worldW = this.mapW * this.tileSize * this.camera.zoom;
+                const vw = this.canvas.width;
+                const scrollRangeX = Math.max(1, worldW - vw + 100);
+                this.camera.x = 50 - progress * scrollRangeX;
+                this.render();
+            } else if (this.isDraggingVScroll) {
+                const trackH = vScrollbar.clientHeight;
+                const thumbH = vThumb.clientHeight;
+                const maxThumbTop = Math.max(1, trackH - thumbH);
+                const rect = vScrollbar.getBoundingClientRect();
+                const newTop = Math.max(0, Math.min(maxThumbTop, e.clientY - rect.top - (thumbH / 2)));
+                const progress = newTop / maxThumbTop;
+
+                const worldH = this.mapH * this.tileSize * this.camera.zoom;
+                const vh = this.canvas.height;
+                const scrollRangeY = Math.max(1, worldH - vh + 100);
+                this.camera.y = 50 - progress * scrollRangeY;
+                this.render();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            this.isDraggingHScroll = false;
+            this.isDraggingVScroll = false;
+        });
+    }
+
+    updateScrollbars() {
+        const modal = this.container;
+        if (!modal) return;
+        const hScrollbar = modal.querySelector('#builder-h-scrollbar');
+        const vScrollbar = modal.querySelector('#builder-v-scrollbar');
+        const hThumb = modal.querySelector('#builder-h-thumb');
+        const vThumb = modal.querySelector('#builder-v-thumb');
+
+        if (!hScrollbar || !vScrollbar || !hThumb || !vThumb || !this.canvas) return;
+
+        const vw = this.canvas.width;
+        const vh = this.canvas.height;
+        const worldW = this.mapW * this.tileSize * this.camera.zoom;
+        const worldH = this.mapH * this.tileSize * this.camera.zoom;
+
+        const trackW = hScrollbar.clientWidth;
+        const trackH = vScrollbar.clientHeight;
+
+        if (trackW <= 0 || trackH <= 0) return;
+
+        // Horizontal thumb
+        const hRatio = Math.min(1, vw / Math.max(1, worldW));
+        const thumbW = Math.max(24, Math.floor(trackW * hRatio));
+        hThumb.style.width = `${thumbW}px`;
+
+        const scrollRangeX = Math.max(1, worldW - vw + 100);
+        const progressX = Math.max(0, Math.min(1, (50 - this.camera.x) / scrollRangeX));
+        const maxThumbLeft = Math.max(0, trackW - thumbW);
+        hThumb.style.left = `${Math.floor(progressX * maxThumbLeft)}px`;
+
+        // Vertical thumb
+        const vRatio = Math.min(1, vh / Math.max(1, worldH));
+        const thumbH = Math.max(24, Math.floor(trackH * vRatio));
+        vThumb.style.height = `${thumbH}px`;
+
+        const scrollRangeY = Math.max(1, worldH - vh + 100);
+        const progressY = Math.max(0, Math.min(1, (50 - this.camera.y) / scrollRangeY));
+        const maxThumbTop = Math.max(0, trackH - thumbH);
+        vThumb.style.top = `${Math.floor(progressY * maxThumbTop)}px`;
     }
 
     bindEvents() {
@@ -707,6 +883,9 @@ class WorldBuilder {
         const viewport = modal.querySelector('#builder-viewport');
 
         viewport.addEventListener('mousedown', (e) => {
+            if (this.isDraggingHScroll || this.isDraggingVScroll) return;
+            if (e.target.closest('#builder-h-scrollbar') || e.target.closest('#builder-v-scrollbar')) return;
+
             if (e.button === 1) {
                 this.isDragging = true;
                 this.dragStart = { x: e.clientX - this.camera.x, y: e.clientY - this.camera.y };
@@ -1447,6 +1626,8 @@ class WorldBuilder {
             const tCount = this.mapData.trash ? this.mapData.trash.length : 0;
             statsEl.innerText = `Buildings: ${bCount} | Objects/NPCs: ${eCount} | Trash: ${tCount}`;
         }
+
+        this.updateScrollbars();
     }
 
     renderToolPreview(tileX, tileY) {

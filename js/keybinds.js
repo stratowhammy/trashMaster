@@ -9,6 +9,7 @@ const DEFAULT_KEYBINDS = {
     moveLeft: 'ArrowLeft',
     moveRight: 'ArrowRight',
     jump: ' ',
+    sprint: 'Shift',
     pickupTrash: 'q',
     interact: 'e',
     harvestTree: 'x',
@@ -69,6 +70,7 @@ const ACTION_CONFIG = [
             { id: 'moveLeft', label: 'Move Left' },
             { id: 'moveRight', label: 'Move Right' },
             { id: 'jump', label: 'Jump' },
+            { id: 'sprint', label: 'Sprint (Hold Shift to Run Fast)' },
             { id: 'pickupTrash', label: 'Pick Up Trash' },
             { id: 'interact', label: 'Interact / Enter Building / Deliver' },
             { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' }
@@ -201,6 +203,7 @@ class KeybindManager {
         if (actionId === 'moveLeft' && (pressed === 'arrowleft' || pressed === 'a')) return true;
         if (actionId === 'moveRight' && (pressed === 'arrowright' || pressed === 'd')) return true;
         if (actionId === 'jump' && (pressed === ' ' || pressed === 'space' || pressed === 'spacebar' || (e && e.code === 'Space'))) return true;
+        if (actionId === 'sprint' && (pressed === 'shift' || (e && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')))) return true;
 
         return pressed === assigned;
     }
@@ -208,6 +211,7 @@ class KeybindManager {
     formatKeyName(key) {
         if (!key) return '[ NONE ]';
         if (key === ' ' || key.toLowerCase() === 'space') return '[ SPACE ]';
+        if (key.toLowerCase() === 'shift') return '[ SHIFT ]';
         if (key === 'ArrowUp') return '[ UP ARROW ]';
         if (key === 'ArrowDown') return '[ DOWN ARROW ]';
         if (key === 'ArrowLeft') return '[ LEFT ARROW ]';

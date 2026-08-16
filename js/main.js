@@ -2755,8 +2755,9 @@ class Game {
         }
 
         if (window.fastFoodMode) {
-            // Hunger timer
-            this.hungerTimer -= dt;
+            // Hunger timer — accelerated depletion when sprinting (1.2x speed burns extra calories!)
+            const hungerRate = (this.player && this.player.isSprinting) ? 2.2 : 1.0;
+            this.hungerTimer -= dt * hungerRate;
             
             const hungerPct = (this.hungerTimer / 45.0) * 100;
             if (hungerPct <= 25 && !this.hungerWarned25) {

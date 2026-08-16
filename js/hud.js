@@ -426,6 +426,42 @@ class HUD {
         const game = window.game;
         if (!game) return;
 
+        // 0. Stamina Bar (Appears when sprinting or when depleted/recovering)
+        if (game.player && (game.player.isSprinting || (game.player.stamina !== undefined && game.player.stamina < game.player.maxStamina))) {
+            const stamina = Math.max(0, Math.min(game.player.maxStamina || 100, game.player.stamina));
+            const fillPct = stamina / (game.player.maxStamina || 100);
+
+            const barW = Math.min(420, canvasWidth * 0.52);
+            const barH = 16;
+            const barX = canvasWidth / 2 - barW / 2;
+            const barY = nextBarY;
+            nextBarY -= 22;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(10, 20, 30, 0.88)';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            let stamColor = '#00ffcc'; // Vibrant Cyan / Electric Green
+            if (fillPct < 0.25) stamColor = '#ff3344'; // Red when critical
+            else if (fillPct < 0.55) stamColor = '#ffcc00'; // Yellow when medium
+
+            ctx.fillStyle = stamColor;
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+            ctx.strokeStyle = game.player.isSprinting ? '#00ffff' : '#00aa88';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const statusText = game.player.isSprinting ? '⚡ SPRINTING (1.2x)' : '⚡ RECOVERING...';
+            ctx.fillText(`${statusText} ${Math.round(fillPct * 100)}%`, canvasWidth / 2, barY + barH / 2 + 1);
+            ctx.restore();
+        }
+
         // 1. Animal Capacity Bar (Ranger char1 mode)
         if (game.player && game.player.characterClass === 'char1') {
             const animalCount = (game.player.capturedAnimals || []).length;

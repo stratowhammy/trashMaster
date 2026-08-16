@@ -8,7 +8,13 @@ class Player {
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
         const chosen = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
         this.spriteId = chosen;
-        this.speed = (chosen === 'char4') ? 8 : 6;
+        
+        // Base original speeds: Athlete=8, Standard=6. Default speed is now 0.8x of baseline.
+        this.rawBaselineSpeed = (chosen === 'char4') ? 8 : 6;
+        this.walkSpeed = this.rawBaselineSpeed * 0.8;
+        this.sprintSpeed = this.rawBaselineSpeed * 1.2;
+        this.speed = this.walkSpeed;
+
         this.size = TILE_SIZE - 4;
         this.direction = 'down';
         this.moving = false;
@@ -16,7 +22,14 @@ class Player {
         this.animTimer = 0;
         this.positionHistory = [];
         this.historyMaxLength = 2000;
-        this.keys = { up: false, down: false, left: false, right: false, space: false, k: false };
+        this.keys = { up: false, down: false, left: false, right: false, space: false, sprint: false, k: false };
+
+        // Stamina & Sprint state
+        this.maxStamina = 100;
+        this.stamina = 100;
+        this.isSprinting = false;
+        this.staminaDepletionRate = 22; // ~4.5s of continuous sprinting
+        this.staminaRecoveryRate = 20;   // ~5s to fully recover
 
         // Jumping state
         this.isJumping = false;
@@ -53,6 +66,9 @@ class Player {
             this.keys.space = true;
             this.jump();
         }
+        if ((window.isKey && window.isKey(e, 'sprint')) || e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+            this.keys.sprint = true;
+        }
     }
 
     handleKeyUp(e) {
@@ -63,6 +79,9 @@ class Player {
         if (window.isKey && window.isKey(e, 'moveRight') || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = false;
         if ((window.isKey && window.isKey(e, 'jump')) || e.code === 'Space' || e.key === ' ') {
             this.keys.space = false;
+        }
+        if ((window.isKey && window.isKey(e, 'sprint')) || e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+            this.keys.sprint = false;
         }
     }
 
@@ -114,6 +133,26 @@ class Player {
 
         this.moving = dx !== 0 || dy !== 0;
 
+        // Stamina & Sprint Logic
+        const wantsSprint = this.keys.sprint && this.moving && this.stamina > 0;
+        if (wantsSprint) {
+            this.isSprinting = true;
+            this.stamina = Math.max(0, this.stamina - this.staminaDepletionRate * dt);
+            if (this.stamina <= 0) {
+                this.isSprinting = false;
+            }
+        } else {
+            this.isSprinting = false;
+            if (this.stamina < this.maxStamina) {
+                this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRecoveryRate * dt);
+            }
+        }
+
+        // Base speed is 0.8x baseline when walking, 1.2x baseline when sprinting
+        const rawBaseline = window.pirateMode ? 8.5 : ((this.spriteId === 'char4' || this.characterClass === 'char4') ? 8 : 6);
+        const sprintOrWalkMultiplier = this.isSprinting ? 1.2 : 0.8;
+        this.speed = rawBaseline * sprintOrWalkMultiplier;
+
         if (this.moving) {
             if (!window.game || !window.game.engine3D || !window.game.engine3D.enabled) {
                 if (dx !== 0 && dy !== 0) { const l = Math.SQRT2; dx /= l; dy /= l; }
@@ -125,7 +164,7 @@ class Player {
             if (this.characterClass === 'char4' && window.playerHasTruck) {
                 effectiveMultiplier = effectiveMultiplier / (this.athleteBaseMultiplier || 1.0);
             }
-            const currentSpeed = (window.pirateMode ? 8.5 : this.speed) * effectiveMultiplier;
+            const currentSpeed = this.speed * effectiveMultiplier;
             let newX = this.x + dx * currentSpeed * 60 * dt;
             let newY = this.y + dy * currentSpeed * 60 * dt;
 
@@ -308,6 +347,31 @@ class Player {
             ctx.restore();
         } else {
             this._drawFallback(ctx, screen.x, screen.y - jHeight);
+        }
+
+        // Overhead Stamina Bar (Visible when sprinting or recovering)
+        if (this.isSprinting || (this.stamina !== undefined && this.stamina < this.maxStamina)) {
+            const barW = 48;
+            const barH = 5;
+            const barX = screen.x - barW / 2;
+            const barY = screen.y - jHeight - drawSize / 2 - 20;
+            const fillPct = Math.max(0, Math.min(1, this.stamina / this.maxStamina));
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(10, 15, 25, 0.85)';
+            ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+
+            let barColor = '#00ffcc';
+            if (fillPct < 0.25) barColor = '#ff3344';
+            else if (fillPct < 0.55) barColor = '#ffcc00';
+
+            ctx.fillStyle = barColor;
+            ctx.fillRect(barX, barY, barW * fillPct, barH);
+
+            ctx.strokeStyle = this.isSprinting ? '#00ffff' : '#00aa88';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
+            ctx.restore();
         }
 
         ctx.fillStyle = '#00ff88';

@@ -683,7 +683,6 @@ class HUD {
         }
         ctx.restore();
     }
-    }
 
     renderGameOver(ctx, canvasWidth, canvasHeight) {
         // Darken screen

@@ -66,6 +66,7 @@ class WorldBuilder {
         this.buildingPlopperMode = 'special';
         this.selectedSpecialBuilding = SPECIAL_BUILDINGS[0];
         this.specialBldgCategoryFilter = 'all';
+        this.doorDirection = 'south'; // 'south', 'north', 'west', 'east'
 
         this.selectedTileType = 0;
         this.brushSize = 1;
@@ -231,7 +232,7 @@ class WorldBuilder {
                                 <button class="btn bldg-cat-filter" data-cat="biomes" style="font-size:5.5px; padding:4px 6px;">🏜️ Biomes</button>
                             </div>
 
-                            <div id="special-buildings-list" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; max-height:280px; overflow-y:auto; background:#162032; padding:8px; border-radius:8px; margin-bottom:10px;">
+                            <div id="special-buildings-list" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; max-height:240px; overflow-y:auto; background:#162032; padding:8px; border-radius:8px; margin-bottom:10px;">
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
@@ -273,6 +274,23 @@ class WorldBuilder {
                                 <button class="btn palette-btn" data-base="#5b5b73" data-roof="#6d6d85" data-dark="#4d4d62" style="background:#5b5b73; height:20px; border:2px solid #6d6d85;"></button>
                                 <button class="btn palette-btn" data-base="#6b735b" data-roof="#7d856d" data-dark="#5a624d" style="background:#6b735b; height:20px; border:2px solid #7d856d;"></button>
                                 <button class="btn palette-btn" data-base="#735b6b" data-roof="#856d7d" data-dark="#624d5a" style="background:#735b6b; height:20px; border:2px solid #856d7d;"></button>
+                            </div>
+                        </div>
+
+                        <!-- Door Placement / Direction Selector -->
+                        <div style="margin-top:10px; margin-bottom:10px; background:#162032; padding:8px; border-radius:8px; border:1px solid #2a3b5c;">
+                            <div style="font-size:7.5px; color:#ffcc00; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>🚪 Door Location:</span>
+                                <span id="current-door-dir-text" style="color:#00ffcc; font-size:6.5px;">South (Bottom)</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; margin-bottom:6px;">
+                                <button class="btn door-dir-btn active" data-dir="south" style="font-size:6px; padding:6px 2px;">⬇️ South</button>
+                                <button class="btn door-dir-btn" data-dir="north" style="font-size:6px; padding:6px 2px;">⬆️ North</button>
+                                <button class="btn door-dir-btn" data-dir="west" style="font-size:6px; padding:6px 2px;">⬅️ West</button>
+                                <button class="btn door-dir-btn" data-dir="east" style="font-size:6px; padding:6px 2px;">➡️ East</button>
+                            </div>
+                            <div style="font-size:5.8px; color:#88a0c0; line-height:1.3;">
+                                💡 Choose entrance side, or click on any perimeter tile of a placed building to move its door!
                             </div>
                         </div>
                     </div>
@@ -774,6 +792,24 @@ class WorldBuilder {
             modal.querySelector('#subpanel-bldg-custom').style.display = 'block';
             modal.querySelector('#subpanel-bldg-special').style.display = 'none';
             this.buildingPlopperMode = 'custom';
+        });
+
+        // Door Direction Buttons
+        modal.querySelectorAll('.door-dir-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelectorAll('.door-dir-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.doorDirection = btn.dataset.dir;
+
+                const dirTextMap = {
+                    'south': 'South (Bottom)',
+                    'north': 'North (Top)',
+                    'west': 'West (Left)',
+                    'east': 'East (Right)'
+                };
+                const label = modal.querySelector('#current-door-dir-text');
+                if (label) label.innerText = dirTextMap[this.doorDirection] || 'South (Bottom)';
+            });
         });
 
         // Specialized Buildings Category Filters
@@ -1303,6 +1339,39 @@ class WorldBuilder {
         } else if (this.currentTool === 'trash_field') {
             this.applyTrashFieldAt(tx, ty);
         } else if (this.currentTool === 'building') {
+            // Check if clicking on an already placed building to move its door!
+            const clickedBldgId = (tx < this.mapW && ty < this.mapH) ? this.mapData.buildingMeta[ty][tx] : -1;
+            if (clickedBldgId >= 0 && this.mapData.buildings && this.mapData.buildings[clickedBldgId]) {
+                const bldg = this.mapData.buildings[clickedBldgId];
+                if (bldg && bldg.tiles && bldg.tiles.length > 0) {
+                    const isPart = bldg.tiles.some(t => t.x === tx && t.y === ty);
+                    if (isPart) {
+                        const minX = Math.min(...bldg.tiles.map(t => t.x));
+                        const maxX = Math.max(...bldg.tiles.map(t => t.x));
+                        const minY = Math.min(...bldg.tiles.map(t => t.y));
+                        const maxY = Math.max(...bldg.tiles.map(t => t.y));
+                        const isPerimeter = (tx === minX || tx === maxX || ty === minY || ty === maxY);
+
+                        if (isPerimeter) {
+                            // Reset previous door tiles back to normal building wall tile
+                            if (bldg.doorTiles) {
+                                for (const dt of bldg.doorTiles) {
+                                    if (dt.x < this.mapW && dt.y < this.mapH) {
+                                        this.mapData.tiles[dt.y][dt.x] = 3;
+                                    }
+                                }
+                            }
+                            this.mapData.tiles[ty][tx] = 4; // TileType.BUILDING_DOOR
+                            bldg.doorTiles = [{ x: tx, y: ty }];
+                            this.render();
+                            this.saveDraft(true);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Normal new building placement
             const isSpecial = (this.buildingPlopperMode === 'special' && this.selectedSpecialBuilding);
             const bw = isSpecial ? this.selectedSpecialBuilding.w : this.buildingSize.w;
             const bh = isSpecial ? this.selectedSpecialBuilding.h : this.buildingSize.h;
@@ -1329,8 +1398,21 @@ class WorldBuilder {
                 }
             }
 
-            const doorTile = { x: tx + Math.floor(bw / 2), y: ty + bh - 1 };
-            this.mapData.tiles[doorTile.y][doorTile.x] = 4;
+            // Calculate door tile based on chosen doorDirection ('south', 'north', 'west', 'east')
+            let doorTile;
+            if (this.doorDirection === 'north') {
+                doorTile = { x: tx + Math.floor(bw / 2), y: ty };
+            } else if (this.doorDirection === 'west') {
+                doorTile = { x: tx, y: ty + Math.floor(bh / 2) };
+            } else if (this.doorDirection === 'east') {
+                doorTile = { x: tx + bw - 1, y: ty + Math.floor(bh / 2) };
+            } else { // 'south' (default)
+                doorTile = { x: tx + Math.floor(bw / 2), y: ty + bh - 1 };
+            }
+
+            if (doorTile.x < this.mapW && doorTile.y < this.mapH) {
+                this.mapData.tiles[doorTile.y][doorTile.x] = 4;
+            }
 
             this.mapData.buildings.push({
                 id: bldgId,
@@ -1496,6 +1578,18 @@ class WorldBuilder {
                 ctx.fillStyle = color;
                 ctx.fillRect(sx, sy, ts, ts);
 
+                // Distinct Door graphics
+                if (tile === 4) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillRect(sx + 2, sy + 2, ts - 4, ts - 4);
+                    ctx.fillStyle = '#5c3a21';
+                    ctx.fillRect(sx + 4, sy + 4, ts - 8, ts - 8);
+                    ctx.font = `${Math.max(6, 9 * z)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🚪', sx + ts / 2, sy + ts / 2);
+                }
+
                 if (tile === 11 || (tile === 0 && this.mapData.restricted_mode === 'pirate')) {
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
                     ctx.fillRect(sx + 2, sy + 6, ts - 4, 1.5);
@@ -1641,21 +1735,48 @@ class WorldBuilder {
         ctx.save();
         if (this.currentTool === 'building') {
             const isSpecial = (this.buildingPlopperMode === 'special' && this.selectedSpecialBuilding);
-            const bw = (isSpecial ? this.selectedSpecialBuilding.w : this.buildingSize.w) * ts;
-            const bh = (isSpecial ? this.selectedSpecialBuilding.h : this.buildingSize.h) * ts;
+            const bw = isSpecial ? this.selectedSpecialBuilding.w : this.buildingSize.w;
+            const bh = isSpecial ? this.selectedSpecialBuilding.h : this.buildingSize.h;
+            const bwp = bw * ts;
+            const bhp = bh * ts;
 
             ctx.fillStyle = isSpecial ? 'rgba(255, 170, 0, 0.35)' : 'rgba(0, 255, 204, 0.3)';
             ctx.strokeStyle = isSpecial ? '#ffaa00' : '#00ffcc';
             ctx.lineWidth = 2;
-            ctx.fillRect(sx, sy, bw, bh);
-            ctx.strokeRect(sx, sy, bw, bh);
+            ctx.fillRect(sx, sy, bwp, bhp);
+            ctx.strokeRect(sx, sy, bwp, bhp);
 
-            const doorW = ts;
-            const doorH = Math.max(4, 6 * z);
-            const doorX = sx + bw / 2 - doorW / 2;
-            const doorY = sy + bh - doorH;
-            ctx.fillStyle = '#ffff00';
-            ctx.fillRect(doorX, doorY, doorW, doorH);
+            // Calculate door tile coordinates
+            let doorRelX = 0, doorRelY = 0;
+            if (this.doorDirection === 'north') {
+                doorRelX = Math.floor(bw / 2);
+                doorRelY = 0;
+            } else if (this.doorDirection === 'west') {
+                doorRelX = 0;
+                doorRelY = Math.floor(bh / 2);
+            } else if (this.doorDirection === 'east') {
+                doorRelX = bw - 1;
+                doorRelY = Math.floor(bh / 2);
+            } else { // 'south'
+                doorRelX = Math.floor(bw / 2);
+                doorRelY = bh - 1;
+            }
+
+            const doorSX = sx + doorRelX * ts;
+            const doorSY = sy + doorRelY * ts;
+
+            // Highlight door tile in bright glowing yellow
+            ctx.fillStyle = 'rgba(255, 230, 0, 0.7)';
+            ctx.fillRect(doorSX, doorSY, ts, ts);
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(doorSX, doorSY, ts, ts);
+
+            // Draw door icon
+            ctx.font = `${Math.max(8, 12 * z)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🚪', doorSX + ts / 2, doorSY + ts / 2);
         } else if (this.currentTool === 'trash_field') {
             const R = this.trashFieldRadius || 3;
             const centerPX = sx + ts / 2;

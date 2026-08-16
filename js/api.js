@@ -683,10 +683,8 @@ function initUI() {
                 if (!window.game.engine3D && window.Engine3D) {
                     const canvas3d = document.getElementById('gameCanvas3d') || window.game.canvas;
                     window.game.engine3D = new Engine3D(canvas3d, window.game);
-                    let theme = 'filthadelphia';
-                    if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
-                    else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
-                    else if (window.pirateMode) theme = 'pirate';
+                    const dest = (window.travelDestination || '').toLowerCase();
+                    let theme = (window.game.gameMap && window.game.gameMap.theme) || (dest === 'dahgbad' ? 'dahgbad' : (dest === 'cucaracha' ? 'cucaracha' : (window.pirateMode ? 'pirate' : 'filthadelphia')));
                     if (window.game.gameMap) {
                         window.game.engine3D.buildMapForGame(window.game.gameMap, theme);
                     }
@@ -1004,6 +1002,11 @@ function initUI() {
                     // returns a DahgbadMap, CucarachaMap, or default Philly map.
                     if (window.game) {
                         window.game.gameMap = new GameMap();
+                        const destLower = (window.travelDestination || destination || '').toLowerCase();
+                        const theme = (window.game.gameMap.theme || (destLower === 'dahgbad' ? 'dahgbad' : (destLower === 'cucaracha' ? 'cucaracha' : (window.pirateMode ? 'pirate' : 'filthadelphia'))));
+                        if (window.game.engine3D) {
+                            window.game.engine3D.buildMapForGame(window.game.gameMap, theme);
+                        }
                         if (window.game.miniMap) {
                             window.game.miniMap.buildStatic(window.game.gameMap);
                         }
@@ -1122,6 +1125,9 @@ function initUI() {
                     window.travelDestination = null;
                     if (window.game) {
                         window.game.gameMap = new GameMap();
+                        if (window.game.engine3D) {
+                            window.game.engine3D.buildMapForGame(window.game.gameMap, 'filthadelphia');
+                        }
                         if (window.game.miniMap) {
                             window.game.miniMap.buildStatic(window.game.gameMap);
                         }

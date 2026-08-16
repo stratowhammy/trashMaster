@@ -3531,10 +3531,8 @@ class Game {
             }
             if (this.engine3D) {
                 this.engine3D.enabled = false; // Always start every round in 2D Retro Mode
-                let theme = 'filthadelphia';
-                if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
-                else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
-                else if (window.pirateMode) theme = 'pirate';
+                const dest = (window.travelDestination || '').toLowerCase();
+                let theme = (this.gameMap && this.gameMap.theme) || (dest === 'dahgbad' ? 'dahgbad' : (dest === 'cucaracha' ? 'cucaracha' : (window.pirateMode ? 'pirate' : 'filthadelphia')));
                 this.engine3D.buildMapForGame(this.gameMap, theme);
             }
         }
@@ -3979,10 +3977,8 @@ class Game {
         this.player = null;
         this.state = GameState.CHARACTER_SELECT;
         if (this.engine3D) {
-            let theme = 'filthadelphia';
-            if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
-            else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
-            else if (window.pirateMode) theme = 'pirate';
+            const dest = (window.travelDestination || '').toLowerCase();
+            let theme = (this.gameMap && this.gameMap.theme) || (dest === 'dahgbad' ? 'dahgbad' : (dest === 'cucaracha' ? 'cucaracha' : (window.pirateMode ? 'pirate' : 'filthadelphia')));
             this.engine3D.buildMapForGame(this.gameMap, theme);
         }
     }

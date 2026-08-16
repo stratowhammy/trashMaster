@@ -443,6 +443,248 @@ class MapBuilder3D {
             ctx.fillRect(w - 14, h / 2 - 2, 4, 6);
         });
 
+        // ============================================================
+        // 🏜️ SWATCH 4: DAHGBAD BIOME TEXTURES (DESERT ARID PALETTE)
+        // ============================================================
+
+        // 29. Dahgbad Sand Dunes (Floor)
+        this.textures.dahgbad_sand = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#d9a05b';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#b87e38';
+            for (let y = 6; y < h; y += 12) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.quadraticCurveTo(w / 3, y - 4, (2 * w) / 3, y + 4);
+                ctx.quadraticCurveTo((5 * w) / 6, y - 2, w, y);
+                ctx.lineTo(w, y + 2);
+                ctx.lineTo(0, y + 2);
+                ctx.fill();
+            }
+            for (let i = 0; i < 180; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(254, 240, 138, 0.4)' : 'rgba(160, 95, 30, 0.25)';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 2);
+            }
+        });
+
+        // 30. Dahgbad Cracked Road
+        this.textures.dahgbad_road = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#8c7058';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#543d2b';
+            ctx.lineWidth = 2;
+            const cracks = [
+                [[4, 0], [16, 20], [32, 28], [56, 36], [64, 48]],
+                [[0, 40], [24, 44], [36, 60], [40, 64]],
+                [[48, 0], [42, 18], [54, 24]]
+            ];
+            cracks.forEach(pts => {
+                ctx.beginPath();
+                ctx.moveTo(pts[0][0], pts[0][1]);
+                for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+                ctx.stroke();
+            });
+            for (let i = 0; i < 120; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#b09070' : '#684d38';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 1);
+            }
+        });
+
+        // 31. Dahgbad Sidewalk (Terracotta Tile Mosaics)
+        this.textures.dahgbad_sidewalk = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#c4885c';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#7a4c28';
+            ctx.strokeRect(1, 1, w - 2, h - 2);
+            ctx.fillRect(w / 2, 0, 2, h);
+            ctx.fillRect(0, h / 2, w, 2);
+            // Diamond center inlay
+            ctx.fillStyle = '#d4af37';
+            const cx = w / 2, cy = h / 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 8); ctx.lineTo(cx + 8, cy); ctx.lineTo(cx, cy + 8); ctx.lineTo(cx - 8, cy);
+            ctx.closePath();
+            ctx.fill();
+        });
+
+        // 32. Dahgbad Sandstone Block (Building)
+        this.textures.dahgbad_sandstone = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#c29b62';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#8c6734';
+            this._drawBrickMortar(ctx, w, h, 6, 3);
+            for (let i = 0; i < 140; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(235, 205, 155, 0.3)' : 'rgba(110, 80, 40, 0.25)';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 2);
+            }
+        });
+
+        // 33. Dahgbad Red Adobe (Building)
+        this.textures.dahgbad_adobe = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#a6603a';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#5c2c14';
+            // Round timber beam ends (vigas)
+            for (let x = 10; x < w; x += 18) {
+                ctx.beginPath();
+                ctx.arc(x, 14, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            // Arched window
+            ctx.fillStyle = '#2b140a';
+            ctx.fillRect(16, 34, 14, 20);
+            ctx.beginPath(); ctx.arc(23, 34, 7, Math.PI, 0); ctx.fill();
+            ctx.fillRect(36, 34, 14, 20);
+            ctx.beginPath(); ctx.arc(43, 34, 7, Math.PI, 0); ctx.fill();
+        });
+
+        // 34. Dahgbad Gold Mosaic (Building)
+        this.textures.dahgbad_gold_mosaic = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#b8860b';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#ffd700';
+            for (let y = 0; y < h; y += 16) {
+                for (let x = 0; x < w; x += 16) {
+                    ctx.fillRect(x + 2, y + 2, 12, 12);
+                    ctx.fillStyle = '#4a2f1b';
+                    ctx.fillRect(x + 6, y + 6, 4, 4);
+                    ctx.fillStyle = '#ffd700';
+                }
+            }
+        });
+
+        // 35. Dahgbad White Plaster (Building)
+        this.textures.dahgbad_white_plaster = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#eae4d8';
+            ctx.fillRect(0, 0, w, h);
+            // Vibrant Turquoise Tile Trim
+            ctx.fillStyle = '#0d9488';
+            ctx.fillRect(0, 0, w, 6);
+            ctx.fillRect(0, h - 6, w, 6);
+            // Ornate windows
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(14, 20, 14, 26);
+            ctx.fillRect(36, 20, 14, 26);
+        });
+
+        // ============================================================
+        // 🌴 SWATCH 5: CUCARACHA BIOME TEXTURES (JUNGLE RAINFOREST)
+        // ============================================================
+
+        // 36. Cucaracha Jungle Floor (Floor)
+        this.textures.cucaracha_jungle_floor = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#194219';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#0f2b0f';
+            for (let i = 0; i < 240; i++) {
+                const rx = Math.floor(Math.random() * w);
+                const ry = Math.floor(Math.random() * h);
+                ctx.fillStyle = Math.random() > 0.4 ? '#16a34a' : (Math.random() > 0.5 ? '#22c55e' : '#0d330d');
+                ctx.fillRect(rx, ry, 3, 3);
+            }
+            // Tropical fern sprig
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(8, 56); ctx.lineTo(44, 12);
+            ctx.moveTo(18, 44); ctx.lineTo(10, 34);
+            ctx.moveTo(28, 32); ctx.lineTo(18, 22);
+            ctx.stroke();
+        });
+
+        // 37. Cucaracha Overgrown Mud Path (Road)
+        this.textures.cucaracha_road = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#3c453c';
+            ctx.fillRect(0, 0, w, h);
+            // Moss in cracks
+            ctx.fillStyle = '#1e4a1e';
+            for (let y = 0; y < h; y += 16) {
+                ctx.fillRect(0, y, w, 3);
+            }
+            for (let x = 0; x < w; x += 20) {
+                ctx.fillRect(x, 0, 3, h);
+            }
+            ctx.fillStyle = '#2d6a2d';
+            ctx.fillRect(10, 18, 14, 4);
+            ctx.fillRect(36, 42, 16, 4);
+        });
+
+        // 38. Cucaracha River Stone Sidewalk
+        this.textures.cucaracha_sidewalk = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#4a5746';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#2d382b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(16, 16, 11, 0, Math.PI * 2);
+            ctx.arc(48, 16, 11, 0, Math.PI * 2);
+            ctx.arc(16, 48, 11, 0, Math.PI * 2);
+            ctx.arc(48, 48, 11, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = '#166534';
+            ctx.fillRect(28, 28, 8, 8);
+        });
+
+        // 39. Cucaracha Mossy Stone (Building)
+        this.textures.cucaracha_mossy_stone = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#2b3b2b';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#141f14';
+            this._drawBrickMortar(ctx, w, h, 6, 3);
+            // Creeping vines & ivy
+            ctx.fillStyle = '#16a34a';
+            ctx.fillRect(6, 0, 4, 28);
+            ctx.fillRect(24, 0, 6, 42);
+            ctx.fillRect(46, 0, 4, 18);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(8, 10, 2, 12);
+            ctx.fillRect(26, 16, 2, 20);
+        });
+
+        // 40. Cucaracha Overgrown Red Brick (Building)
+        this.textures.cucaracha_overgrown_brick = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#8c4f35';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#5c301d';
+            this._drawBrickMortar(ctx, w, h, 8, 4);
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(0, h - 22, w, 22);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(4, h - 28, 8, 12);
+            ctx.fillRect(28, h - 34, 12, 16);
+            ctx.fillRect(48, h - 26, 10, 10);
+        });
+
+        // 41. Cucaracha Bamboo / Timber Slats (Building)
+        this.textures.cucaracha_bamboo_hut = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#826f4f';
+            ctx.fillRect(0, 0, w, h);
+            for (let x = 0; x < w; x += 8) {
+                ctx.fillStyle = x % 16 === 0 ? '#9a8560' : '#6b583a';
+                ctx.fillRect(x + 1, 0, 6, h);
+                ctx.fillStyle = '#3f321e';
+                ctx.fillRect(x + 7, 0, 1, h);
+                // Bamboo notches
+                ctx.fillRect(x + 1, 16, 6, 2);
+                ctx.fillRect(x + 1, 44, 6, 2);
+            }
+        });
+
+        // 42. Cucaracha Weathered Plaster (Building)
+        this.textures.cucaracha_weathered_plaster = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#4a5f4a';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#2d3f2d';
+            ctx.strokeRect(1, 1, w - 2, h - 2);
+            for (let i = 0; i < 200; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(20, 45, 20, 0.35)' : 'rgba(90, 130, 90, 0.2)';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 3);
+            }
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(8, 0, 8, 22);
+            ctx.fillRect(36, 0, 12, 34);
+        });
+
         // Compile Mesh Materials
         this.materials = {};
         for (const [key, tex] of Object.entries(this.textures)) {
@@ -472,6 +714,9 @@ class MapBuilder3D {
     }
 
     buildMap(gameMap, theme = 'filthadelphia') {
+        // Normalize theme string
+        theme = ((gameMap && gameMap.theme) || theme || 'filthadelphia').toLowerCase();
+
         // Clear previous meshes
         while (this.mapMeshGroup.children.length > 0) {
             const obj = this.mapMeshGroup.children[0];
@@ -486,7 +731,7 @@ class MapBuilder3D {
         const S = this.TILE_SIZE_3D;
         const wallH = this.WALL_HEIGHT;
 
-        // Building Materials Palette
+        // Building Materials Palette (Default / Filthadelphia)
         const buildingMaterials = [
             this.materials.brick_terra_cotta,
             this.materials.brick_sienna,
@@ -506,6 +751,20 @@ class MapBuilder3D {
             this.materials.facade_green_wall
         ];
 
+        const dahgbadPalette = [
+            this.materials.dahgbad_sandstone,
+            this.materials.dahgbad_adobe,
+            this.materials.dahgbad_gold_mosaic,
+            this.materials.dahgbad_white_plaster
+        ];
+
+        const cucarachaPalette = [
+            this.materials.cucaracha_mossy_stone,
+            this.materials.cucaracha_overgrown_brick,
+            this.materials.cucaracha_bamboo_hut,
+            this.materials.cucaracha_weathered_plaster
+        ];
+
         // Coordinate collection maps for InstancedMesh Batching
         const floorBuckets = new Map();
         const wallBuckets = new Map();
@@ -519,6 +778,27 @@ class MapBuilder3D {
                 if (tileType === (window.TileType ? TileType.SIDEWALK : 1)) return 'beach_sand';
                 return 'ocean_water';
             }
+
+            if (theme === 'dahgbad') {
+                if (tileType === (window.TileType ? TileType.GRASS : 2) || tileType === (window.TileType ? TileType.PARK_PATH : 6)) {
+                    return 'dahgbad_sand';
+                }
+                if (tileType === (window.TileType ? TileType.SIDEWALK : 1)) {
+                    return 'dahgbad_sidewalk';
+                }
+                return 'dahgbad_road';
+            }
+
+            if (theme === 'cucaracha') {
+                if (tileType === (window.TileType ? TileType.GRASS : 2) || tileType === (window.TileType ? TileType.PARK_PATH : 6)) {
+                    return 'cucaracha_jungle_floor';
+                }
+                if (tileType === (window.TileType ? TileType.SIDEWALK : 1)) {
+                    return 'cucaracha_sidewalk';
+                }
+                return 'cucaracha_road';
+            }
+
             if (tileType === (window.TileType ? TileType.PARK_PATH : 6)) {
                 return 'park_path';
             }
@@ -565,6 +845,14 @@ class MapBuilder3D {
             } else {
                 bldgId = Math.floor(x / 10) * 13 + Math.floor(y / 10);
             }
+
+            if (theme === 'dahgbad') {
+                return dahgbadPalette[Math.abs(bldgId) % dahgbadPalette.length];
+            }
+            if (theme === 'cucaracha') {
+                return cucarachaPalette[Math.abs(bldgId) % cucarachaPalette.length];
+            }
+
             const wallIdx = Math.abs(bldgId) % buildingMaterials.length;
             return buildingMaterials[wallIdx];
         };
@@ -716,6 +1004,7 @@ class MapBuilder3D {
     }
 
     _createSkyDome(theme) {
+        theme = (theme || 'filthadelphia').toLowerCase();
         let skyHex = 0x1e3a8a; // Bright 16-bit city daylight/dusk
         if (theme === 'dahgbad') skyHex = 0x9a3412; // Desert sunset
         else if (theme === 'cucaracha') skyHex = 0x581c87; // Purple twilight
@@ -725,8 +1014,8 @@ class MapBuilder3D {
             this.scene.background = new THREE.Color(skyHex);
             if (this.scene.fog) {
                 this.scene.fog.color.setHex(skyHex);
-                this.scene.fog.near = 120;
-                this.scene.fog.far = 420;
+                this.scene.fog.near = (theme === 'dahgbad' || theme === 'cucaracha') ? 100 : 120;
+                this.scene.fog.far = (theme === 'dahgbad' || theme === 'cucaracha') ? 380 : 420;
             }
         }
 

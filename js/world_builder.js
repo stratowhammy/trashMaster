@@ -281,7 +281,7 @@ class WorldBuilder {
                         <div style="margin-top:10px; margin-bottom:10px; background:#162032; padding:8px; border-radius:8px; border:1px solid #2a3b5c;">
                             <div style="font-size:7.5px; color:#ffcc00; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
                                 <span>🚪 Door Location:</span>
-                                <span id="current-door-dir-text" style="color:#00ffcc; font-size:6.5px;">South (Bottom)</span>
+                                <button id="btn-rotate-door" class="btn secondary" style="font-size:5.5px; padding:3px 6px; background:#1f3554; border-color:#00ffcc; color:#00ffcc;">🔄 Rotate (R)</button>
                             </div>
                             <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; margin-bottom:6px;">
                                 <button class="btn door-dir-btn active" data-dir="south" style="font-size:6px; padding:6px 2px;">⬇️ South</button>
@@ -290,7 +290,7 @@ class WorldBuilder {
                                 <button class="btn door-dir-btn" data-dir="east" style="font-size:6px; padding:6px 2px;">➡️ East</button>
                             </div>
                             <div style="font-size:5.8px; color:#88a0c0; line-height:1.3;">
-                                💡 Choose entrance side, or click on any perimeter tile of a placed building to move its door!
+                                💡 Current: <strong id="current-door-dir-text" style="color:#00ffcc;">South (Bottom)</strong>. Press <strong>'R'</strong> or click above to rotate door! Or click any placed building perimeter tile.
                             </div>
                         </div>
                     </div>
@@ -809,8 +809,15 @@ class WorldBuilder {
                 };
                 const label = modal.querySelector('#current-door-dir-text');
                 if (label) label.innerText = dirTextMap[this.doorDirection] || 'South (Bottom)';
+                this.render();
             });
         });
+
+        // Rotate Door Button
+        const rotBtn = modal.querySelector('#btn-rotate-door');
+        if (rotBtn) {
+            rotBtn.addEventListener('click', () => this.rotateDoor());
+        }
 
         // Specialized Buildings Category Filters
         modal.querySelectorAll('.bldg-cat-filter').forEach(btn => {
@@ -969,9 +976,15 @@ class WorldBuilder {
 
         window.addEventListener('keydown', (e) => {
             const overlay = document.getElementById('world-builder-overlay');
-            if (overlay && overlay.style.display !== 'none' && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            if (!overlay || overlay.style.display === 'none') return;
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
                 this.undo();
+            } else if (e.key.toLowerCase() === 'r') {
+                e.preventDefault();
+                this.rotateDoor();
             }
         });
 
@@ -995,6 +1008,35 @@ class WorldBuilder {
                 this.saveDraft(true);
             }
         });
+    }
+
+    rotateDoor() {
+        const order = ['south', 'west', 'north', 'east'];
+        const currentIdx = order.indexOf(this.doorDirection);
+        const nextIdx = (currentIdx + 1) % order.length;
+        this.doorDirection = order[nextIdx];
+
+        const dirTextMap = {
+            'south': 'South (Bottom)',
+            'north': 'North (Top)',
+            'west': 'West (Left)',
+            'east': 'East (Right)'
+        };
+
+        const modal = this.container;
+        if (modal) {
+            modal.querySelectorAll('.door-dir-btn').forEach(btn => {
+                if (btn.dataset.dir === this.doorDirection) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            const label = modal.querySelector('#current-door-dir-text');
+            if (label) label.innerText = dirTextMap[this.doorDirection] || 'South (Bottom)';
+        }
+
+        this.render();
     }
 
     // ── Undo History Methods (Max 20 steps) ──

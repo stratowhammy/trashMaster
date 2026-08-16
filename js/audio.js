@@ -470,6 +470,94 @@ class SoundManager {
         osc.stop(now + 0.1);
     }
 
+    // ── Medication Sound Effects ──
+    playPillReminderSFX() {
+        if (this.isMuted) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // Dual electronic pill alert beeps
+        [0, 0.16].forEach((offset) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, now + offset);
+            osc.frequency.exponentialRampToValueAtTime(1760, now + offset + 0.08);
+
+            gain.gain.setValueAtTime(0.25, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.12);
+        });
+    }
+
+    playPillSwallowSFX() {
+        if (this.isMuted) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // Ascending health sparkle chime
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+
+            gain.gain.setValueAtTime(0.28, now + idx * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now + idx * 0.06);
+            osc.stop(now + idx * 0.06 + 0.25);
+        });
+    }
+
+    playPsychosisSFX() {
+        if (this.isMuted) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // Heavy dissonant glitch drop
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(320, now);
+        osc1.frequency.exponentialRampToValueAtTime(45, now + 0.8);
+
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(312, now);
+        osc2.frequency.exponentialRampToValueAtTime(40, now + 0.8);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1400, now);
+        filter.frequency.exponentialRampToValueAtTime(120, now + 0.8);
+        filter.Q.setValueAtTime(8.0, now);
+
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.85);
+        osc2.stop(now + 0.85);
+    }
+
     playTone(freq, type = 'sine', duration = 0.2, startTime = 0, gainLevel = 0.15) {
         if (!this.ctx || this.isMuted || typeof freq !== 'number' || !isFinite(freq) || freq <= 0) return;
 

@@ -95,6 +95,15 @@ class Engine3D {
                         return;
                     }
                 }
+
+                // Check Medication Alert click
+                if (this.game.medicationAlertActive && this.game.hud && this.game.hud.medicationBtnBounds) {
+                    const mb = this.game.hud.medicationBtnBounds;
+                    if (clickX >= mb.x && clickX <= mb.x + mb.width && clickY >= mb.y && clickY <= mb.y + mb.height) {
+                        this.game.takeMedication();
+                        return;
+                    }
+                }
                 
                 if (!document.pointerLockElement && typeof targetElem.requestPointerLock === 'function') {
                     try {
@@ -517,6 +526,10 @@ class Engine3D {
             ctx.font = '6px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
             ctx.fillText(`📍 GO: ${navTarget}`, msgBtnX + msgBtnW / 2, badgeY + 13);
+        }
+
+        if (this.game && this.game.hud && typeof this.game.hud.renderMedicationAlert === 'function') {
+            this.game.hud.renderMedicationAlert(ctx, w, h);
         }
 
         ctx.restore();

@@ -55,6 +55,7 @@ const DEFAULT_KEYBINDS = {
     useFertilizer: 'f',
     useBottomlessPit: 'B',
     eatShroom: 'M',
+    takeMeds: 'x',
 
     // Audio Controls
     toggleMusic: 'm',
@@ -73,7 +74,8 @@ const ACTION_CONFIG = [
             { id: 'sprint', label: 'Sprint (Hold Shift to Run Fast)' },
             { id: 'pickupTrash', label: 'Pick Up Trash' },
             { id: 'interact', label: 'Interact / Enter Building / Deliver' },
-            { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' }
+            { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' },
+            { id: 'takeMeds', label: 'Take Medication 💊' }
         ]
     },
     {

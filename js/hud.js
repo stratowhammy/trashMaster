@@ -19,6 +19,7 @@ class HUD {
         this.followerNotification = '';
         this.followerNotificationTimer = 0;
         this.roundMessages = [];
+        this.medicationBtnBounds = null;
     }
 
     reset() {
@@ -38,6 +39,7 @@ class HUD {
         this.isHighScore = false;
         this.leaderboard = [];
         this.roundMessages = [];
+        this.medicationBtnBounds = null;
     }
 
     updateScore(newScore) {
@@ -1061,6 +1063,86 @@ class HUD {
         ctx.fillText(modeLabel, currX + 8, panelY + 50);
 
         ctx.restore();
+
+        // Render Medication Alert Banner / Status
+        this.renderMedicationAlert(ctx, canvasWidth, canvasHeight);
+    }
+
+    renderMedicationAlert(ctx, w, h) {
+        if (!window.game) return;
+
+        if (window.game.medicationAlertActive) {
+            ctx.save();
+            const pulse = Math.abs(Math.sin(Date.now() / 160));
+            const bannerW = Math.min(420, w - 40);
+            const bannerH = 54;
+            const bannerX = (w - bannerW) / 2;
+            const bannerY = 22;
+
+            this.medicationBtnBounds = { x: bannerX, y: bannerY, width: bannerW, height: bannerH };
+
+            // Glowing Card Background
+            ctx.fillStyle = 'rgba(15, 5, 25, 0.94)';
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 8);
+            else ctx.rect(bannerX, bannerY, bannerW, bannerH);
+            ctx.fill();
+
+            // Pulsing Neon Cyan/Magenta Border
+            ctx.strokeStyle = pulse > 0.5 ? '#ff0055' : '#00ffcc';
+            ctx.lineWidth = 3;
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 8);
+            else ctx.rect(bannerX, bannerY, bannerW, bannerH);
+            ctx.stroke();
+
+            // Header Banner Text
+            ctx.fillStyle = '#ff0055';
+            ctx.font = 'bold 9px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('💊 TAKE YOUR MEDS! [PRESS X / M] 💊', bannerX + bannerW / 2, bannerY + 18);
+
+            // Countdown timer & progress bar
+            const timerLeft = Math.max(0, window.game.medicationAlertTimer || 0);
+            const maxTime = window.game.medicationAlertMaxDuration || 12;
+            const progress = timerLeft / maxTime;
+
+            const barW = bannerW - 32;
+            const barH = 6;
+            const barX = bannerX + 16;
+            const barY = bannerY + 26;
+
+            ctx.fillStyle = '#1e1b4b';
+            ctx.fillRect(barX, barY, barW, barH);
+            ctx.fillStyle = (timerLeft < 4) ? '#ef4444' : '#00ffcc';
+            ctx.fillRect(barX, barY, barW * progress, barH);
+
+            ctx.fillStyle = '#fef08a';
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.fillText(`⏱️ ${Math.ceil(timerLeft)}s remaining — CLICK TO TAKE!`, bannerX + bannerW / 2, bannerY + 45);
+
+            ctx.restore();
+        } else if (window.game.medsMissed) {
+            this.medicationBtnBounds = null;
+            ctx.save();
+            const badgeW = 320;
+            const badgeH = 22;
+            const badgeX = (w - badgeW) / 2;
+            const badgeY = 16;
+
+            ctx.fillStyle = 'rgba(40, 0, 0, 0.9)';
+            ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+
+            ctx.fillStyle = '#f87171';
+            ctx.font = 'bold 6.5px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('😵‍💫 MISSED MEDS: INVERTED & 90° ROTATED', badgeX + badgeW / 2, badgeY + 15);
+            ctx.restore();
+        } else {
+            this.medicationBtnBounds = null;
+        }
     }
 }
 

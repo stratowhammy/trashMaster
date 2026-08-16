@@ -206,6 +206,14 @@ class Game {
         // Near-trash flag for HUD prompt
         this.playerNearTrash = false;
 
+        // Medication System Variables
+        this.medicationSchedule = [];
+        this.medicationAlertActive = false;
+        this.medicationAlertTimer = 0;
+        this.medicationAlertMaxDuration = 12.0;
+        this.medsMissed = false;
+        this.medsTakenCount = 0;
+
         // Debug info
         this.debugKeys = '';
         this.errorLog = [];
@@ -328,8 +336,16 @@ class Game {
                     this.interact();
                 }
 
-                // M or m key to open Messages & Navigation Waypoints Dialog
+                // X or x key (or takeMeds keybind) to take medications
+                if ((window.isKey && window.isKey(e, 'takeMeds')) || e.key === 'x' || e.key === 'X') {
+                    if (this.takeMedication()) return;
+                }
+
+                // M or m key to open Messages & Navigation Waypoints Dialog (or take meds if alert active)
                 if (e.key === 'm' || e.key === 'M') {
+                    if (this.medicationAlertActive) {
+                        if (this.takeMedication()) return;
+                    }
                     if (document.pointerLockElement) {
                         document.exitPointerLock();
                     }
@@ -736,6 +752,14 @@ class Game {
                 const b = this.hud.messagesBtnBounds;
                 if (clickX >= b.x && clickX <= b.x + b.width && clickY >= b.y && clickY <= b.y + b.height) {
                     this.openMessagesLogDialog();
+                    return;
+                }
+            }
+
+            if (this.state === GameState.PLAYING && this.medicationAlertActive && this.hud && this.hud.medicationBtnBounds) {
+                const mb = this.hud.medicationBtnBounds;
+                if (clickX >= mb.x && clickX <= mb.x + mb.width && clickY >= mb.y && clickY <= mb.y + mb.height) {
+                    this.takeMedication();
                     return;
                 }
             }
@@ -1310,6 +1334,34 @@ class Game {
         // 11. Generic Residence Door
         this.hud.showFollowerNotification(`🚪 Knocked on ${bldg.address || 'residence'}. Nobody is home!`, true);
         return true;
+    }
+
+    takeMedication() {
+        if (this.state !== GameState.PLAYING || this.isPaused) return false;
+        if (this.medicationAlertActive) {
+            this.medicationAlertActive = false;
+            this.medsTakenCount = (this.medsTakenCount || 0) + 1;
+            if (this.medicationSchedule) {
+                const activeEv = this.medicationSchedule.find(e => e.triggered && !e.completed);
+                if (activeEv) activeEv.completed = true;
+            }
+            if (window.soundManager && typeof window.soundManager.playPillSwallowSFX === 'function') {
+                window.soundManager.playPillSwallowSFX();
+            }
+            if (this.hud) {
+                this.hud.showFollowerNotification(`💊 Took Medication (${this.medsTakenCount}/3)! Mind is crystal clear! ✨`, true);
+                if (this.trashManager) {
+                    this.trashManager.totalPoints += 150;
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                }
+            }
+            return true;
+        } else {
+            if (this.hud) {
+                this.hud.showFollowerNotification('💊 Medication level is stable. No dose required yet!', true);
+            }
+            return false;
+        }
     }
 
     pickupTrash() {
@@ -2259,6 +2311,58 @@ class Game {
         }
         this.hud.evalTimer = 10 - this.followerCheckTimer;
         this.hud.trashInWindow = this.trashCollectedInWindow;
+
+        // ── Medication Schedule & Psychosis Effects ──
+        if (this.state === GameState.PLAYING && !this.isPaused && this.hud) {
+            const curTimeLeft = this.hud.timeRemaining;
+
+            // Check if any medication event should trigger
+            if (!this.medicationAlertActive && this.medicationSchedule) {
+                for (const event of this.medicationSchedule) {
+                    if (!event.triggered && curTimeLeft <= event.triggerTime) {
+                        event.triggered = true;
+                        this.medicationAlertActive = true;
+                        this.medicationAlertTimer = this.medicationAlertMaxDuration || 12.0;
+                        if (window.soundManager && typeof window.soundManager.playPillReminderSFX === 'function') {
+                            window.soundManager.playPillReminderSFX();
+                        }
+                        if (this.hud) {
+                            this.hud.showFollowerNotification('⚠️ TIME FOR MEDICATION! Press [X] or click pill to take meds! 💊', false);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Countdown active medication alert timer
+            if (this.medicationAlertActive) {
+                this.medicationAlertTimer -= dt;
+                if (this.medicationAlertTimer <= 0) {
+                    this.medicationAlertActive = false;
+                    this.medsMissed = true; // Missed meds! Psychosis effects active till end of round!
+                    if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+                        window.soundManager.playPsychosisSFX();
+                    }
+                    if (this.hud) {
+                        this.hud.showFollowerNotification('😵‍💫 MISSED MEDICATION! Color inverted & screen rotated 90°! 💊❌', false);
+                    }
+                }
+            }
+
+            // Apply or clear viewport visual distortion (100% invert & 90deg rotate)
+            const viewport = document.getElementById('game-viewport');
+            if (viewport) {
+                if (this.medsMissed) {
+                    viewport.style.filter = 'invert(100%)';
+                    viewport.style.transform = 'rotate(90deg) scale(0.85)';
+                    viewport.style.transformOrigin = 'center center';
+                } else {
+                    viewport.style.filter = '';
+                    viewport.style.transform = '';
+                    viewport.style.transformOrigin = '';
+                }
+            }
+        }
 
         if (this.hud.isTimeUp()) {
             this.state = GameState.UI_OVERLAY;
@@ -3514,6 +3618,31 @@ class Game {
         this.nightTimeTriggered = false;
         this.flashlightEquipped = false;
 
+        // ── Medication System Initialization (3 times per round) ──
+        this.medicationAlertActive = false;
+        this.medicationAlertTimer = 0;
+        this.medicationAlertMaxDuration = 12.0;
+        this.medsMissed = false;
+        this.medsTakenCount = 0;
+
+        const roundDur = (this.hud && this.hud.gameDuration) ? this.hud.gameDuration : 120;
+        const medTime1 = roundDur - (roundDur * (0.15 + Math.random() * 0.18)); // Event 1 (~85% to 67% time left)
+        const medTime2 = roundDur - (roundDur * (0.42 + Math.random() * 0.20)); // Event 2 (~58% to 38% time left)
+        const medTime3 = roundDur - (roundDur * (0.70 + Math.random() * 0.18)); // Event 3 (~30% to 12% time left)
+
+        this.medicationSchedule = [
+            { triggerTime: medTime1, triggered: false, completed: false },
+            { triggerTime: medTime2, triggered: false, completed: false },
+            { triggerTime: medTime3, triggered: false, completed: false }
+        ];
+
+        const vp = document.getElementById('game-viewport');
+        if (vp) {
+            vp.style.filter = '';
+            vp.style.transform = '';
+            vp.style.transformOrigin = '';
+        }
+
         // ── Character Class Initialization Rules ──
         const charClass = this.player ? this.player.characterClass : spriteId;
         this._applyCharacterClassInit(charClass);
@@ -3804,6 +3933,15 @@ class Game {
             }
         }
 
+        this.medsMissed = false;
+        this.medicationAlertActive = false;
+        const vp = document.getElementById('game-viewport');
+        if (vp) {
+            vp.style.filter = '';
+            vp.style.transform = '';
+            vp.style.transformOrigin = '';
+        }
+
         if (window.renderStore) window.renderStore();
         if (window.showScreen) window.showScreen('store-screen');
 
@@ -3972,6 +4110,15 @@ class Game {
     }
 
     _restartGame() {
+        this.medsMissed = false;
+        this.medicationAlertActive = false;
+        const vp = document.getElementById('game-viewport');
+        if (vp) {
+            vp.style.filter = '';
+            vp.style.transform = '';
+            vp.style.transformOrigin = '';
+        }
+
         this.gameMap = new GameMap();
         this.miniMap.buildStatic(this.gameMap);
         this.player = null;
@@ -4686,6 +4833,15 @@ class Game {
 
         this.state = GameState.UI_OVERLAY;
         if (this.player) this.player.keys = { up: false, down: false, left: false, right: false };
+
+        this.medsMissed = false;
+        this.medicationAlertActive = false;
+        const vp = document.getElementById('game-viewport');
+        if (vp) {
+            vp.style.filter = '';
+            vp.style.transform = '';
+            vp.style.transformOrigin = '';
+        }
 
         const titleEl = document.getElementById('defeat-title');
         if (titleEl) titleEl.innerText = title;

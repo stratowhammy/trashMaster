@@ -54,8 +54,8 @@ const DEFAULT_KEYBINDS = {
     useSnacks: 'k',
     useFertilizer: 'f',
     useBottomlessPit: 'B',
-    eatShroom: 'M',
-    takeMeds: 'x',
+    eatShroom: 'e',
+    takeMeds: 'Shift+M',
 
     // Audio Controls
     toggleMusic: 'm',
@@ -75,7 +75,7 @@ const ACTION_CONFIG = [
             { id: 'pickupTrash', label: 'Pick Up Trash' },
             { id: 'interact', label: 'Interact / Enter Building / Deliver' },
             { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' },
-            { id: 'takeMeds', label: 'Take Medication 💊' }
+            { id: 'takeMeds', label: 'Take Medication 💊 (Shift+M)' }
         ]
     },
     {
@@ -206,6 +206,11 @@ class KeybindManager {
         if (actionId === 'moveRight' && (pressed === 'arrowright' || pressed === 'd')) return true;
         if (actionId === 'jump' && (pressed === ' ' || pressed === 'space' || pressed === 'spacebar' || (e && e.code === 'Space'))) return true;
         if (actionId === 'sprint' && (pressed === 'shift' || (e && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')))) return true;
+        if (actionId === 'takeMeds') {
+            if (assigned === 'shift+m' || assigned === 'm' || assigned === '') {
+                return (e && (e.shiftKey || e.key === 'M') && (pressed === 'm' || (e && e.code === 'KeyM')));
+            }
+        }
 
         return pressed === assigned;
     }
@@ -214,6 +219,8 @@ class KeybindManager {
         if (!key) return '[ NONE ]';
         if (key === ' ' || key.toLowerCase() === 'space') return '[ SPACE ]';
         if (key.toLowerCase() === 'shift') return '[ SHIFT ]';
+        if (key === 'Shift+M' || key === 'M' || key.toLowerCase() === 'shift+m') return '[ SHIFT + M ]';
+        if (key === 'Shift+B' || key === 'B' || key.toLowerCase() === 'shift+b') return '[ SHIFT + B ]';
         if (key === 'ArrowUp') return '[ UP ARROW ]';
         if (key === 'ArrowDown') return '[ DOWN ARROW ]';
         if (key === 'ArrowLeft') return '[ LEFT ARROW ]';

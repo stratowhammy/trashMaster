@@ -1099,7 +1099,7 @@ class HUD {
             ctx.fillStyle = '#ff0055';
             ctx.font = 'bold 9px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('💊 TAKE YOUR MEDS! [PRESS X / M] 💊', bannerX + bannerW / 2, bannerY + 18);
+            ctx.fillText('💊 TAKE YOUR MEDS! [PRESS SHIFT + M] 💊', bannerX + bannerW / 2, bannerY + 18);
 
             // Countdown timer & progress bar
             const timerLeft = Math.max(0, window.game.medicationAlertTimer || 0);

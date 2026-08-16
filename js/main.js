@@ -336,16 +336,13 @@ class Game {
                     this.interact();
                 }
 
-                // X or x key (or takeMeds keybind) to take medications
-                if ((window.isKey && window.isKey(e, 'takeMeds')) || e.key === 'x' || e.key === 'X') {
+                // Shift+M (or takeMeds keybind) to take medications
+                if ((window.isKey && window.isKey(e, 'takeMeds')) || (e.shiftKey && (e.key === 'M' || e.key === 'm' || e.code === 'KeyM')) || e.key === 'M') {
                     if (this.takeMedication()) return;
                 }
 
-                // M or m key to open Messages & Navigation Waypoints Dialog (or take meds if alert active)
-                if (e.key === 'm' || e.key === 'M') {
-                    if (this.medicationAlertActive) {
-                        if (this.takeMedication()) return;
-                    }
+                // M or m key (without Shift) to open Messages & Navigation Waypoints Dialog
+                if ((e.key === 'm' || e.key === 'M') && !e.shiftKey) {
                     if (document.pointerLockElement) {
                         document.exitPointerLock();
                     }
@@ -700,7 +697,13 @@ class Game {
                 }
 
                 if (e.shiftKey && (e.key === 'M' || e.key === 'm')) {
-                    this.eatShroom();
+                    if (this.medicationAlertActive) {
+                        this.takeMedication();
+                    } else if (window.playerInventory && window.playerInventory['Wild Mushrooms'] > 0) {
+                        this.eatShroom();
+                    } else {
+                        this.takeMedication();
+                    }
                 }
 
                 if (window.isKey(e, 'harvestTree') || e.key === 'x' || e.key === 'X') {
@@ -2327,7 +2330,7 @@ class Game {
                             window.soundManager.playPillReminderSFX();
                         }
                         if (this.hud) {
-                            this.hud.showFollowerNotification('⚠️ TIME FOR MEDICATION! Press [X] or click pill to take meds! 💊', false);
+                            this.hud.showFollowerNotification('⚠️ TIME FOR MEDICATION! Press [Shift + M] or click pill to take meds! 💊', false);
                         }
                         break;
                     }

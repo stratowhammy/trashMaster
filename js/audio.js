@@ -33,6 +33,7 @@ class SoundManager {
         };
 
         this.NOTES = {
+            'C1': 32.70, 'CS1': 34.65, 'D1': 36.71, 'DS1': 38.89, 'E1': 41.20, 'F1': 43.65, 'FS1': 46.25, 'G1': 49.00, 'GS1': 51.91, 'A1': 55.00, 'AS1': 58.27, 'B1': 61.74,
             'C2': 65.41, 'CS2': 69.30, 'D2': 73.42, 'DS2': 77.78, 'E2': 82.41, 'F2': 87.31, 'FS2': 92.50, 'G2': 98.00, 'GS2': 103.83, 'A2': 110.00, 'AS2': 116.54, 'B2': 123.47,
             'C3': 130.81, 'CS3': 138.59, 'D3': 146.83, 'DS3': 155.56, 'E3': 164.81, 'F3': 174.61, 'FS3': 185.00, 'G3': 196.00, 'GS3': 207.65, 'A3': 220.00, 'AS3': 233.08, 'B3': 246.94,
             'C4': 261.63, 'CS4': 277.18, 'D4': 293.66, 'DS4': 311.13, 'E4': 329.63, 'F4': 349.23, 'FS4': 369.99, 'G4': 392.00, 'GS4': 415.30, 'A4': 440.00, 'AS4': 466.16, 'B4': 493.88,
@@ -668,24 +669,181 @@ class SoundManager {
         }, stepTime * 1000);
     }
 
-    // ── Cucaracha Lo-Fi Latin Beat ──
+    // ── Dubstep Synthesis Engine ──
+    playDubstepWobble(freq, now, duration, wobbleRate = 4) {
+        if (!this.ctx || this.isMuted || this.isMusicMuted || !freq) return;
+
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(freq, now);
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(freq * 1.008, now); // Detune for thick width
+
+        filter.type = 'lowpass';
+        filter.Q.setValueAtTime(6.5, now); // Resonant screech/growl
+
+        // Rhythmic LFO lowpass filter wobble modulation
+        const totalWobbles = Math.max(1, Math.floor(duration * wobbleRate));
+        const wobbleDur = duration / totalWobbles;
+        for (let i = 0; i < totalWobbles; i++) {
+            const t0 = now + i * wobbleDur;
+            const tMid = t0 + wobbleDur * 0.45;
+            const tEnd = t0 + wobbleDur;
+            filter.frequency.setValueAtTime(220, t0);
+            filter.frequency.exponentialRampToValueAtTime(2600, tMid);
+            filter.frequency.exponentialRampToValueAtTime(220, tEnd);
+        }
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.24, now + 0.03);
+        gain.gain.setValueAtTime(0.22, now + duration - 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration + 0.05);
+        osc2.stop(now + duration + 0.05);
+    }
+
+    playDubstepSub(freq, now, duration) {
+        if (!this.ctx || this.isMuted || this.isMusicMuted || !freq) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.95, now + duration);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.38, now + 0.03);
+        gain.gain.setValueAtTime(0.35, now + duration - 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.05);
+    }
+
+    playDubstepKick(now) {
+        if (!this.ctx || this.isMuted || this.isMusicMuted) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(42, now + 0.18);
+
+        gain.gain.setValueAtTime(0.65, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.22);
+    }
+
+    playDubstepSnare(now) {
+        if (!this.ctx || this.isMuted || this.isMusicMuted) return;
+        const bufferSize = Math.floor(this.ctx.sampleRate * 0.18);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(1600, now);
+        noiseFilter.Q.setValueAtTime(1.5, now);
+
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.3, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
+        noise.start(now);
+        noise.stop(now + 0.18);
+
+        const body = this.ctx.createOscillator();
+        const bodyGain = this.ctx.createGain();
+        body.type = 'triangle';
+        body.frequency.setValueAtTime(240, now);
+        body.frequency.exponentialRampToValueAtTime(90, now + 0.1);
+
+        bodyGain.gain.setValueAtTime(0.38, now);
+        bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+
+        body.connect(bodyGain);
+        bodyGain.connect(this.masterGain);
+        body.start(now);
+        body.stop(now + 0.1);
+    }
+
+    playDubstepPad(chord, now, duration) {
+        if (!this.ctx || this.isMuted || this.isMusicMuted || !chord) return;
+        chord.forEach((note, idx) => {
+            const freq = this.NOTES[note];
+            if (!freq) return;
+
+            const osc = this.ctx.createOscillator();
+            const filter = this.ctx.createBiquadFilter();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.01);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(450, now);
+            filter.frequency.exponentialRampToValueAtTime(950, now + duration * 0.5);
+            filter.frequency.exponentialRampToValueAtTime(400, now + duration);
+
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.04, now + 0.1);
+            gain.gain.setValueAtTime(0.035, now + duration - 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(now + idx * 0.01);
+            osc.stop(now + duration + 0.05);
+        });
+    }
+
+    // ── Cucaracha Heavy Dubstep Soundtrack (Half-Time 140 BPM) ──
     playCucarachaSoundtrack() {
         if (this.sequenceInterval) {
             clearInterval(this.sequenceInterval);
             this.sequenceInterval = null;
         }
 
-        const bpm = 82;
-        const stepTime = (60 / bpm) / 4;
+        const bpm = 140; // 140 BPM Dubstep Tempo
+        const stepTime = (60 / bpm) / 4; // Sixteenth note step duration
 
-        const chords = [
-            ['C4', 'E4', 'G4', 'B4'],
-            ['A3', 'C4', 'E4', 'G4'],
-            ['D3', 'F3', 'A3', 'C4'],
-            ['G3', 'B3', 'D4', 'F4']
+        const pads = [
+            ['D3', 'F3', 'A3', 'C4'],  // Dm7
+            ['AS2', 'D3', 'F3', 'A3'], // Bbmaj7
+            ['C3', 'E3', 'G3', 'AS3'], // C7
+            ['A2', 'C3', 'E3', 'G3']   // Am7
         ];
-        const bassNotes = ['C2', 'A2', 'D2', 'G2'];
-        const montunoPattern = ['E5', 'G5', 'C6', 'B5', 'A5', 'G5', 'F5', 'E5'];
+
+        const subNotes = ['D1', 'AS1', 'C1', 'A1'];
+        const bassNotes = ['D2', 'AS1', 'C2', 'A1'];
 
         this.sequenceInterval = setInterval(() => {
             if (this.currentTrack !== 'cucaracha') return;
@@ -695,27 +853,68 @@ class SoundManager {
             const barIndex = Math.floor(step / 16);
             const stepInBar = step % 16;
 
-            if ([0, 3, 6, 10, 12].includes(stepInBar)) {
-                this.playLofiChord(chords[barIndex], now, stepTime * 2.5);
+            // 1. Atmospheric Deep Pad Chords (Bar Start)
+            if (stepInBar === 0) {
+                this.playDubstepPad(pads[barIndex], now, stepTime * 14);
             }
 
-            if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
-                const bassNote = bassNotes[barIndex];
-                if (bassNote && this.NOTES[bassNote]) {
-                    this.playTone(this.NOTES[bassNote], 'sine', stepTime * 4, now, 0.3);
+            // 2. Heavy Sub-Bass
+            if (stepInBar === 0) {
+                const sub = subNotes[barIndex];
+                if (sub && this.NOTES[sub]) {
+                    this.playDubstepSub(this.NOTES[sub], now, stepTime * 7);
+                }
+            } else if (stepInBar === 8) {
+                const sub = subNotes[barIndex];
+                if (sub && this.NOTES[sub]) {
+                    this.playDubstepSub(this.NOTES[sub], now, stepTime * 6);
                 }
             }
 
-            if (stepInBar % 2 === 1) {
-                const noteName = montunoPattern[(stepInBar + barIndex * 2) % montunoPattern.length];
-                if (noteName && this.NOTES[noteName]) {
-                    this.playTone(this.NOTES[noteName], 'triangle', stepTime * 1.5, now, 0.12);
-                }
+            // 3. Dubstep Wobble Basslines & Growls (No 8-bit beeps!)
+            const rootBass = bassNotes[barIndex];
+            const rootFreq = rootBass && this.NOTES[rootBass] ? this.NOTES[rootBass] : 73.42;
+
+            if (barIndex === 0) {
+                if (stepInBar === 0) this.playDubstepWobble(rootFreq, now, stepTime * 3.8, 2);
+                else if (stepInBar === 4) this.playDubstepWobble(rootFreq, now, stepTime * 3.8, 4);
+                else if (stepInBar === 10) this.playDubstepWobble(this.NOTES['F2'], now, stepTime * 2.8, 4);
+                else if (stepInBar === 13) this.playDubstepWobble(rootFreq, now, stepTime * 2.8, 8);
+            } else if (barIndex === 1) {
+                if (stepInBar === 0) this.playDubstepWobble(rootFreq, now, stepTime * 3.8, 4);
+                else if (stepInBar === 4) this.playDubstepWobble(this.NOTES['D2'], now, stepTime * 3.8, 8);
+                else if (stepInBar === 10) this.playDubstepWobble(this.NOTES['F2'], now, stepTime * 2.8, 6);
+                else if (stepInBar === 13) this.playDubstepWobble(rootFreq, now, stepTime * 2.8, 8);
+            } else if (barIndex === 2) {
+                if (stepInBar === 0) this.playDubstepWobble(rootFreq, now, stepTime * 3.8, 2);
+                else if (stepInBar === 4) this.playDubstepWobble(this.NOTES['E2'], now, stepTime * 3.8, 4);
+                else if (stepInBar === 10) this.playDubstepWobble(this.NOTES['G2'], now, stepTime * 2.8, 8);
+                else if (stepInBar === 13) this.playDubstepWobble(rootFreq, now, stepTime * 2.8, 8);
+            } else if (barIndex === 3) {
+                if (stepInBar === 0) this.playDubstepWobble(rootFreq, now, stepTime * 3.8, 4);
+                else if (stepInBar === 4) this.playDubstepWobble(this.NOTES['C2'], now, stepTime * 3.8, 8);
+                else if (stepInBar === 10) this.playDubstepWobble(this.NOTES['D2'], now, stepTime * 2.8, 8);
+                else if (stepInBar === 13) this.playDubstepWobble(this.NOTES['E2'], now, stepTime * 2.8, 12); // Turnaround stutter
             }
 
-            if ([0, 6, 10].includes(stepInBar)) this.playLofiKick(now);
-            if ([3, 9, 12].includes(stepInBar)) this.playLofiSnare(now);
-            this.playLofiHat(now, stepInBar % 2 !== 0);
+            // 4. Dubstep Half-Time Drum Groove
+            if (stepInBar === 0 || stepInBar === 10) {
+                this.playDubstepKick(now);
+            } else if (stepInBar === 6 && (barIndex === 1 || barIndex === 3)) {
+                this.playDubstepKick(now);
+            }
+
+            // Half-time snare on beat 3 (step 8)
+            if (stepInBar === 8) {
+                this.playDubstepSnare(now);
+            } else if (stepInBar === 15 && barIndex === 3) {
+                this.playDubstepSnare(now); // turnaround ghost snare
+            }
+
+            // Crisp Hi-Hats
+            if (stepInBar % 2 === 0) {
+                this.playLofiHat(now, stepInBar % 4 !== 0);
+            }
 
             this.currentStep++;
         }, stepTime * 1000);

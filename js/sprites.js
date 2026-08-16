@@ -86,9 +86,96 @@ const SPRITE_CONFIG = {
         { id: 'obelisco_ba', name: 'Obelisco', src: 'assets/sprites/obelisco_ba.png' },
         { id: 'torre_entel', name: 'Torre Entel', src: 'assets/sprites/torre_entel.jpg' },
         { id: 'palacio_salvo', name: 'Palacio Salvo', src: 'assets/sprites/palacio_salvo.png' },
-        { id: 'congresso_nacional', name: 'Congresso Nacional', src: 'assets/sprites/congresso_nacional.png' }
+        { id: 'congresso_nacional', name: 'Congresso Nacional', src: 'assets/sprites/congresso_nacional.png' },
+        { id: 'police_badge', name: 'Police Badge', src: 'assets/sprites/protection.png', color: '#3388ff' },
+        { id: 'hospital', name: 'Hospital', src: 'assets/sprites/hospital.png', color: '#ff4444' },
+        { id: 'pulp_mill', name: 'Pulp Mill', src: 'assets/sprites/organizer.png', color: '#a0522d' },
+        { id: 'zoo', name: 'Zoo Animal', src: 'assets/sprites/animal.png', color: '#ffaa00' },
+        { id: 'cityhall', name: 'City Hall', src: 'assets/sprites/philly_city_hall.png' }
     ]
 };
+
+function getBuildingVisualInfo(type) {
+    if (!type || type === 'default' || type === 'normal') return null;
+
+    switch (type) {
+        // Restaurants
+        case 'chinos_steaks':
+            return { label: "CHINO'S STEAKS", spriteKey: 'chinos_steaks', icon: '🥩', color: '#ff3333', borderColor: '#ff6666' };
+        case 'rats_steaks':
+            return { label: "RATS STEAKS", spriteKey: 'rats_steaks', icon: '🥩', color: '#3399ff', borderColor: '#66b2ff' };
+        case 'zippy_ds':
+            return { label: "ZIPPY D'S", spriteKey: 'zippy_ds', icon: '🌯', color: '#ffcc00', borderColor: '#ffe066' };
+        case 'goose':
+            return { label: "GOOSE", spriteKey: 'goose', icon: '🥪', color: '#ffaa00', borderColor: '#ffcc44' };
+        case 'fast_food':
+            return { label: "FAST FOOD", spriteKey: 'goose', icon: '🍔', color: '#ffaa00', borderColor: '#ffcc44' };
+
+        // Infrastructure & Facilities
+        case 'dump':
+            return { label: "CITY DUMP", spriteKey: 'dump', icon: '🗑️', color: '#00ff88', borderColor: '#44ffaa' };
+        case 'airport':
+            return { label: "AIRPORT", spriteKey: 'airport', icon: '✈️', color: '#00ccff', borderColor: '#66e0ff' };
+        case 'black_market':
+            return { label: "BLACK MARKET", spriteKey: 'black_market', icon: '☠️', color: '#ff0055', borderColor: '#ff4488' };
+        case 'hospital':
+            return { label: "HOSPITAL", spriteKey: 'hospital_landmark', icon: '🏥', color: '#ff4444', borderColor: '#ff8888' };
+        case 'police':
+            return { label: "POLICE DEPT", spriteKey: 'police_badge', icon: '👮', color: '#3388ff', borderColor: '#66a3ff' };
+        case 'bank':
+            return { label: "FIRST BANK", spriteKey: 'treasure', icon: '🏦', color: '#ffd700', borderColor: '#ffe666' };
+        case 'zoo':
+            return { label: "CITY ZOO", spriteKey: 'animal', icon: '🦁', color: '#ffaa00', borderColor: '#ffcc44' };
+        case 'pulp_mill':
+            return { label: "PULP MILL", spriteKey: 'pulp_mill', icon: '🪵', color: '#e08a44', borderColor: '#f0aa77' };
+
+        // Philly Landmarks
+        case 'cityhall':
+            return { label: "CITY HALL", spriteKey: 'philly_city_hall', icon: '🏛️', color: '#00ffcc', borderColor: '#66ffea' };
+        case 'art_museum':
+            return { label: "ART MUSEUM", spriteKey: 'philly_art_museum', icon: '🎨', color: '#ff77bb', borderColor: '#ff99cc' };
+        case 'liberty_bell':
+            return { label: "LIBERTY BELL", spriteKey: 'philly_liberty_bell', icon: '🔔', color: '#ffd700', borderColor: '#ffe57f' };
+        case 'one_liberty':
+            return { label: "ONE LIBERTY", spriteKey: 'philly_one_liberty', icon: '🏙️', color: '#00d2ff', borderColor: '#66e3ff' };
+        case 'franklin_institute':
+            return { label: "FRANKLIN INST", spriteKey: 'philly_franklin_inst', icon: '⚡', color: '#00ff88', borderColor: '#66ffb2' };
+        case 'station':
+            return { label: "30TH ST STATION", spriteKey: 'philly_station', icon: '🚆', color: '#ffaa44', borderColor: '#ffc577' };
+
+        // Dahgbad Landmarks
+        case 'burj_khalifa':
+            return { label: "BURJ KHALIFA", spriteKey: 'burj_khalifa', icon: '🏙️', color: '#00e5ff', borderColor: '#66efff' };
+        case 'petra':
+            return { label: "PETRA", spriteKey: 'petra', icon: '🏛️', color: '#ff8844', borderColor: '#ffaa77' };
+        case 'dome_of_rock':
+            return { label: "DOME OF ROCK", spriteKey: 'dome_of_rock', icon: '🕌', color: '#ffd700', borderColor: '#ffe57f' };
+        case 'pyramids':
+            return { label: "PYRAMIDS", spriteKey: 'pyramids', icon: '🔺', color: '#ffaa00', borderColor: '#ffcc44' };
+        case 'burj_al_arab':
+            return { label: "BURJ AL ARAB", spriteKey: 'burj_al_arab', icon: '⛵', color: '#00bcd4', borderColor: '#4dd0e1' };
+        case 'kingdom_centre':
+            return { label: "KINGDOM CENTRE", spriteKey: 'kingdom_centre', icon: '🏢', color: '#7c4dff', borderColor: '#b388ff' };
+
+        // Cucaracha Landmarks
+        case 'christ_redeemer':
+            return { label: "CHRIST REDEEMER", spriteKey: 'christ_redeemer', icon: '🗽', color: '#00e676', borderColor: '#69f0ae' };
+        case 'machu_picchu':
+            return { label: "MACHU PICCHU", spriteKey: 'machu_picchu', icon: '⛰️', color: '#8d6e63', borderColor: '#bcaaa4' };
+        case 'obelisco_ba':
+            return { label: "OBELISCO", spriteKey: 'obelisco_ba', icon: '🏛️', color: '#29b6f6', borderColor: '#81d4fa' };
+        case 'torre_entel':
+            return { label: "TORRE ENTEL", spriteKey: 'torre_entel', icon: '🗼', color: '#ab47bc', borderColor: '#ce93d8' };
+        case 'palacio_salvo':
+            return { label: "PALACIO SALVO", spriteKey: 'palacio_salvo', icon: '🏰', color: '#ffa726', borderColor: '#ffcc80' };
+        case 'congresso_nacional':
+            return { label: "CONGRESSO", spriteKey: 'congresso_nacional', icon: '🏛️', color: '#26a69a', borderColor: '#80cbc4' };
+
+        default:
+            return null;
+    }
+}
+window.getBuildingVisualInfo = getBuildingVisualInfo;
 
 class SpriteManager {
     constructor() {

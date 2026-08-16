@@ -21,6 +21,8 @@ class BillboardManager3D {
         this.shroomSprites = [];
         this.flowerSprites = [];
         this.floatingTextSprites = [];
+        this.buildingBillboardMap = new Map();
+        this.buildingTextures = new Map();
 
         this.TILE_SIZE_3D = 4;
     }
@@ -103,6 +105,9 @@ class BillboardManager3D {
 
         // 8. Synchronize Floating Text FX
         this._syncFloatingTexts(game, mapW, mapH, S, dt, player, p3dX, p3dZ);
+
+        // 9. Synchronize Floating Restaurant & Specialized Building Sprites in 3D
+        this._syncBuildingBillboards(game, mapW, mapH, S, time, player, p3dX, p3dZ);
     }
 
     _syncTrash(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
@@ -460,6 +465,126 @@ class BillboardManager3D {
         const sprite = new THREE.Sprite(spriteMat);
         sprite.scale.set(2.5, 0.7, 1);
         return sprite;
+    }
+
+    _getBuildingBillboardTexture(type, info) {
+        if (this.buildingTextures && this.buildingTextures.has(type)) {
+            return this.buildingTextures.get(type);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const spriteMgr = this.spriteManager || (window.game && window.game.spriteManager);
+        const img = spriteMgr && spriteMgr.images ? spriteMgr.images[info.spriteKey] : null;
+
+        const themeColor = info.color || '#00ffcc';
+        const borderColor = info.borderColor || '#ffffff';
+
+        // Outer neon glow box
+        ctx.fillStyle = 'rgba(8, 12, 24, 0.90)';
+        ctx.fillRect(8, 8, 240, 240);
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 6;
+        ctx.strokeRect(8, 8, 240, 240);
+
+        // Inner glowing border accent
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(16, 16, 224, 224);
+
+        // Draw Sprite Image in Center/Top
+        if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
+            try {
+                ctx.drawImage(img, 38, 24, 180, 150);
+            } catch (e) {
+                ctx.font = '80px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(info.icon || '🏢', 128, 100);
+            }
+        } else {
+            ctx.font = '80px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(info.icon || '🏢', 128, 100);
+        }
+
+        // Nameplate Banner at Bottom
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+        ctx.fillRect(16, 184, 224, 56);
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(16, 184, 224, 56);
+
+        // Text
+        ctx.fillStyle = themeColor;
+        let label = info.label || type.toUpperCase();
+        if (label.length > 14) {
+            ctx.font = 'bold 12px "Press Start 2P", monospace';
+        } else {
+            ctx.font = 'bold 14px "Press Start 2P", monospace';
+        }
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${info.icon} ${label}`, 128, 212);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        this.buildingTextures.set(type, tex);
+        return tex;
+    }
+
+    _syncBuildingBillboards(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
+        if (!game.gameMap || !game.gameMap.buildings) return;
+        const buildings = game.gameMap.buildings;
+        const activeIds = new Set();
+
+        for (const bldg of buildings) {
+            if (!bldg || !bldg.tiles || bldg.tiles.length === 0) continue;
+            const info = window.getBuildingVisualInfo ? window.getBuildingVisualInfo(bldg.type) : null;
+            if (!info) continue;
+
+            activeIds.add(bldg.id);
+
+            let sprite = this.buildingBillboardMap.get(bldg.id);
+            if (!sprite) {
+                const tex = this._getBuildingBillboardTexture(bldg.type, info);
+                sprite = this._createSprite(tex, 5.2, 5.2);
+                this.billboardGroup.add(sprite);
+                this.buildingBillboardMap.set(bldg.id, sprite);
+            }
+
+            // Calculate center of building in pixels
+            let sumX = 0, sumY = 0;
+            for (const t of bldg.tiles) {
+                sumX += t.x;
+                sumY += t.y;
+            }
+            const bldgCenterX = (sumX / bldg.tiles.length + 0.5) * TILE_SIZE;
+            const bldgCenterY = (sumY / bldg.tiles.length + 0.5) * TILE_SIZE;
+
+            const pos = this._getToroidal3DPos(bldgCenterX, bldgCenterY, player, p3dX, p3dZ, S);
+            if (pos.distSq > 480 * 480) {
+                sprite.visible = false;
+                continue;
+            }
+
+            sprite.visible = true;
+            const bob = Math.sin(time * 2.8 + bldg.id * 1.4) * 0.45;
+            sprite.position.set(pos.x, 9.2 + bob, pos.z);
+        }
+
+        // Hide inactive
+        for (const [id, sprite] of this.buildingBillboardMap.entries()) {
+            if (!activeIds.has(id)) {
+                sprite.visible = false;
+            }
+        }
     }
 }
 

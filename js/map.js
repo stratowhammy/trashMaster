@@ -602,11 +602,116 @@ class BaseMap {
     }
 
     renderAddresses(ctx, camera) {
+        const time = performance.now() / 1000;
+        const camCenterX = camera.x + camera.width / 2;
+        const camCenterY = camera.y + camera.height / 2;
+        const spriteMgr = (window.game && window.game.spriteManager) ? window.game.spriteManager : null;
+
+        // 1. Render Floating Overhead Sprites & Badges for all Specialized Buildings & Restaurants
+        for (const bldg of this.buildings) {
+            if (!bldg || !bldg.tiles || bldg.tiles.length === 0) continue;
+            const info = window.getBuildingVisualInfo ? window.getBuildingVisualInfo(bldg.type) : null;
+            if (!info) continue;
+
+            // Calculate center of building in pixels
+            let sumX = 0, sumY = 0;
+            for (const t of bldg.tiles) {
+                sumX += t.x;
+                sumY += t.y;
+            }
+            const bldgCenterX = (sumX / bldg.tiles.length + 0.5) * TILE_SIZE;
+            const bldgCenterY = (sumY / bldg.tiles.length + 0.5) * TILE_SIZE;
+
+            // Toroidal wrapping relative to camera center
+            let dX = bldgCenterX - camCenterX;
+            let dY = bldgCenterY - camCenterY;
+            if (!window.pirateMode) {
+                if (dX > MAP_PIXEL_W / 2) dX -= MAP_PIXEL_W;
+                else if (dX < -MAP_PIXEL_W / 2) dX += MAP_PIXEL_W;
+                if (dY > MAP_PIXEL_H / 2) dY -= MAP_PIXEL_H;
+                else if (dY < -MAP_PIXEL_H / 2) dY += MAP_PIXEL_H;
+            }
+
+            const screenX = camera.width / 2 + dX;
+            const screenY = camera.height / 2 + dY;
+
+            // Skip if offscreen
+            if (screenX < -150 || screenX > camera.width + 150 || screenY < -150 || screenY > camera.height + 150) continue;
+
+            ctx.save();
+            const bob = Math.sin(time * 3.2 + bldg.id * 1.5) * 5;
+            const floatY = screenY - 24 + bob;
+
+            // 1a. Glowing ground/roof shadow beneath floating sprite
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(screenX, screenY + 4, 18, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 1b. Glowing Halo / Sprite Backdrop
+            ctx.fillStyle = info.borderColor || '#00ffcc';
+            ctx.shadowColor = info.color || '#00ffcc';
+            ctx.shadowBlur = 12;
+
+            // 1c. Draw Sprite Image
+            const spriteSize = 36;
+            let img = spriteMgr && spriteMgr.images ? spriteMgr.images[info.spriteKey] : null;
+            if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
+                ctx.drawImage(img, screenX - spriteSize / 2, floatY - spriteSize / 2 - 10, spriteSize, spriteSize);
+            } else {
+                // Fallback Emoji / Icon
+                ctx.font = '22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(info.icon || '🏢', screenX, floatY - 10);
+            }
+
+            // 1d. Stylized Retro Nameplate Badge
+            const badgeText = `${info.icon} ${info.label}`;
+            ctx.font = 'bold 7px "Press Start 2P", monospace';
+            const textWidth = ctx.measureText(badgeText).width;
+            const badgeW = textWidth + 14;
+            const badgeH = 16;
+            const badgeX = screenX - badgeW / 2;
+            const badgeY = floatY + 12;
+
+            ctx.fillStyle = 'rgba(10, 15, 28, 0.92)';
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4);
+            else ctx.rect(badgeX, badgeY, badgeW, badgeH);
+            ctx.fill();
+
+            ctx.strokeStyle = info.borderColor || '#00ffcc';
+            ctx.lineWidth = 1.8;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = info.color || '#00ffcc';
+            ctx.stroke();
+
+            ctx.fillStyle = info.color || '#ffffff';
+            ctx.shadowBlur = 0;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(badgeText, screenX, badgeY + badgeH / 2 + 1);
+
+            ctx.restore();
+        }
+
+        // 2. Render Door Addresses for all buildings
         for (const bldg of this.buildings) {
             if (bldg.doorTiles.length === 0) continue;
             const door = bldg.doorTiles[0];
-            const sx = door.x * TILE_SIZE - camera.x;
-            const sy = door.y * TILE_SIZE - camera.y;
+
+            let dX = (door.x * TILE_SIZE + TILE_SIZE / 2) - camCenterX;
+            let dY = (door.y * TILE_SIZE + TILE_SIZE / 2) - camCenterY;
+            if (!window.pirateMode) {
+                if (dX > MAP_PIXEL_W / 2) dX -= MAP_PIXEL_W;
+                else if (dX < -MAP_PIXEL_W / 2) dX += MAP_PIXEL_W;
+                if (dY > MAP_PIXEL_H / 2) dY -= MAP_PIXEL_H;
+                else if (dY < -MAP_PIXEL_H / 2) dY += MAP_PIXEL_H;
+            }
+
+            const sx = camera.width / 2 + dX - TILE_SIZE / 2;
+            const sy = camera.height / 2 + dY - TILE_SIZE / 2;
 
             if (sx < -100 || sx > camera.width + 100 || sy < -100 || sy > camera.height + 100) continue;
 
@@ -623,15 +728,18 @@ class BaseMap {
                 }
             }
 
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.save();
+            ctx.font = '7px "Press Start 2P", monospace';
+            const textWidth = ctx.measureText(text).width;
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
             ctx.beginPath();
-            ctx.roundRect(sx - 2, sy - 14, ctx.measureText(text).width + 8 || 40, 14, 3);
+            if (ctx.roundRect) ctx.roundRect(sx - 2, sy - 14, textWidth + 8, 14, 3);
+            else ctx.rect(sx - 2, sy - 14, textWidth + 8, 14);
             ctx.fill();
 
             ctx.fillStyle = color;
-            ctx.font = '8px "Press Start 2P", monospace';
             ctx.textAlign = 'left';
-            ctx.fillText(text, sx, sy - 4);
+            ctx.fillText(text, sx + 2, sy - 4);
             ctx.restore();
         }
     }

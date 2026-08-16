@@ -12,7 +12,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-app.config['SECRET_KEY'] = 'trashmaster_secret_key_123'
+app.config['SECRET_KEY'] = 'trashmaster_super_secret_key_1234567890_jwt_secure'
 DATABASE = 'trashmaster.db'
 
 # 3 Lists of 50 words each for username generation
@@ -222,27 +222,220 @@ def init_db():
         ''')
         db.commit()
         
+        # Phase 4: User profiles, sticker avatars & bio
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN avatar_sticker TEXT DEFAULT 'ducky_sticker.png'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT 'Ready to clean up the city!'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            db.execute("ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        except sqlite3.OperationalError:
+            pass
+        db.execute("UPDATE users SET avatar_sticker='ducky_sticker.png' WHERE avatar_sticker IS NULL OR avatar_sticker=''")
+        db.execute("UPDATE users SET bio='Ready to clean up the city!' WHERE bio IS NULL OR bio=''")
+        db.commit()
+
+        # Phase 5: Daily Streak Economy ("Lids") & Black Market Mechanics
+        for streak_col in [
+            'lids INTEGER DEFAULT 0',
+            'current_streak INTEGER DEFAULT 0',
+            'max_streak INTEGER DEFAULT 0',
+            'last_active_date TEXT',
+            'streak_start_date TEXT',
+            'streak_qualified INTEGER DEFAULT 0'
+        ]:
+            try:
+                db.execute(f"ALTER TABLE users ADD COLUMN {streak_col}")
+            except sqlite3.OperationalError:
+                pass
+
+        try:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS gameplay_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    play_date TEXT NOT NULL,
+                    streak_day INTEGER DEFAULT 1,
+                    lids_awarded INTEGER DEFAULT 0,
+                    round_number INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            ''')
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS black_market_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    lids_sold INTEGER NOT NULL,
+                    cash_earned INTEGER NOT NULL,
+                    officers_dispatched INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            ''')
+        except sqlite3.OperationalError:
+            pass
+        db.commit()
+        
         # Create default admin if not exists
         cursor = db.cursor()
         cursor.execute("SELECT id FROM users WHERE role='admin'")
         if not cursor.fetchone():
             hashed = bcrypt.hashpw(b'admin', bcrypt.gensalt())
-            db.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", 
+            db.execute("INSERT INTO users (username, password_hash, role, avatar_sticker, bio) VALUES (?, ?, ?, 'ducky_sticker.png', 'System Administrator')", 
                        ('admin', hashed.decode('utf-8'), 'admin'))
             db.commit()
 
 init_db()
 
+def process_gameplay_log(db, user_id, date_override=None, round_num=0):
+    """
+    Log an exact timestamp for every game played, track consecutive daily active days,
+    handle 7-day streak qualification with retroactive lid payouts, ongoing day 8+ payouts,
+    and streak resets upon missing a daily cycle.
+    """
+    cursor = db.cursor()
+    cursor.execute("""
+        SELECT IFNULL(lids, 0) AS lids,
+               IFNULL(current_streak, 0) AS current_streak,
+               IFNULL(max_streak, 0) AS max_streak,
+               last_active_date,
+               streak_start_date,
+               IFNULL(streak_qualified, 0) AS streak_qualified
+        FROM users WHERE id = ?
+    """, (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        return None
+
+    current_time = datetime.utcnow()
+    played_at_iso = current_time.isoformat()
+    today_str = date_override if date_override else current_time.strftime('%Y-%m-%d')
+    today_date = datetime.strptime(today_str, '%Y-%m-%d').date()
+
+    last_date_str = user['last_active_date']
+    current_streak = int(user['current_streak'])
+    max_streak = int(user['max_streak'])
+    streak_start = user['streak_start_date'] or today_str
+    streak_qualified = int(user['streak_qualified'])
+    current_lids = int(user['lids'])
+
+    if not last_date_str:
+        # First game played ever
+        current_streak = 1
+        streak_start = today_str
+        streak_qualified = 0
+    else:
+        last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+        diff_days = (today_date - last_date).days
+        if diff_days == 0:
+            # Same day play
+            pass
+        elif diff_days == 1:
+            # Consecutive active day
+            current_streak += 1
+        elif diff_days > 1:
+            # Missed a daily cycle! Streak resets to 1
+            current_streak = 1
+            streak_start = today_str
+            streak_qualified = 0
+
+    max_streak = max(max_streak, current_streak)
+
+    lids_awarded = 0
+    retroactive_payout = False
+
+    # Streak Qualification & Payout Rules:
+    # 1. Days 1..6: Locked (0 Lids).
+    # 2. Day 7: Retroactively credit 1 Lid for every game played across Days 1 through 7.
+    # 3. Day 8+: 1 Lid per game played on that day.
+    if current_streak == 7 and streak_qualified == 0:
+        cursor.execute("""
+            SELECT id FROM gameplay_logs
+            WHERE user_id = ? AND lids_awarded = 0 AND play_date >= ?
+        """, (user_id, streak_start))
+        uncredited_logs = cursor.fetchall()
+        uncredited_count = len(uncredited_logs)
+
+        # Retroactive payout includes previous uncredited games + this 7th day game
+        total_payout = uncredited_count + 1
+        lids_awarded = total_payout
+        retroactive_payout = True
+        streak_qualified = 1
+        current_lids += total_payout
+
+        if uncredited_logs:
+            uncredited_ids = [row['id'] for row in uncredited_logs]
+            cursor.execute(f"""
+                UPDATE gameplay_logs SET lids_awarded = 1
+                WHERE id IN ({','.join(['?'] * len(uncredited_ids))})
+            """, uncredited_ids)
+
+        this_game_lids_awarded = 1
+    elif current_streak >= 8 or (current_streak == 7 and streak_qualified == 1):
+        lids_awarded = 1
+        current_lids += 1
+        this_game_lids_awarded = 1
+    else:
+        lids_awarded = 0
+        this_game_lids_awarded = 0
+
+    # Insert gameplay log with exact timestamp
+    cursor.execute("""
+        INSERT INTO gameplay_logs (user_id, played_at, play_date, streak_day, lids_awarded, round_number)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, played_at_iso, today_str, current_streak, this_game_lids_awarded, round_num))
+
+    # Update users table
+    cursor.execute("""
+        UPDATE users
+        SET lids = ?, current_streak = ?, max_streak = ?, last_active_date = ?, streak_start_date = ?, streak_qualified = ?
+        WHERE id = ?
+    """, (current_lids, current_streak, max_streak, today_str, streak_start, streak_qualified, user_id))
+
+    # Synchronize inventory 'Lids'
+    cursor.execute("SELECT quantity FROM inventory WHERE user_id = ? AND item_name = 'Lids'", (user_id,))
+    inv_row = cursor.fetchone()
+    if inv_row:
+        cursor.execute("UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_name = 'Lids'", (current_lids, user_id))
+    else:
+        cursor.execute("INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, 'Lids', ?)", (user_id, current_lids))
+
+    return {
+        'played_at': played_at_iso,
+        'play_date': today_str,
+        'current_streak': current_streak,
+        'max_streak': max_streak,
+        'streak_qualified': streak_qualified,
+        'lids_awarded': lids_awarded,
+        'retroactive_payout': retroactive_payout,
+        'total_lids': current_lids
+    }
+
+
 def verify_token(req):
     auth_header = req.headers.get('Authorization')
     if not auth_header:
         return None
-    token = auth_header.split(" ")[1]
-    try:
-        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-        return data
-    except:
+    parts = auth_header.split(" ")
+    if len(parts) < 2:
         return None
+    token = parts[1]
+    for secret in [app.config.get('SECRET_KEY', 'trashmaster_secret_key_123'), 'trashmaster_secret_key_123', 'trashmaster_super_secret_key_1234567890_jwt_secure']:
+        try:
+            data = jwt.decode(token, secret, algorithms=["HS256"])
+            return data
+        except Exception:
+            pass
+    return None
 
 # --- STATIC FILES ---
 @app.route('/')
@@ -251,6 +444,8 @@ def serve_index():
 
 @app.route('/<path:path>')
 def serve_static(path):
+    if path.startswith('api/') or path.startswith('api'):
+        return jsonify({'error': f'API endpoint /{path} not found'}), 404
     return send_from_directory('.', path)
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -264,13 +459,21 @@ def login():
     user = cursor.fetchone()
     
     if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
-        token = jwt.encode({'user_id': user['id'], 'role': user['role'], 'exp': datetime.utcnow() + timedelta(days=1)}, app.config['SECRET_KEY'], algorithm="HS256")
+        token = jwt.encode({
+            'user_id': user['id'], 
+            'username': user['username'],
+            'role': user['role'], 
+            'exp': datetime.utcnow() + timedelta(days=1)
+        }, app.config['SECRET_KEY'], algorithm="HS256")
         return jsonify({
             'token': token, 
             'role': user['role'], 
+            'username': user['username'],
             'balance': user['balance'],
             'has_truck': int(user['has_truck']),
-            'chosen_sprite': user['chosen_sprite'] or 'char2'
+            'chosen_sprite': user['chosen_sprite'] or 'char2',
+            'avatar_sticker': user['avatar_sticker'] or 'ducky_sticker.png',
+            'bio': user['bio'] or 'Ready to clean up the city!'
         })
     return jsonify({'error': 'Invalid credentials'}), 401
 
@@ -280,6 +483,8 @@ def register():
     username = data.get('username')
     password = data.get('password')
     chosen_sprite = data.get('chosen_sprite', 'char2')
+    avatar_sticker = data.get('avatar_sticker', 'ducky_sticker.png')
+    bio = data.get('bio', 'Ready to clean up the city!')
 
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
@@ -292,13 +497,26 @@ def register():
 
     hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     cursor.execute(
-        "INSERT INTO users (username, password_hash, role, chosen_sprite) VALUES (?, ?, 'player', ?)",
-        (username, hashed, chosen_sprite)
+        "INSERT INTO users (username, password_hash, role, chosen_sprite, avatar_sticker, bio) VALUES (?, ?, 'player', ?, ?, ?)",
+        (username, hashed, chosen_sprite, avatar_sticker, bio)
     )
     db.commit()
 
-    token = jwt.encode({'user_id': cursor.lastrowid, 'role': 'player', 'exp': datetime.utcnow() + timedelta(days=1)}, app.config['SECRET_KEY'], algorithm="HS256")
-    return jsonify({'token': token, 'role': 'player', 'chosen_sprite': chosen_sprite})
+    user_id = cursor.lastrowid
+    token = jwt.encode({
+        'user_id': user_id, 
+        'username': username,
+        'role': 'player', 
+        'exp': datetime.utcnow() + timedelta(days=1)
+    }, app.config['SECRET_KEY'], algorithm="HS256")
+    return jsonify({
+        'token': token, 
+        'role': 'player', 
+        'username': username,
+        'chosen_sprite': chosen_sprite,
+        'avatar_sticker': avatar_sticker,
+        'bio': bio
+    })
 
 @app.route('/api/auth/change-password', methods=['POST'])
 def change_password():
@@ -350,7 +568,7 @@ def sync_game():
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        SELECT balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime,
+        SELECT username, balance, has_truck, employee_death_penalty, movement_size, unlocked_fastfood, unlocked_crime,
                made_man_status, political_office, completed_mafia_jobs,
                stat_max_single_trash, stat_cumulative_trash, stat_max_single_money, stat_cumulative_money, stat_max_single_followers,
                credits, international_followers, total_rounds_played, election_state,
@@ -359,7 +577,14 @@ def sync_game():
                IFNULL(unlocked_fantasy, 0) AS unlocked_fantasy,
                IFNULL(cult_leaves_cumulative, 0) AS cult_leaves_cumulative,
                IFNULL(happiness, 100.0) AS happiness,
-               IFNULL(chosen_sprite, 'char2') AS chosen_sprite
+               IFNULL(chosen_sprite, 'char2') AS chosen_sprite,
+               IFNULL(avatar_sticker, 'ducky_sticker.png') AS avatar_sticker,
+               IFNULL(bio, 'Ready to clean up the city!') AS bio,
+               IFNULL(lids, 0) AS lids,
+               IFNULL(current_streak, 0) AS current_streak,
+               IFNULL(max_streak, 0) AS max_streak,
+               last_active_date,
+               IFNULL(streak_qualified, 0) AS streak_qualified
         FROM users WHERE id=?
     """, (user_data['user_id'],))
     user = cursor.fetchone()
@@ -377,12 +602,25 @@ def sync_game():
             pass
         word_game = {'collected_letters': '{}', 'completed_words': '[]', 'word_slots_state': '{}'}
     
+    # Calculate effective streak for display
+    effective_streak = int(user['current_streak'])
+    streak_qualified = int(user['streak_qualified'])
+    if user['last_active_date']:
+        try:
+            last_d = datetime.strptime(user['last_active_date'], '%Y-%m-%d').date()
+            if (datetime.utcnow().date() - last_d).days > 1:
+                effective_streak = 0
+                streak_qualified = 0
+        except Exception:
+            pass
+
     return jsonify({
         'word_game_state': {
             'collected_letters': json.loads(word_game['collected_letters'] or '{}'),
             'completed_words': json.loads(word_game['completed_words'] or '[]'),
             'word_slots_state': json.loads(word_game['word_slots_state'] or '{}')
         },
+        'username': user['username'],
         'balance': user['balance'],
         'has_truck': int(user['has_truck']),
         'employee_death_penalty': user['employee_death_penalty'] if user['employee_death_penalty'] else 1.0,
@@ -403,6 +641,13 @@ def sync_game():
         'happiness': float(user['happiness']),
         'cult_leaves_cumulative': int(user['cult_leaves_cumulative']),
         'chosen_sprite': user['chosen_sprite'] or 'char2',
+        'avatar_sticker': user['avatar_sticker'] or 'ducky_sticker.png',
+        'bio': user['bio'] or 'Ready to clean up the city!',
+        'lids': int(user['lids']),
+        'current_streak': effective_streak,
+        'max_streak': int(user['max_streak']),
+        'streak_qualified': streak_qualified,
+        'last_active_date': user['last_active_date'],
         'inventory': inventory,
         'stats': {
             'stat_max_single_trash': user['stat_max_single_trash'] or 0,
@@ -1101,6 +1346,10 @@ def end_round():
         new_movement_size,
         new_balance
     ))
+
+    # Process gameplay tracking timestamp, daily streak, and lid reward generation
+    streak_info = process_gameplay_log(db, user_data['user_id'], round_num=total_rounds_played)
+
     db.commit()
     
     return jsonify({
@@ -1115,7 +1364,157 @@ def end_round():
         'primary_lost': primary_lost,
         'stranded': stranded,
         'dragon_lost': dragon_lost,
-        'organizers_lost': organizers_lost
+        'organizers_lost': organizers_lost,
+        'streak_info': streak_info,
+        'lids': streak_info['total_lids'] if streak_info else 0,
+        'lids_awarded': streak_info['lids_awarded'] if streak_info else 0,
+        'retroactive_payout': streak_info['retroactive_payout'] if streak_info else False,
+        'current_streak': streak_info['current_streak'] if streak_info else 0
+    })
+
+@app.route('/api/game/streak-status', methods=['GET'])
+def get_streak_status():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        SELECT IFNULL(lids, 0) AS lids,
+               IFNULL(current_streak, 0) AS current_streak,
+               IFNULL(max_streak, 0) AS max_streak,
+               last_active_date,
+               streak_start_date,
+               IFNULL(streak_qualified, 0) AS streak_qualified
+        FROM users WHERE id = ?
+    """, (user_data['user_id'],))
+    user = cursor.fetchone()
+    if not user: return jsonify({'error': 'User not found'}), 404
+
+    current_time = datetime.utcnow()
+    today_date = current_time.date()
+    today_str = today_date.strftime('%Y-%m-%d')
+
+    raw_streak = int(user['current_streak'])
+    last_date_str = user['last_active_date']
+    streak_qualified = int(user['streak_qualified'])
+
+    effective_streak = raw_streak
+    if last_date_str:
+        try:
+            last_date = datetime.strptime(last_date_str, '%Y-%m-%d').date()
+            diff = (today_date - last_date).days
+            if diff > 1:
+                effective_streak = 0
+                streak_qualified = 0
+        except Exception:
+            pass
+
+    cursor.execute("""
+        SELECT id, played_at, play_date, streak_day, lids_awarded, round_number
+        FROM gameplay_logs
+        WHERE user_id = ?
+        ORDER BY id DESC LIMIT 20
+    """, (user_data['user_id'],))
+    logs = [dict(row) for row in cursor.fetchall()]
+
+    cursor.execute("SELECT COUNT(*) AS count FROM gameplay_logs WHERE user_id = ? AND play_date = ?", (user_data['user_id'], today_str))
+    today_games = cursor.fetchone()['count']
+
+    return jsonify({
+        'success': True,
+        'lids': int(user['lids']),
+        'current_streak': effective_streak,
+        'max_streak': int(user['max_streak']),
+        'last_active_date': user['last_active_date'],
+        'streak_qualified': streak_qualified,
+        'days_until_unlock': max(0, 7 - effective_streak) if streak_qualified == 0 else 0,
+        'today_games_count': today_games,
+        'recent_logs': logs
+    })
+
+@app.route('/api/game/log-game', methods=['POST'])
+def log_game_play():
+    """Explicitly log a game play with exact timestamp and calculate streak/lids."""
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json() or {}
+    date_override = data.get('date_override')
+    round_num = int(data.get('round_number', 0))
+
+    db = get_db()
+    streak_info = process_gameplay_log(db, user_data['user_id'], date_override=date_override, round_num=round_num)
+    db.commit()
+
+    if not streak_info:
+        return jsonify({'error': 'Failed to process gameplay log'}), 500
+
+    return jsonify({
+        'success': True,
+        'streak_info': streak_info
+    })
+
+@app.route('/api/game/black-market/sell-lids', methods=['POST'])
+def black_market_sell_lids():
+    """
+    Sell Lids on the black market:
+    - 10 Lids or fewer in a single transaction is safe (0 officers dispatched).
+    - More than 10 Lids in a single transaction dispatches law enforcement.
+    - Dispatch Formula: If Lids_Sold > 10: Officers_Dispatched = Floor(Lids_Sold / 10).
+    """
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json() or {}
+    try:
+        count = int(data.get('count', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid count'}), 400
+
+    if count <= 0:
+        return jsonify({'error': 'Must sell at least 1 Lid'}), 400
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT balance, IFNULL(lids, 0) AS lids FROM users WHERE id = ?", (user_data['user_id'],))
+    user = cursor.fetchone()
+    if not user: return jsonify({'error': 'User not found'}), 404
+
+    current_lids = int(user['lids'])
+    if current_lids < count:
+        return jsonify({'error': f'Insufficient Lids (You have {current_lids}, tried to sell {count})'}), 400
+
+    price_per_lid = 250
+    cash_earned = count * price_per_lid
+    new_balance = int(user['balance'] or 0) + cash_earned
+    new_lids = current_lids - count
+
+    # Law Enforcement Scaling:
+    # Single transaction <= 10 Lids: safe (0 officers).
+    # Single transaction > 10 Lids: 1 officer per 10 Lids sold (Floor(count / 10)).
+    if count > 10:
+        officers_dispatched = count // 10
+    else:
+        officers_dispatched = 0
+
+    cursor.execute("UPDATE users SET balance = ?, lids = ? WHERE id = ?", (new_balance, new_lids, user_data['user_id']))
+    cursor.execute("UPDATE inventory SET quantity = ? WHERE user_id = ? AND item_name = 'Lids'", (new_lids, user_data['user_id']))
+
+    cursor.execute("""
+        INSERT INTO black_market_transactions (user_id, lids_sold, cash_earned, officers_dispatched)
+        VALUES (?, ?, ?, ?)
+    """, (user_data['user_id'], count, cash_earned, officers_dispatched))
+
+    db.commit()
+
+    return jsonify({
+        'success': True,
+        'lids_sold': count,
+        'cash_earned': cash_earned,
+        'officers_dispatched': officers_dispatched,
+        'new_lids': new_lids,
+        'new_balance': new_balance
     })
 
 @app.route('/api/game/buildings', methods=['GET'])
@@ -1347,6 +1746,406 @@ def political_choice():
     db.commit()
     return jsonify({'success': True, 'political_office': office, 'election_state': election_state})
 
+def calculate_trophies(user, published_maps_count=0, buildings_count=0, completed_words_count=0):
+    cum_trash = user['stat_cumulative_trash'] or 0
+    max_trash = user['stat_max_single_trash'] or 0
+    cum_money = user['stat_cumulative_money'] or 0
+    balance = user['balance'] or 0
+    move_size = user['movement_size'] or 0
+    intl = user['international_followers'] or 0
+    rounds = user['total_rounds_played'] or 0
+    made_man = user['made_man_status'] or 'none'
+    office = user['political_office'] or 'citizen'
+
+    return [
+        {
+            'id': 'first_sweep',
+            'name': 'First Cleanup',
+            'icon': '🧹',
+            'description': 'Clean your first piece of trash from the city streets.',
+            'unlocked': cum_trash >= 1,
+            'progress': min(1, cum_trash),
+            'target': 1
+        },
+        {
+            'id': 'trash_centurion',
+            'name': 'Trash Centurion',
+            'icon': '🗑️',
+            'description': 'Clean 100 total pieces of trash.',
+            'unlocked': cum_trash >= 100,
+            'progress': min(100, cum_trash),
+            'target': 100
+        },
+        {
+            'id': 'trash_titan',
+            'name': 'Trash Titan',
+            'icon': '👑',
+            'description': 'Clean 1,000 total pieces of trash across all rounds.',
+            'unlocked': cum_trash >= 1000,
+            'progress': min(1000, cum_trash),
+            'target': 1000
+        },
+        {
+            'id': 'high_scorer',
+            'name': 'Speed Demon',
+            'icon': '⚡',
+            'description': 'Collect 30 or more trash cans in a single round.',
+            'unlocked': max_trash >= 30,
+            'progress': min(30, max_trash),
+            'target': 30
+        },
+        {
+            'id': 'first_grand',
+            'name': 'First Grand',
+            'icon': '💵',
+            'description': 'Earn $1,000 in total cumulative money.',
+            'unlocked': (cum_money >= 1000 or balance >= 1000),
+            'progress': min(1000, max(cum_money, balance)),
+            'target': 1000
+        },
+        {
+            'id': 'trash_tycoon',
+            'name': 'Trash Tycoon',
+            'icon': '💎',
+            'description': 'Amass $50,000 in total cash and cumulative earnings.',
+            'unlocked': (balance + cum_money) >= 50000,
+            'progress': min(50000, (balance + cum_money)),
+            'target': 50000
+        },
+        {
+            'id': 'posse_leader',
+            'name': 'Posse Leader',
+            'icon': '🤝',
+            'description': 'Recruit a posse of 25 followers in your movement.',
+            'unlocked': move_size >= 25,
+            'progress': min(25, move_size),
+            'target': 25
+        },
+        {
+            'id': 'mega_movement',
+            'name': 'Mega Movement',
+            'icon': '📣',
+            'description': 'Grow your community movement to 100 followers.',
+            'unlocked': move_size >= 100,
+            'progress': min(100, move_size),
+            'target': 100
+        },
+        {
+            'id': 'globe_trotter',
+            'name': 'Globe Trotter',
+            'icon': '✈️',
+            'description': 'Recruit 10 international followers through airport travel.',
+            'unlocked': intl >= 10,
+            'progress': min(10, intl),
+            'target': 10
+        },
+        {
+            'id': 'seasoned_vet',
+            'name': 'Seasoned Veteran',
+            'icon': '🎖️',
+            'description': 'Complete 10 full gameplay rounds.',
+            'unlocked': rounds >= 10,
+            'progress': min(10, rounds),
+            'target': 10
+        },
+        {
+            'id': 'property_baron',
+            'name': 'Real Estate Baron',
+            'icon': '🏙️',
+            'description': 'Purchase and own at least 1 city property in Builder mode.',
+            'unlocked': buildings_count >= 1,
+            'progress': min(1, buildings_count),
+            'target': 1
+        },
+        {
+            'id': 'community_architect',
+            'name': 'Master Architect',
+            'icon': '🗺️',
+            'description': 'Publish a custom map for the world to play in Community Maps.',
+            'unlocked': published_maps_count >= 1,
+            'progress': min(1, published_maps_count),
+            'target': 1
+        },
+        {
+            'id': 'made_man',
+            'name': 'Underworld Don',
+            'icon': '🎩',
+            'description': 'Achieve Made Man or Boss status in the Crime syndicate.',
+            'unlocked': made_man not in ('none', ''),
+            'progress': 1 if made_man not in ('none', '') else 0,
+            'target': 1
+        },
+        {
+            'id': 'elected_official',
+            'name': 'Elected Official',
+            'icon': '🏛️',
+            'description': 'Win political office as Mayor, Senator, or President.',
+            'unlocked': office in ('mayor', 'senator', 'president'),
+            'progress': 1 if office in ('mayor', 'senator', 'president') else 0,
+            'target': 1
+        }
+    ]
+
+# ------------------------------------------------------------
+# Stickers & Profile API
+# ------------------------------------------------------------
+@app.route('/api/stickers', methods=['GET'])
+def get_stickers():
+    stickers_dir = os.path.join(os.path.dirname(__file__), 'assets', 'stickers')
+    stickers = []
+    if os.path.exists(stickers_dir):
+        files = sorted(os.listdir(stickers_dir))
+        for f in files:
+            if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.svg'):
+                label = f.replace('_sticker', '').replace('.png', '').replace('.jpg', '').replace('_', ' ').title()
+                stickers.append({
+                    'id': f,
+                    'file': f,
+                    'path': f"assets/stickers/{f}",
+                    'name': label
+                })
+    return jsonify({'success': True, 'stickers': stickers})
+
+@app.route('/api/user/profile', methods=['GET'])
+@app.route('/api/user/profile/<username>', methods=['GET'])
+def get_user_profile(username=None):
+    current_user_data = verify_token(request)
+    db = get_db()
+    cursor = db.cursor()
+
+    if username is None:
+        if not current_user_data:
+            return jsonify({'error': 'Unauthorized'}), 401
+        cursor.execute("SELECT * FROM users WHERE id = ?", (current_user_data['user_id'],))
+    else:
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        
+    user = cursor.fetchone()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    target_user_id = user['id']
+    is_owner = bool(current_user_data and current_user_data['user_id'] == target_user_id)
+
+    # Inventory
+    cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id = ? AND quantity > 0", (target_user_id,))
+    inventory = {row['item_name']: row['quantity'] for row in cursor.fetchall()}
+
+    # Buildings
+    cursor.execute("SELECT id, building_idx, address, tenants FROM user_buildings WHERE user_id = ?", (target_user_id,))
+    buildings = [dict(row) for row in cursor.fetchall()]
+
+    # Published maps
+    cursor.execute("""
+        SELECT id, title, description, restricted_mode, created_at, play_count
+        FROM custom_maps
+        WHERE author_username = ?
+        ORDER BY created_at DESC
+    """, (user['username'],))
+    published_maps = [dict(row) for row in cursor.fetchall()]
+
+    # Word game completed words
+    cursor.execute("SELECT completed_words FROM user_word_game WHERE user_id = ?", (target_user_id,))
+    word_row = cursor.fetchone()
+    completed_words = []
+    if word_row and word_row['completed_words']:
+        try:
+            completed_words = json.loads(word_row['completed_words'])
+        except Exception:
+            completed_words = []
+
+    trophies = calculate_trophies(
+        user,
+        published_maps_count=len(published_maps),
+        buildings_count=len(buildings),
+        completed_words_count=len(completed_words)
+    )
+
+    unlocked_trophies_count = sum(1 for t in trophies if t['unlocked'])
+
+    # Determine user title/rank
+    cum_trash = user['stat_cumulative_trash'] or 0
+    if cum_trash >= 1000:
+        player_title = "Trash Titan"
+    elif cum_trash >= 500:
+        player_title = "Master Scavenger"
+    elif cum_trash >= 200:
+        player_title = "Senior Sweeper"
+    elif cum_trash >= 50:
+        player_title = "City Custodian"
+    else:
+        player_title = "Rookie Sweeper"
+
+    if user['political_office'] and user['political_office'] != 'citizen':
+        player_title = f"{user['political_office'].title()} of Trash City"
+    elif user['made_man_status'] and user['made_man_status'] != 'none':
+        player_title = f"Syndicate {user['made_man_status'].title()}"
+
+    profile_data = {
+        'id': user['id'],
+        'username': user['username'],
+        'role': user['role'],
+        'avatar_sticker': user['avatar_sticker'] or 'ducky_sticker.png',
+        'avatar_path': f"assets/stickers/{user['avatar_sticker'] or 'ducky_sticker.png'}",
+        'chosen_sprite': user['chosen_sprite'] or 'char2',
+        'bio': user['bio'] or 'Ready to clean up the city!',
+        'title': player_title,
+        'created_at': user['created_at'] if 'created_at' in user.keys() else '2026-01-01',
+        'is_owner': is_owner,
+        'balance': user['balance'] or 0,
+        'has_truck': bool(user['has_truck']),
+        'movement_size': user['movement_size'] or 0,
+        'international_followers': user['international_followers'] or 0,
+        'made_man_status': user['made_man_status'] or 'none',
+        'political_office': user['political_office'] or 'citizen',
+        'completed_mafia_jobs': user['completed_mafia_jobs'] or 0,
+        'lids': int(user['lids'] or 0) if 'lids' in user.keys() else 0,
+        'current_streak': int(user['current_streak'] or 0) if 'current_streak' in user.keys() else 0,
+        'max_streak': int(user['max_streak'] or 0) if 'max_streak' in user.keys() else 0,
+        'last_active_date': user['last_active_date'] if 'last_active_date' in user.keys() else None,
+        'streak_qualified': int(user['streak_qualified'] or 0) if 'streak_qualified' in user.keys() else 0,
+        'stats': {
+            'stat_cumulative_trash': user['stat_cumulative_trash'] or 0,
+            'stat_max_single_trash': user['stat_max_single_trash'] or 0,
+            'stat_cumulative_money': user['stat_cumulative_money'] or 0,
+            'stat_max_single_money': user['stat_max_single_money'] or 0,
+            'stat_max_single_followers': user['stat_max_single_followers'] or 0,
+            'total_rounds_played': user['total_rounds_played'] or 0
+        },
+        'inventory': inventory,
+        'buildings': buildings,
+        'completed_words_count': len(completed_words),
+        'published_maps': published_maps,
+        'published_maps_count': len(published_maps),
+        'trophies': trophies,
+        'trophy_stats': {
+            'unlocked': unlocked_trophies_count,
+            'total': len(trophies),
+            'percentage': round((unlocked_trophies_count / len(trophies)) * 100)
+        }
+    }
+
+    return jsonify({'success': True, 'profile': profile_data})
+
+@app.route('/api/user/profile', methods=['POST'])
+def update_user_profile():
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json or {}
+    avatar_sticker = data.get('avatar_sticker')
+    bio = data.get('bio')
+    chosen_sprite = data.get('chosen_sprite')
+    
+    db = get_db()
+    cursor = db.cursor()
+    
+    updates = []
+    params = []
+    if avatar_sticker is not None:
+        updates.append("avatar_sticker = ?")
+        params.append(avatar_sticker)
+    if bio is not None:
+        bio = bio.strip()[:200]
+        updates.append("bio = ?")
+        params.append(bio)
+    if chosen_sprite is not None:
+        updates.append("chosen_sprite = ?")
+        params.append(chosen_sprite)
+        
+    if updates:
+        params.append(user_data['user_id'])
+        db.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+        db.commit()
+        
+    cursor.execute("SELECT id, username, avatar_sticker, bio, chosen_sprite FROM users WHERE id = ?", (user_data['user_id'],))
+    updated_user = dict(cursor.fetchone())
+    return jsonify({
+        'success': True, 
+        'user': updated_user,
+        'avatar_path': f"assets/stickers/{updated_user['avatar_sticker'] or 'ducky_sticker.png'}"
+    })
+
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    category = request.args.get('category', 'trash')
+    db = get_db()
+    cursor = db.cursor()
+    
+    if category == 'single_trash':
+        query = """
+            SELECT username, chosen_sprite, IFNULL(avatar_sticker, 'ducky_sticker.png') AS avatar_sticker,
+                   stat_max_single_trash AS score, total_rounds_played, bio
+            FROM users
+            WHERE role != 'admin' AND stat_max_single_trash > 0
+            ORDER BY stat_max_single_trash DESC, total_rounds_played DESC
+            LIMIT 25
+        """
+        metric_label = "Single-Run High Score"
+        metric_unit = "cans"
+    elif category == 'money':
+        query = """
+            SELECT username, chosen_sprite, IFNULL(avatar_sticker, 'ducky_sticker.png') AS avatar_sticker,
+                   (balance + stat_cumulative_money) AS score, total_rounds_played, bio
+            FROM users
+            WHERE role != 'admin'
+            ORDER BY score DESC, balance DESC
+            LIMIT 25
+        """
+        metric_label = "Total Wealth"
+        metric_unit = "$"
+    elif category == 'followers':
+        query = """
+            SELECT username, chosen_sprite, IFNULL(avatar_sticker, 'ducky_sticker.png') AS avatar_sticker,
+                   (movement_size + international_followers) AS score, total_rounds_played, bio
+            FROM users
+            WHERE role != 'admin'
+            ORDER BY score DESC, stat_max_single_followers DESC
+            LIMIT 25
+        """
+        metric_label = "Total Movement Size"
+        metric_unit = "followers"
+    elif category == 'maps':
+        query = """
+            SELECT u.username, u.chosen_sprite, IFNULL(u.avatar_sticker, 'ducky_sticker.png') AS avatar_sticker,
+                   COUNT(m.id) AS score, IFNULL(SUM(m.play_count), 0) AS extra_score, u.bio
+            FROM users u
+            INNER JOIN custom_maps m ON u.username = m.author_username
+            WHERE u.role != 'admin'
+            GROUP BY u.username
+            ORDER BY score DESC, extra_score DESC
+            LIMIT 25
+        """
+        metric_label = "Published Maps"
+        metric_unit = "maps"
+    else: # default: cumulative trash
+        query = """
+            SELECT username, chosen_sprite, IFNULL(avatar_sticker, 'ducky_sticker.png') AS avatar_sticker,
+                   stat_cumulative_trash AS score, total_rounds_played, bio
+            FROM users
+            WHERE role != 'admin'
+            ORDER BY stat_cumulative_trash DESC, stat_max_single_trash DESC
+            LIMIT 25
+        """
+        metric_label = "Lifetime Trash Cleaned"
+        metric_unit = "cans"
+        
+    cursor.execute(query)
+    rows = []
+    for rank, row in enumerate(cursor.fetchall(), 1):
+        item = dict(row)
+        item['rank'] = rank
+        item['avatar_path'] = f"assets/stickers/{item['avatar_sticker']}"
+        rows.append(item)
+        
+    return jsonify({
+        'success': True,
+        'category': category,
+        'metric_label': metric_label,
+        'metric_unit': metric_unit,
+        'leaderboard': rows
+    })
+
 # ------------------------------------------------------------
 # Custom Maps API
 # ------------------------------------------------------------
@@ -1354,12 +2153,18 @@ def political_choice():
 def get_maps():
     db = get_db()
     cursor = db.execute("""
-        SELECT id, title, author_username, description, restricted_mode, created_at, play_count
-        FROM custom_maps
-        ORDER BY created_at DESC
+        SELECT m.id, m.title, m.author_username, m.description, m.restricted_mode, m.created_at, m.play_count,
+               IFNULL(u.avatar_sticker, 'ducky_sticker.png') AS author_avatar
+        FROM custom_maps m
+        LEFT JOIN users u ON m.author_username = u.username
+        ORDER BY m.created_at DESC
         LIMIT 100
     """)
-    maps = [dict(row) for row in cursor.fetchall()]
+    maps = []
+    for row in cursor.fetchall():
+        m = dict(row)
+        m['author_avatar_path'] = f"assets/stickers/{m['author_avatar']}"
+        maps.append(m)
     return jsonify({'success': True, 'maps': maps})
 
 @app.route('/api/maps/publish', methods=['POST'])
@@ -1370,7 +2175,12 @@ def publish_map():
         token = auth_header.split(' ')[1]
         try:
             payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            username = payload.get('username', 'Anonymous Builder')
+            username = payload.get('username')
+            if not username and 'user_id' in payload:
+                db_temp = get_db()
+                u_row = db_temp.execute("SELECT username FROM users WHERE id = ?", (payload['user_id'],)).fetchone()
+                if u_row:
+                    username = u_row['username']
         except Exception:
             pass
 
@@ -1403,11 +2213,17 @@ def publish_map():
 @app.route('/api/maps/<int:map_id>', methods=['GET'])
 def get_map_by_id(map_id):
     db = get_db()
-    cursor = db.execute("SELECT * FROM custom_maps WHERE id = ?", (map_id,))
+    cursor = db.execute("""
+        SELECT m.*, IFNULL(u.avatar_sticker, 'ducky_sticker.png') AS author_avatar
+        FROM custom_maps m
+        LEFT JOIN users u ON m.author_username = u.username
+        WHERE m.id = ?
+    """, (map_id,))
     row = cursor.fetchone()
     if not row:
         return jsonify({'error': 'Map not found'}), 404
     m = dict(row)
+    m['author_avatar_path'] = f"assets/stickers/{m['author_avatar']}"
     try:
         m['map_data'] = json.loads(m['map_data'])
     except Exception:
@@ -1430,5 +2246,26 @@ def record_map_play(map_id):
         pass
     return jsonify({'success': True, 'map': m})
 
+@app.route('/api/maps/<int:map_id>/unpublish', methods=['POST'])
+def unpublish_map(map_id):
+    user_data = verify_token(request)
+    if not user_data: return jsonify({'error': 'Unauthorized'}), 401
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT author_username FROM custom_maps WHERE id = ?", (map_id,))
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({'error': 'Map not found'}), 404
+        
+    cursor.execute("SELECT username, role FROM users WHERE id = ?", (user_data['user_id'],))
+    user_row = cursor.fetchone()
+    if not user_row or (user_row['username'] != row['author_username'] and user_row['role'] != 'admin'):
+        return jsonify({'error': 'Forbidden: You can only unpublish your own maps'}), 403
+        
+    db.execute("DELETE FROM custom_maps WHERE id = ?", (map_id,))
+    db.commit()
+    return jsonify({'success': True, 'unregistered_id': map_id})
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000)
+    app.run(host='0.0.0.0', port=3000, debug=True)

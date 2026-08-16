@@ -8,6 +8,7 @@ const DEFAULT_KEYBINDS = {
     moveDown: 'ArrowDown',
     moveLeft: 'ArrowLeft',
     moveRight: 'ArrowRight',
+    jump: ' ',
     pickupTrash: 'q',
     interact: 'e',
     harvestTree: 'x',
@@ -67,6 +68,7 @@ const ACTION_CONFIG = [
             { id: 'moveDown', label: 'Move Down' },
             { id: 'moveLeft', label: 'Move Left' },
             { id: 'moveRight', label: 'Move Right' },
+            { id: 'jump', label: 'Jump' },
             { id: 'pickupTrash', label: 'Pick Up Trash' },
             { id: 'interact', label: 'Interact / Enter Building / Deliver' },
             { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' }
@@ -198,13 +200,14 @@ class KeybindManager {
         if (actionId === 'moveDown' && (pressed === 'arrowdown' || pressed === 's')) return true;
         if (actionId === 'moveLeft' && (pressed === 'arrowleft' || pressed === 'a')) return true;
         if (actionId === 'moveRight' && (pressed === 'arrowright' || pressed === 'd')) return true;
+        if (actionId === 'jump' && (pressed === ' ' || pressed === 'space' || pressed === 'spacebar' || (e && e.code === 'Space'))) return true;
 
         return pressed === assigned;
     }
 
     formatKeyName(key) {
         if (!key) return '[ NONE ]';
-        if (key === ' ') return '[ SPACE ]';
+        if (key === ' ' || key.toLowerCase() === 'space') return '[ SPACE ]';
         if (key === 'ArrowUp') return '[ UP ARROW ]';
         if (key === 'ArrowDown') return '[ DOWN ARROW ]';
         if (key === 'ArrowLeft') return '[ LEFT ARROW ]';

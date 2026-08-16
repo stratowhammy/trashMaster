@@ -600,7 +600,7 @@ class CrimeManager {
     }
 
     update(dt, game) {
-        if (!window.crimeMode && !(window.politicsMode && game.acceptedMafiaVotes) && !game.priceFixingActive && !game.blackMarketPenalized && !(game.poisonPoliceChaseTimer > 0)) return;
+        if (!window.crimeMode && !(window.politicsMode && game.acceptedMafiaVotes) && !game.priceFixingActive && !game.blackMarketPenalized && !(game.poisonPoliceChaseTimer > 0) && (!this.police || this.police.length === 0)) return;
 
         // If robbing the bank, decay gold bags over time
         if (this.activeTask && this.activeTask.type === 'rob_bank' && this.goldBags.length > 0) {

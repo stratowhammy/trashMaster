@@ -16,7 +16,12 @@ class Player {
         this.animTimer = 0;
         this.positionHistory = [];
         this.historyMaxLength = 2000;
-        this.keys = { up: false, down: false, left: false, right: false, k: false };
+        this.keys = { up: false, down: false, left: false, right: false, space: false, k: false };
+
+        // Jumping state
+        this.isJumping = false;
+        this.jumpHeight = 0;
+        this.jumpVelocity = 0;
 
         // Character class & Phase 1 state
         this.characterClass = spriteId; // e.g. 'char1' through 'char6'
@@ -28,23 +33,51 @@ class Player {
         this.dockedBoat = null;         // Pirate Mode: { x, y, direction } of anchored boat on shore
     }
 
+    jump() {
+        if (!this.isJumping && this.jumpHeight <= 0.01) {
+            this.isJumping = true;
+            this.jumpVelocity = 5.6; // Upward jump velocity
+            if (window.soundManager && typeof window.soundManager.playJumpSFX === 'function') {
+                window.soundManager.playJumpSFX();
+            }
+        }
+    }
+
     handleKeyDown(e) {
         if (!e || !e.key) return;
-        if (window.isKey(e, 'moveUp')) this.keys.up = true;
-        if (window.isKey(e, 'moveDown')) this.keys.down = true;
-        if (window.isKey(e, 'moveLeft')) this.keys.left = true;
-        if (window.isKey(e, 'moveRight')) this.keys.right = true;
+        if (window.isKey && window.isKey(e, 'moveUp') || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.keys.up = true;
+        if (window.isKey && window.isKey(e, 'moveDown') || e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.keys.down = true;
+        if (window.isKey && window.isKey(e, 'moveLeft') || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = true;
+        if (window.isKey && window.isKey(e, 'moveRight') || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = true;
+        if ((window.isKey && window.isKey(e, 'jump')) || e.code === 'Space' || e.key === ' ') {
+            this.keys.space = true;
+            this.jump();
+        }
     }
 
     handleKeyUp(e) {
         if (!e || !e.key) return;
-        if (window.isKey(e, 'moveUp')) this.keys.up = false;
-        if (window.isKey(e, 'moveDown')) this.keys.down = false;
-        if (window.isKey(e, 'moveLeft')) this.keys.left = false;
-        if (window.isKey(e, 'moveRight')) this.keys.right = false;
+        if (window.isKey && window.isKey(e, 'moveUp') || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.keys.up = false;
+        if (window.isKey && window.isKey(e, 'moveDown') || e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.keys.down = false;
+        if (window.isKey && window.isKey(e, 'moveLeft') || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = false;
+        if (window.isKey && window.isKey(e, 'moveRight') || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = false;
+        if ((window.isKey && window.isKey(e, 'jump')) || e.code === 'Space' || e.key === ' ') {
+            this.keys.space = false;
+        }
     }
 
     update(gameMap, dt) {
+        // Vertical jump physics update
+        if (this.isJumping || this.jumpHeight > 0) {
+            this.jumpHeight += this.jumpVelocity * 60 * dt;
+            this.jumpVelocity -= 26 * dt; // Gravity
+            if (this.jumpHeight <= 0) {
+                this.jumpHeight = 0;
+                this.jumpVelocity = 0;
+                this.isJumping = false;
+            }
+        }
+
         if (window.game && window.game.pirateModeManager && window.game.pirateModeManager.playerStunTimer > 0) {
             this.moving = false;
             return; // Immobilized by cannonball!
@@ -216,6 +249,18 @@ class Player {
 
         const screen = camera.worldToScreen(this.x, this.y);
         let drawSize = 64;
+        const jHeight = this.jumpHeight || 0;
+
+        // Ground shadow when in the air
+        if (jHeight > 0) {
+            const shadowScale = Math.max(0.3, 1 - (jHeight / 60));
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(screen.x, screen.y + 18, 16 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
         
         if (this.direction === 'left') {
             this.lastFacingDir = 'left';
@@ -239,7 +284,7 @@ class Player {
         if (img && (img.complete || img instanceof HTMLCanvasElement)) {
             let bobY = this.moving ? Math.sin(this.animTimer * 0.8) * 1.5 : 0;
             ctx.save();
-            ctx.translate(screen.x, screen.y + bobY);
+            ctx.translate(screen.x, screen.y + bobY - jHeight);
             
             if (window.duckyModeActive) {
                 // ducky_left and ducky_right pre-oriented
@@ -262,13 +307,13 @@ class Player {
             ctx.drawImage(img, -drawSize/2, -drawSize/2, drawSize, drawSize);
             ctx.restore();
         } else {
-            this._drawFallback(ctx, screen.x, screen.y);
+            this._drawFallback(ctx, screen.x, screen.y - jHeight);
         }
 
         ctx.fillStyle = '#00ff88';
         ctx.font = 'bold 10px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('YOU', screen.x, screen.y - drawSize/2 - 6);
+        ctx.fillText('YOU', screen.x, screen.y - jHeight - drawSize/2 - 6);
     }
 
     _drawFallback(ctx, sx, sy) {

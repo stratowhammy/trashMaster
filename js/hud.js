@@ -207,34 +207,125 @@ class HUD {
         ctx.fillStyle = (this.trashInWindow >= 7) ? '#0f8' : (this.trashInWindow >= 5 ? '#ffcc00' : '#f44');
         ctx.fillText(`Trash: ${this.trashInWindow || 0}/7`, scoreX - 5, scoreY + 40);
 
-        // ── Follower Count (top-left) ──
-        const fX = 20;
-        const fY = 20;
+        // ── Player Avatar & Posse Card (top-left) ──
+        const pCardX = 20;
+        const pCardY = 20;
+        const pCardW = 210;
+        const pCardH = 46;
 
-        ctx.fillStyle = 'rgba(10,15,25,0.75)';
+        this.profileBtnBounds = { x: pCardX - 10, y: pCardY - 10, width: pCardW, height: pCardH };
+
+        ctx.fillStyle = 'rgba(10,15,25,0.85)';
         ctx.beginPath();
-        ctx.roundRect(fX - 10, fY - 10, 160, 40, 8);
+        ctx.roundRect(pCardX - 10, pCardY - 10, pCardW, pCardH, 8);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(100,200,255,0.2)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,255,204,0.4)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(fX - 10, fY - 10, 160, 40, 8);
+        ctx.roundRect(pCardX - 10, pCardY - 10, pCardW, pCardH, 8);
         ctx.stroke();
 
-        ctx.fillStyle = '#68f';
-        ctx.font = '16px serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('👥', fX, fY + 12);
+        // Draw Avatar Sticker image
+        if (!this.avatarImg || this.avatarSrc !== (window.currentUserAvatar || 'ducky_sticker.png')) {
+            this.avatarSrc = window.currentUserAvatar || 'ducky_sticker.png';
+            this.avatarImg = new Image();
+            this.avatarImg.src = `assets/stickers/${this.avatarSrc}`;
+        }
 
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px "Press Start 2P", monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(`Posse: ${this.followerCount}`, fX + 28, fY + 12);
+        if (this.avatarImg.complete && this.avatarImg.naturalWidth > 0) {
+            ctx.drawImage(this.avatarImg, pCardX - 4, pCardY - 4, 34, 34);
+        } else {
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = '16px serif';
+            ctx.fillText('👤', pCardX - 4, pCardY + 20);
+        }
 
-        // ── Politics/El Presidente Mode Votes Display (top-left, below Posse) ──
+        const currentName = window.currentUsername || 'Player';
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = 'bold 8px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(currentName.slice(0, 10), pCardX + 36, pCardY + 10);
+
+        const curLids = (window.playerLids !== undefined ? window.playerLids : ((window.playerInventory && window.playerInventory['Lids']) || 0));
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillText(`🥫 ${curLids}`, pCardX + 125, pCardY + 10);
+
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillText(`Posse: ${this.followerCount}`, pCardX + 36, pCardY + 26);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '5px "Press Start 2P", monospace';
+        ctx.fillText('[TAB] Match', pCardX + 125, pCardY + 26);
+
+        // ── Map GPS Coordinates Box (top-left, below Player Card) ──
+        if (window.game && window.game.gameMap) {
+            const gpsX = pCardX - 10;
+            const gpsY = pCardY + pCardH + 4;
+            const gpsW = pCardW;
+            const gpsH = 34;
+
+            ctx.fillStyle = 'rgba(10, 15, 25, 0.85)';
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(gpsX, gpsY, gpsW, gpsH, 6);
+            else ctx.rect(gpsX, gpsY, gpsW, gpsH);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+            ctx.lineWidth = 1;
+            if (ctx.roundRect) ctx.roundRect(gpsX, gpsY, gpsW, gpsH, 6);
+            else ctx.strokeRect(gpsX, gpsY, gpsW, gpsH);
+            ctx.stroke();
+
+            const getBldgCoords = (type) => {
+                if (!window.game || !window.game.gameMap || !window.game.gameMap.buildings) return '??,??';
+                const b = window.game.gameMap.buildings.find(bldg => {
+                    if (!bldg || !bldg.type) return false;
+                    const bt = bldg.type.toLowerCase();
+                    if (type === 'pulp_mill') return bt === 'pulp_mill' || bt === 'pulp mill';
+                    if (type === 'goose') return bt === 'goose' || bt === 'fast_food';
+                    if (type === 'zippy_ds') return bt === 'zippy_ds' || bt === 'zippy ds';
+                    if (type === 'chinos_steaks') return bt === 'chinos_steaks' || bt === 'chinos';
+                    if (type === 'rats_steaks') return bt === 'rats_steaks' || bt === 'rats';
+                    return bt === type;
+                });
+                if (!b) return '??,??';
+                let tx = 0, ty = 0;
+                if (b.doorTiles && b.doorTiles.length > 0) {
+                    tx = b.doorTiles[0].x;
+                    ty = b.doorTiles[0].y;
+                } else if (b.tiles && b.tiles.length > 0) {
+                    tx = b.tiles[0].x;
+                    ty = b.tiles[0].y;
+                } else {
+                    tx = Math.floor(b.x / TILE_SIZE);
+                    ty = Math.floor(b.y / TILE_SIZE);
+                }
+                return `${wrapTileX(tx)},${wrapTileY(ty)}`;
+            };
+
+            const playerTX = window.game.player ? wrapTileX(Math.floor(window.game.player.x / TILE_SIZE)) : 0;
+            const playerTY = window.game.player ? wrapTileY(Math.floor(window.game.player.y / TILE_SIZE)) : 0;
+            const dumpCoord = getBldgCoords('dump');
+            const hospCoord = getBldgCoords('hospital');
+            const airpCoord = getBldgCoords('airport');
+            const pulpCoord = getBldgCoords('pulp_mill');
+
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = '6px "Press Start 2P", monospace';
+            ctx.fillText(`📍 YOU: (${playerTX}, ${playerTY})`, gpsX + 6, gpsY + 11);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '5.5px "Press Start 2P", monospace';
+            ctx.fillText(`🗑️DUMP:${dumpCoord}  🏥HOSP:${hospCoord}`, gpsX + 6, gpsY + 22);
+            ctx.fillText(`✈️AIRP:${airpCoord}  🪵PULP:${pulpCoord}`, gpsX + 6, gpsY + 31);
+        }
+
+        // ── Politics/El Presidente Mode Votes Display (top-left, below Player Card) ──
         if ((window.politicsMode || window.elPresidenteElection) && window.game) {
             const pvX = 20;
-            const pvY = 70;
+            const pvY = 76;
             ctx.fillStyle = 'rgba(10,15,25,0.75)';
             ctx.beginPath();
             ctx.roundRect(pvX - 10, pvY - 10, 220, 40, 8);
@@ -264,7 +355,7 @@ class HUD {
             const vacX = 20;
             const ownedCount = (window.game.ownedBuildings || []).length;
             const vacancies = window.game.totalVacancies || 0;
-            const bvY = (window.politicsMode || window.elPresidenteElection) ? 120 : 70;
+            const bvY = (window.politicsMode || window.elPresidenteElection) ? 126 : 76;
             ctx.fillStyle = 'rgba(10,15,25,0.75)';
             ctx.beginPath();
             ctx.roundRect(vacX - 10, bvY - 10, 230, 40, 8);
@@ -659,7 +750,7 @@ class HUD {
     }
 
     renderDoomStatusBar(ctx, w, h, game) {
-        const barH = 64;
+        const barH = 78;
         const barY = h - barH;
 
         ctx.save();
@@ -677,14 +768,14 @@ class HUD {
 
         const pFaceW = 64;
         const remainingW = maxBarWidth - pFaceW - 24;
-        const p1W = Math.floor(remainingW * 0.35); // Trash Load
-        const p3W = Math.floor(remainingW * 0.35); // Bank Balance & Posse
+        const p1W = Math.floor(remainingW * 0.33); // Trash Load
+        const p3W = Math.floor(remainingW * 0.42); // Bank Balance, Posse & GPS Coordinates
         const p4W = remainingW - p1W - p3W;        // Time & Mode
 
         let currX = startX;
 
         // 1. TRASH LOAD PANEL
-        const panelMargin = 6;
+        const panelMargin = 5;
         const panelY = barY + panelMargin;
         const panelH = barH - panelMargin * 2;
 
@@ -694,93 +785,174 @@ class HUD {
         ctx.lineWidth = 2;
         ctx.strokeRect(currX, panelY, p1W, panelH);
 
-        const truckCount = (game && game.trashTrucksPurchased) || (window.playerHasTruck) || 0;
-        const maxCapacity = 100 + truckCount * 200;
-        const currentTrash = (game && game.trashCollectedInRound !== undefined) ? game.trashCollectedInRound : (this.trashCarried || 0);
-        const trashPct = Math.min(1.0, currentTrash / maxCapacity);
+        const currentTrash = (game && game.trashCollectedInTruck !== undefined) ? game.trashCollectedInTruck : 0;
+        const animalPenalty = (game && game.player && game.player.capturedAnimals) ? (game.player.capturedAnimals.length * 10) : 0;
+        const trucks = Math.max(0, (window.playerHasTruck || 0));
+        const totalCap = window.pirateMode ? 100 : Math.max(0, 100 + (trucks * 200) - animalPenalty);
+        const treesCarried = (game && game.treesCarried !== undefined) ? game.treesCarried : 0;
+        const treeUnits = treesCarried * 100;
+        const trashUnits = currentTrash;
+        const usedCap = treeUnits + trashUnits;
+        const fillPct = totalCap > 0 ? Math.min(1.0, usedCap / totalCap) : 0;
 
         ctx.fillStyle = '#94a3b8';
         ctx.font = '7px "Press Start 2P", monospace';
         ctx.textAlign = 'left';
-        ctx.fillText('TRASH LOAD', currX + 8, panelY + 14);
+        const panelTitle = window.pirateMode ? 'SHIP HOLD' : (trucks > 0 ? 'TRUCK LOAD' : 'TRASH LOAD');
+        ctx.fillText(panelTitle, currX + 8, panelY + 14);
 
         // Progress Bar
         const barW = p1W - 16;
-        const barFillW = Math.max(0, barW * trashPct);
         ctx.fillStyle = '#1e293b';
-        ctx.fillRect(currX + 8, panelY + 20, barW, 12);
+        ctx.fillRect(currX + 8, panelY + 22, barW, 14);
 
-        let fillColor = '#22c55e';
-        if (trashPct >= 1.0) fillColor = '#ef4444';
-        else if (trashPct > 0.6) fillColor = '#eab308';
+        if (totalCap > 0) {
+            // Green fill for trees (100 capacity per tree)
+            const greenPct = Math.min(1, treeUnits / totalCap);
+            const greenW = barW * greenPct;
+            if (greenW > 0) {
+                ctx.fillStyle = '#2e8b57';
+                ctx.fillRect(currX + 8, panelY + 22, greenW, 14);
+            }
 
-        ctx.fillStyle = fillColor;
-        ctx.fillRect(currX + 8, panelY + 20, barFillW, 12);
-        ctx.strokeStyle = '#000';
-        ctx.strokeRect(currX + 8, panelY + 20, barW, 12);
+            // Brown/Gold fill for regular trash
+            const trashFillPct = Math.min(1 - greenPct, trashUnits / totalCap);
+            const brownW = barW * trashFillPct;
+            if (brownW > 0) {
+                let trashColor = '#8b5a2b';
+                if (fillPct >= 1.0) trashColor = '#ef4444';
+                else if (fillPct > 0.75) trashColor = '#eab308';
+                ctx.fillStyle = trashColor;
+                ctx.fillRect(currX + 8 + greenW, panelY + 22, brownW, 14);
+            }
+        }
+
+        ctx.strokeStyle = '#334155';
+        ctx.strokeRect(currX + 8, panelY + 22, barW, 14);
+
+        const totalRoundTrash = (game && game.trashCollectedInRound !== undefined) ? game.trashCollectedInRound : 0;
+        const evalTrash = (game && game.trashCollectedInWindow !== undefined) ? game.trashCollectedInWindow : 0;
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 8px "Press Start 2P", monospace';
+        ctx.font = 'bold 7px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`HOLD:${usedCap}/${totalCap}`, currX + 8, panelY + 44);
+
+        ctx.fillStyle = '#00ffcc';
+        ctx.textAlign = 'right';
+        ctx.fillText(`TRASH:${totalRoundTrash}`, currX + p1W - 8, panelY + 44);
+
+        ctx.fillStyle = (evalTrash >= 7) ? '#00ff88' : (evalTrash >= 5 ? '#facc15' : '#f87171');
+        ctx.font = '6.5px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${currentTrash} / ${maxCapacity}`, currX + p1W / 2, panelY + 44);
+        ctx.fillText(`EVAL: ${evalTrash}/7`, currX + p1W / 2, panelY + 58);
 
         currX += p1W + 8;
 
-        // 2. DOOM FACE PORTRAIT
+        // 2. PLAYER PROFILE STICKER AVATAR PORTRAIT
         ctx.fillStyle = '#090d16';
         ctx.fillRect(currX, panelY, pFaceW, panelH);
-        ctx.strokeStyle = '#e2e8f0';
+        ctx.strokeStyle = '#00ffcc';
         ctx.lineWidth = 2;
         ctx.strokeRect(currX, panelY, pFaceW, panelH);
 
-        const faceCX = currX + pFaceW / 2;
-        const faceCY = panelY + panelH / 2;
-        const time = performance.now() / 1000;
-        const lookDir = Math.sin(time * 1.5);
+        this.avatarPortraitBounds3D = { x: currX, y: panelY, width: pFaceW, height: panelH };
 
-        // Face skin
-        ctx.fillStyle = '#fed7aa';
-        ctx.fillRect(faceCX - 12, faceCY - 12, 24, 24);
-        // Hair
-        ctx.fillStyle = '#854d0e';
-        ctx.fillRect(faceCX - 14, faceCY - 15, 28, 7);
-        // Eyes
-        const eyeOffset = lookDir > 0.3 ? 2 : (lookDir < -0.3 ? -2 : 0);
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(faceCX - 7 + eyeOffset, faceCY - 4, 3, 3);
-        ctx.fillRect(faceCX + 3 + eyeOffset, faceCY - 4, 3, 3);
-        // Mouth
-        if (trashPct >= 1.0) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(faceCX - 6, faceCY + 5, 12, 4);
-            ctx.fillStyle = '#991b1b';
-            ctx.fillRect(faceCX - 6, faceCY + 6, 12, 1);
+        // Cache and load selected avatar sticker image
+        const currentAvatarFile = window.currentUserAvatar || localStorage.getItem('trashMasterAvatar') || 'ducky_sticker.png';
+        if (!this.avatarImg3D || this.avatarSrc3D !== currentAvatarFile) {
+            this.avatarSrc3D = currentAvatarFile;
+            this.avatarImg3D = new Image();
+            this.avatarImg3D.src = `assets/stickers/${this.avatarSrc3D}`;
+        }
+
+        const facePad = 8;
+        const faceSize = Math.min(pFaceW - facePad * 2, panelH - facePad * 2);
+        const faceX = currX + (pFaceW - faceSize) / 2;
+        const faceY = panelY + (panelH - faceSize) / 2;
+
+        if (this.avatarImg3D.complete && this.avatarImg3D.naturalWidth > 0) {
+            ctx.drawImage(this.avatarImg3D, faceX, faceY, faceSize, faceSize);
         } else {
-            ctx.fillStyle = '#991b1b';
-            ctx.fillRect(faceCX - 5, faceCY + 5, 10, 3);
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = '20px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('👤', currX + pFaceW / 2, panelY + panelH / 2 + 7);
         }
 
         currX += pFaceW + 8;
 
-        // 3. BANK & SCORE LED PANEL
+        // 3. BANK, POSSE & MAP COORDINATES PANEL
         ctx.fillStyle = '#090d16';
         ctx.fillRect(currX, panelY, p3W, panelH);
         ctx.strokeStyle = '#334155';
         ctx.lineWidth = 2;
         ctx.strokeRect(currX, panelY, p3W, panelH);
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '7px "Press Start 2P", monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('BANK BALANCE', currX + 8, panelY + 14);
-
+        // Header: Bank Balance & Posse count
         ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 12px "Press Start 2P", monospace';
-        ctx.fillText(`$${this.score || 0}`, currX + 8, panelY + 30);
+        ctx.font = 'bold 9px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`$${this.score || 0}`, currX + 8, panelY + 14);
 
         ctx.fillStyle = '#38bdf8';
         ctx.font = '7px "Press Start 2P", monospace';
-        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + 8, panelY + 44);
+        ctx.textAlign = 'right';
+        ctx.fillText(`👥 POSSE: ${this.followerCount || 0}`, currX + p3W - 8, panelY + 14);
+
+        // Small Coordinates Box under the Posse count
+        const getBldgCoords = (type) => {
+            if (!game || !game.gameMap || !game.gameMap.buildings) return '??,??';
+            const b = game.gameMap.buildings.find(bldg => {
+                if (!bldg || !bldg.type) return false;
+                const bt = bldg.type.toLowerCase();
+                if (type === 'pulp_mill') return bt === 'pulp_mill' || bt === 'pulp mill';
+                return bt === type;
+            });
+            if (!b) return '??,??';
+            let tx = 0, ty = 0;
+            if (b.doorTiles && b.doorTiles.length > 0) {
+                tx = b.doorTiles[0].x;
+                ty = b.doorTiles[0].y;
+            } else if (b.tiles && b.tiles.length > 0) {
+                tx = b.tiles[0].x;
+                ty = b.tiles[0].y;
+            } else {
+                tx = Math.floor(b.x / TILE_SIZE);
+                ty = Math.floor(b.y / TILE_SIZE);
+            }
+            return `${wrapTileX(tx)},${wrapTileY(ty)}`;
+        };
+
+        const playerTX = (game && game.player) ? wrapTileX(Math.floor(game.player.x / TILE_SIZE)) : 0;
+        const playerTY = (game && game.player) ? wrapTileY(Math.floor(game.player.y / TILE_SIZE)) : 0;
+
+        const dumpCoord = getBldgCoords('dump');
+        const hospCoord = getBldgCoords('hospital');
+        const airpCoord = getBldgCoords('airport');
+        const pulpCoord = getBldgCoords('pulp_mill');
+
+        const boxX = currX + 6;
+        const boxY = panelY + 22;
+        const boxW = p3W - 12;
+        const boxH = panelH - 26;
+
+        ctx.fillStyle = '#030712';
+        ctx.fillRect(boxX, boxY, boxW, boxH);
+        ctx.strokeStyle = '#1e3a8a';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+        // Coordinates Text inside box
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.fillText(`📍 YOU: (${playerTX}, ${playerTY})`, boxX + 5, boxY + 10);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '5.5px "Press Start 2P", monospace';
+        ctx.fillText(`🗑️DUMP:${dumpCoord}  🏥HOSP:${hospCoord}`, boxX + 5, boxY + 22);
+        ctx.fillText(`✈️AIRP:${airpCoord}  🪵PULP:${pulpCoord}`, boxX + 5, boxY + 34);
 
         currX += p3W + 8;
 
@@ -802,8 +974,8 @@ class HUD {
         const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 
         ctx.fillStyle = timeLeft < 30 ? '#ef4444' : '#facc15';
-        ctx.font = 'bold 12px "Press Start 2P", monospace';
-        ctx.fillText(timeStr, currX + 8, panelY + 30);
+        ctx.font = 'bold 10.5px "Press Start 2P", monospace';
+        ctx.fillText(`${timeStr} (${Math.ceil(timeLeft)}s)`, currX + 8, panelY + 30);
 
         let modeLabel = '🏙️ CLEANING';
         if (window.pirateMode) modeLabel = '🏴‍☠️ PIRATE';
@@ -813,7 +985,7 @@ class HUD {
 
         ctx.fillStyle = '#e2e8f0';
         ctx.font = '7px "Press Start 2P", monospace';
-        ctx.fillText(modeLabel, currX + 8, panelY + 44);
+        ctx.fillText(modeLabel, currX + 8, panelY + 50);
 
         ctx.restore();
     }

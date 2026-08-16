@@ -76,6 +76,11 @@
                     <button class="btn sprite-option-btn" data-sprite="char6">⚡ SUPERHERO</button>
                 </div>
 
+                <label style="font-size: 8px; color: #00ffcc; display: block; margin-bottom: 8px; text-align: left;">CHOOSE AVATAR STICKER:</label>
+                <div id="register-stickers-container" style="display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: #050a12; border: 2px solid #1a2a44; border-radius: 6px; margin-bottom: 18px;">
+                    <!-- Populated dynamically from js/profile.js -->
+                </div>
+
                 <div style="display: flex; gap: 10px;">
                     <button id="btn-do-register" class="btn" style="flex: 1; background: #00aa66; border-color: #007744;">Register & Play 🚀</button>
                     <button id="btn-goto-login" class="btn secondary" style="flex: 1;">Back to Login</button>
@@ -118,6 +123,8 @@
                 <h1 class="store-title">Trash Master</h1>
                 <div class="store-stats-badge">
                     <div class="stat-item"><span class="stat-label">BALANCE:</span> <span id="store-balance" class="stat-value">$0</span></div>
+                    <div class="stat-item"><span class="stat-label">LIDS:</span> <span id="store-lids" class="stat-value">0</span> 🥫</div>
+                    <div class="stat-item"><span class="stat-label">STREAK:</span> <span id="store-streak" class="stat-value">0d</span> 🔥</div>
                     <div class="stat-item"><span class="stat-label">MOVEMENT:</span> <span id="store-movement-size" class="stat-value">0</span> followers</div>
                     <div class="stat-item"><span class="stat-label">INTL:</span> <span id="store-international-followers" class="stat-value">0</span> followers</div>
                 </div>
@@ -132,8 +139,27 @@
                     </div>
                 </div>
 
-                <!-- Column 2: Game Modes -->
+                <!-- Column 2: Streak & Game Modes -->
                 <div class="store-dashboard-panel info-panel">
+                    <div class="panel-header">🔥 DAILY STREAK & LIDS</div>
+                    <div id="streak-panel-widget" style="padding: 10px; background: rgba(5, 15, 25, 0.7); border: 1px solid rgba(0,255,204,0.25); border-radius: 6px; margin-bottom: 12px; font-family: 'Press Start 2P', monospace;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 8px; color: #ffaa00;">ACTIVE STREAK:</span>
+                            <span id="streak-counter-badge" style="font-size: 8px; background: #221500; border: 1px solid #ffaa00; padding: 4px 8px; border-radius: 4px; color: #ffcc00;">🔥 0 Days</span>
+                        </div>
+                        <div id="streak-progress-bar-container" style="background: #111; border: 1px solid #444; border-radius: 4px; height: 16px; overflow: hidden; margin-bottom: 8px; position: relative;">
+                            <div id="streak-progress-bar" style="background: linear-gradient(90deg, #ffaa00, #00ffcc); height: 100%; width: 0%; transition: width 0.4s ease;"></div>
+                            <span id="streak-progress-text" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; line-height: 16px; font-size: 7px; color: #fff; text-shadow: 1px 1px #000;">0 / 7 Days to Unlock</span>
+                        </div>
+                        <div id="streak-status-desc" style="color: #00ffcc; font-size: 7px; line-height: 1.5; margin-bottom: 6px;">
+                            📅 7-Day Streak unlocks retroactive Lid payout for all games!
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 7px; color: #888;">
+                            <span>VAULT: <strong id="streak-lids-count" style="color:#00ffcc;">0 Lids 🥫</strong></span>
+                            <span>TODAY: <strong id="streak-today-games" style="color:#ffcc00;">0 games</strong></span>
+                        </div>
+                    </div>
+
                     <div class="panel-header">🎮 GAME MODES</div>
                     <div class="game-modes-grid">
                         <div id="pirate-toggle-container" class="toggle-container">
@@ -597,14 +623,19 @@
 
     <!-- Fast Food Dialog -->
     <div id="fast-food-dialog" class="hidden" style="position: fixed; z-index: 1001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
-        <div style="background: #222; border: 4px solid #ffaa00; border-radius: 12px; padding: 25px; width: 400px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
-            <div style="font-size: 48px; margin-bottom: 15px;">🍔</div>
-            <h2 style="color: #ffaa00; margin-bottom: 15px; font-size: 16px;">Feed Your Posse?</h2>
-            <p id="fast-food-cost-text" style="color: #ddd; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">Cost: $0</p>
-            <p id="fast-food-warning-text" style="color: #ff3333; font-size: 10px; line-height: 1.6; margin-bottom: 25px; display: none; font-family: 'Press Start 2P', monospace;"></p>
+        <div id="fast-food-card-box" style="background: #222; border: 4px solid #ffaa00; border-radius: 12px; padding: 25px; width: 440px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.8);">
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 12px;">
+                <img id="fast-food-dialog-img" src="assets/sprites/goose.png" style="width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; border-radius: 6px;" />
+                <div id="fast-food-emoji" style="font-size: 48px; display: none;">🍔</div>
+            </div>
+            <h2 id="fast-food-title" style="color: #ffaa00; margin-bottom: 8px; font-size: 15px; font-family: 'Press Start 2P', monospace;">Goose Fast Food</h2>
+            <div id="fast-food-item-name" style="font-size: 11px; font-weight: bold; color: #ffffff; margin-bottom: 10px; font-family: 'Press Start 2P', monospace;">Classic Hoagie (Tier 2)</div>
+            <p id="fast-food-effects-text" style="color: #00ffaa; font-size: 9px; line-height: 1.6; margin-bottom: 12px; font-family: 'Press Start 2P', monospace; background: rgba(0,255,170,0.1); padding: 8px; border-radius: 6px; border: 1px dashed #00ffaa;"></p>
+            <p id="fast-food-cost-text" style="color: #ffd700; font-size: 11px; line-height: 1.6; margin-bottom: 20px; font-family: 'Press Start 2P', monospace;">Cost: $0</p>
+            <p id="fast-food-warning-text" style="color: #ff3333; font-size: 9px; line-height: 1.6; margin-bottom: 20px; display: none; font-family: 'Press Start 2P', monospace;"></p>
             <div style="display: flex; gap: 15px; justify-content: center;">
-                <button id="btn-fast-food-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px;">Yes</button>
-                <button id="btn-fast-food-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px;">No</button>
+                <button id="btn-fast-food-yes" class="btn" style="background: #44cc44; border-color: #22aa22; min-width: 120px;">Feed Posse</button>
+                <button id="btn-fast-food-no" class="btn" style="background: #cc4444; border-color: #aa2222; min-width: 120px;">Leave</button>
             </div>
         </div>
     </div>
@@ -785,9 +816,9 @@
 
     <!-- Black Market Retro Pixel Art Dialog -->
     <div id="black-market-dialog" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.88); z-index: 2000; display: flex; align-items: center; justify-content: center;">
-        <div style="width: 520px; max-height: 90vh; overflow-y: auto; background: #12061c; border: 4px solid #ff0055; border-radius: 8px; padding: 20px; box-shadow: 0 0 25px rgba(255, 0, 85, 0.6); color: #fff; font-family: 'Press Start 2P', monospace; text-align: center;">
-            <div style="font-size: 14px; color: #ff0055; text-shadow: 2px 2px #550011; margin-bottom: 10px;">☠️ BLACK MARKET TRADING ☠️</div>
-            <div style="font-size: 8px; color: #ffcc00; line-height: 1.5; margin-bottom: 14px;">"Buy illegal contraband or sell wild shrooms! Watch out—some shrooms are deadly!"</div>
+        <div style="width: 540px; max-height: 90vh; overflow-y: auto; background: #12061c; border: 4px solid #ff0055; border-radius: 8px; padding: 20px; box-shadow: 0 0 25px rgba(255, 0, 85, 0.6); color: #fff; font-family: 'Press Start 2P', monospace; text-align: center;">
+            <div style="font-size: 14px; color: #ff0055; text-shadow: 2px 2px #550011; margin-bottom: 8px;">☠️ BLACK MARKET TRADING ☠️</div>
+            <div style="font-size: 8px; color: #ffcc00; line-height: 1.5; margin-bottom: 12px;">"Trade illegal contraband, sell wild shrooms, and fence bottle caps (Lids)!"</div>
             
             <div id="bm-status-info" style="font-size: 8px; background: rgba(255,0,85,0.15); border: 1px dashed #ff0055; padding: 10px; margin-bottom: 12px; color: #00ffcc; line-height: 1.6;">
                 Loading stock...
@@ -795,15 +826,35 @@
 
             <div id="bm-log" style="font-size: 8px; color: #ffaaaa; min-height: 24px; margin-bottom: 12px; line-height: 1.4;"></div>
 
+            <!-- Sell Lids Section -->
+            <div style="font-size: 9px; color: #00ffcc; margin-bottom: 6px; text-align: left; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 4px; display: flex; justify-content: space-between;">
+                <span>🥫 SELL LIDS ($250/EA)</span>
+                <span id="bm-lids-vault-tag" style="color: #ffcc00;">VAULT: <span id="bm-lids-count">0</span></span>
+            </div>
+            <div style="font-size: 7px; color: #ffaaaa; background: rgba(255, 50, 50, 0.1); border: 1px solid rgba(255, 50, 50, 0.3); border-radius: 4px; padding: 6px; margin-bottom: 8px; line-height: 1.5; text-align: left;">
+                ⚠️ <strong>LAW ENFORCEMENT RISK:</strong> Selling ≤10 Lids is SAFE (0 police). Selling &gt;10 Lids dispatches police officers (1 cop per 10 Lids sold: <span style="color:#00ffcc;">Floor(Lids/10)</span>)!
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                <button id="btn-bm-sell-lid-1" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #008855; border: 2px solid #00ff88; color: #fff; cursor: pointer; border-radius: 4px;">1 LID<br><span style="font-size:6px; color:#aaffaa;">+$250</span></button>
+                <button id="btn-bm-sell-lid-5" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #008855; border: 2px solid #00ff88; color: #fff; cursor: pointer; border-radius: 4px;">5 LIDS<br><span style="font-size:6px; color:#aaffaa;">+$1,250</span></button>
+                <button id="btn-bm-sell-lid-10" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #0066aa; border: 2px solid #00ccff; color: #fff; cursor: pointer; border-radius: 4px;">10 LIDS<br><span style="font-size:6px; color:#88ffff;">SAFE +$2.5k</span></button>
+                <button id="btn-bm-sell-lid-all" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 4px; background: #aa0033; border: 2px solid #ff0055; color: #fff; cursor: pointer; border-radius: 4px;">SELL ALL<br><span style="font-size:6px; color:#ffaaaa;">DANGER!</span></button>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 14px; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 4px; border: 1px solid #333;">
+                <input type="number" id="bm-lid-input" min="1" placeholder="Custom Qty" style="width: 110px; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 6px; background: #111; color: #00ffcc; border: 1px solid #00ffcc; border-radius: 4px;">
+                <button id="btn-bm-sell-lid-custom" class="btn" style="flex: 1; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 6px; background: #442266; border: 2px solid #aa44ff; color: #fff; cursor: pointer; border-radius: 4px;">SELL CUSTOM QTY</button>
+                <span id="bm-dispatch-preview" style="font-size: 6px; color: #00ff88; min-width: 90px; text-align: right;">(0 Cops)</span>
+            </div>
+
             <!-- Sell Shrooms Section -->
-            <div style="font-size: 9px; color: #ff0055; margin-bottom: 8px; text-align: left; border-bottom: 1px solid rgba(255,0,85,0.3); padding-bottom: 4px;">🍄 SELL MUSHROOMS</div>
+            <div style="font-size: 9px; color: #ff0055; margin-bottom: 6px; text-align: left; border-bottom: 1px solid rgba(255,0,85,0.3); padding-bottom: 4px;">🍄 SELL MUSHROOMS</div>
             <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 14px;">
                 <button id="btn-bm-sell-one" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 10px; background: #ff0055; border: 2px solid #ff66aa; color: #fff; cursor: pointer; border-radius: 4px;">SELL 1 SHROOM</button>
                 <button id="btn-bm-sell-all" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 10px; background: #aa0044; border: 2px solid #ff0055; color: #fff; cursor: pointer; border-radius: 4px;">SELL ALL SHROOMS</button>
             </div>
 
             <!-- Buy Contraband Section -->
-            <div style="font-size: 9px; color: #00ffcc; margin-bottom: 8px; text-align: left; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 4px;">🛒 BUY CONTRABAND ITEMS</div>
+            <div style="font-size: 9px; color: #00ffcc; margin-bottom: 6px; text-align: left; border-bottom: 1px solid rgba(0,255,204,0.3); padding-bottom: 4px;">🛒 BUY CONTRABAND ITEMS</div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
                 <button id="btn-bm-buy-cannon" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 6px; background: #222544; border: 2px solid #4466ff; color: #fff; cursor: pointer; border-radius: 4px;">💣 10 CANNONBALLS ($100)</button>
                 <button id="btn-bm-buy-portal" class="btn" style="font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 8px 6px; background: #222544; border: 2px solid #00ffcc; color: #fff; cursor: pointer; border-radius: 4px;">🌀 PORTAL GUN ($1,000)</button>
@@ -848,10 +899,15 @@
             <div style="background: #0d1a24; border: 2px solid #00ccff; border-radius: 6px; padding: 10px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-shrink: 0;">
                 <span style="font-size: 8px; color: #00ffcc;">NAVIGATE TO:</span>
                 <select id="nav-location-select" style="background: #050a10; border: 1px solid #00ffcc; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px; border-radius: 4px; cursor: pointer;">
-                    <option value="airport">AIRPORT</option>
-                    <option value="hospital">HOSPITAL</option>
-                    <option value="dump">DUMP</option>
-                    <option value="pulp mill">PULP MILL</option>
+                    <option value="dump">DUMP 🗑️</option>
+                    <option value="pulp mill">PULP MILL 🪵</option>
+                    <option value="hospital">HOSPITAL 🏥</option>
+                    <option value="airport">AIRPORT ✈️</option>
+                    <option value="zippy_ds">ZIPPY D'S 🌯</option>
+                    <option value="goose">GOOSE 🥪</option>
+                    <option value="chinos_steaks">CHINO'S STEAKS 🥩</option>
+                    <option value="rats_steaks">RATS STEAKS 🥩</option>
+                    <option value="black market">BLACK MARKET 🕵️</option>
                 </select>
                 <button id="btn-nav-go" class="btn" style="background: #ffaa00; border: 2px solid #ffcc00; color: #000; padding: 8px 16px; font-size: 8px; font-weight: bold; cursor: pointer; font-family: 'Press Start 2P', monospace; border-radius: 4px;">GO</button>
             </div>
@@ -940,7 +996,7 @@
 
     <!-- Fixed Audio, Keybinds, FPS Toggle & Pause Buttons (Bottom Right) -->
     <div style="position: fixed; right: 20px; bottom: 20px; z-index: 1005; display: flex; gap: 10px; align-items: center;">
-        <button id="btn-fps-toggle" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #00ffcc; color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">🎮 3D FPS</button>
+        <button id="btn-fps-toggle" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #ffaa00; color: #ffaa00; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">🕹️ 2D RETRO</button>
         <button id="btn-sound-menu" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #00ffcc; color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">SOUND</button>
         <button id="btn-keybinds-menu" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #00ccff; color: #00ccff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">KEYS ⌨️</button>
         <button id="btn-pause" style="background: rgba(20, 25, 40, 0.88); border: 2px solid #ffcc00; color: #ffcc00; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; border-radius: 4px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s ease;">PAUSE</button>
@@ -968,9 +1024,11 @@
     <script src="js/crime.js?v=4"></script>
     <script src="js/world_builder.js?v=1"></script>
     <script src="js/map_browser.js?v=1"></script>
+    <script src="js/profile.js?v=1"></script>
 
     <!-- Three.js 3D WebGL Engine & FPS Components -->
     <script src="js/three.min.js"></script>
+    <script src="js/sprites3d.js?v=1"></script>
     <script src="js/map_builder3d.js?v=2"></script>
     <script src="js/billboard_manager3d.js?v=2"></script>
     <script src="js/fps_viewmodel.js?v=2"></script>

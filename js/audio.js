@@ -125,6 +125,31 @@ class SoundManager {
 
     // ── Sound Effects ──
 
+    playJumpSFX() {
+        if (!this.isSFXEnabled('trash')) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(160, now);
+            osc.frequency.exponentialRampToValueAtTime(460, now + 0.12);
+
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(now);
+            osc.stop(now + 0.16);
+        } catch (e) {}
+    }
+
     playButtonClickSFX() {
         if (!this.isSFXEnabled('click')) return;
         if (!this.ctx) this._initAudio();

@@ -27,8 +27,18 @@ async function apiCall(endpoint, method = 'GET', body = null) {
     
     try {
         const res = await fetch(`${API_URL}${endpoint}`, options);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'API Error');
+        const contentType = res.headers.get('content-type') || '';
+        let data = null;
+        if (contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            const text = await res.text();
+            if (!res.ok) {
+                throw new Error(`Server status ${res.status}: ${text.slice(0, 80)}`);
+            }
+            data = { success: true, text };
+        }
+        if (!res.ok) throw new Error((data && data.error) || `API Error ${res.status}`);
         return data;
     } catch (e) {
         throw e;
@@ -104,9 +114,12 @@ function initUI() {
                 authToken = data.token;
                 userRole = data.role;
                 window.currentUsername = user;
+                window.currentUserAvatar = data.avatar_sticker || 'ducky_sticker.png';
+                window.currentUserBio = data.bio || 'Ready to clean up the city!';
                 localStorage.setItem('trashMasterToken', authToken);
                 localStorage.setItem('trashMasterRole', userRole);
                 localStorage.setItem('trashMasterUsername', user);
+                localStorage.setItem('trashMasterAvatar', window.currentUserAvatar);
                 errEl.innerText = '';
                 
                 if (userRole === 'admin') {
@@ -128,6 +141,9 @@ function initUI() {
 
     if (btnGotoRegister) {
         btnGotoRegister.addEventListener('click', () => {
+            if (window.profileManager && typeof window.profileManager.populateRegisterStickers === 'function') {
+                window.profileManager.populateRegisterStickers();
+            }
             showScreen('register-screen');
         });
     }
@@ -166,14 +182,25 @@ function initUI() {
             const activeBtn = document.querySelector('#register-screen .sprite-option-btn.active') || document.querySelector('#register-screen .sprite-option-btn');
             const selectedSprite = activeBtn ? activeBtn.getAttribute('data-sprite') : 'char2';
 
+            const activeStickerBtn = document.querySelector('#register-screen .register-sticker-btn.active');
+            const selectedSticker = activeStickerBtn ? activeStickerBtn.getAttribute('data-sticker') : 'ducky_sticker.png';
+
             try {
-                const data = await apiCall('/api/auth/register', 'POST', { username: user, password: pass, chosen_sprite: selectedSprite });
+                const data = await apiCall('/api/auth/register', 'POST', { 
+                    username: user, 
+                    password: pass, 
+                    chosen_sprite: selectedSprite,
+                    avatar_sticker: selectedSticker
+                });
                 authToken = data.token;
                 userRole = data.role;
                 window.currentUsername = user;
+                window.currentUserAvatar = data.avatar_sticker || selectedSticker;
+                window.currentUserBio = data.bio || 'Ready to clean up the city!';
                 localStorage.setItem('trashMasterToken', authToken);
                 localStorage.setItem('trashMasterRole', userRole);
                 localStorage.setItem('trashMasterUsername', user);
+                localStorage.setItem('trashMasterAvatar', window.currentUserAvatar);
                 if (errEl) errEl.innerText = '';
                 await refreshGameState();
                 renderStore();
@@ -421,9 +448,11 @@ function initUI() {
             activeSlides.push({
                 title: "FAST FOOD MODE 🍔",
                 icon: "assets/sprites/fast_food.png",
-                desc: "Keep your muchachos fed and energized for maximum street performance!",
+                desc: "Keep your muchachos fed and energized across 3 tiers of restaurants!",
                 controls: [
-                    "<span class='key-pill'>E</span> Press E at Fast Food restaurant doors to buy munchies and boost your posse's speed!",
+                    "🌯 Tier 1 - Zippy D's: Budget SnackRap (+25-45% hunger, +8-18% happiness).",
+                    "🥪 Tier 2 - Goose: Classic Hoagie (+55-80% hunger, +20-35% happiness, 25% off w/ Goose Cards).",
+                    "🥩 Tier 3 - Chino's & Rats: Rival Philly Cheesesteaks across the street (+90-100% hunger, +45-70% happiness).",
                     "🏥 Healthcare: Greasy food can cause ailments—visit the Hospital and press E for healthcare!"
                 ]
             });
@@ -650,20 +679,33 @@ function initUI() {
     const btnFpsToggle = document.getElementById('btn-fps-toggle');
     if (btnFpsToggle) {
         btnFpsToggle.addEventListener('click', () => {
-            if (window.game && window.game.engine3D) {
-                window.game.engine3D.enabled = !window.game.engine3D.enabled;
-                const is3D = window.game.engine3D.enabled;
-                btnFpsToggle.innerHTML = is3D ? '🎮 3D FPS' : '🕹️ 2D RETRO';
-                btnFpsToggle.style.borderColor = is3D ? '#00ffcc' : '#ffaa00';
-                btnFpsToggle.style.color = is3D ? '#00ffcc' : '#ffaa00';
-
-                const canvas3d = document.getElementById('gameCanvas3d');
-                if (canvas3d) {
-                    canvas3d.style.display = is3D ? 'block' : 'none';
+            if (window.game) {
+                if (!window.game.engine3D && window.Engine3D) {
+                    const canvas3d = document.getElementById('gameCanvas3d') || window.game.canvas;
+                    window.game.engine3D = new Engine3D(canvas3d, window.game);
+                    let theme = 'filthadelphia';
+                    if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
+                    else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
+                    else if (window.pirateMode) theme = 'pirate';
+                    if (window.game.gameMap) {
+                        window.game.engine3D.buildMapForGame(window.game.gameMap, theme);
+                    }
                 }
+                if (window.game.engine3D) {
+                    window.game.engine3D.enabled = !window.game.engine3D.enabled;
+                    const is3D = window.game.engine3D.enabled;
+                    btnFpsToggle.innerHTML = is3D ? '🎮 3D FPS' : '🕹️ 2D RETRO';
+                    btnFpsToggle.style.borderColor = is3D ? '#00ffcc' : '#ffaa00';
+                    btnFpsToggle.style.color = is3D ? '#00ffcc' : '#ffaa00';
 
-                if (window.game.hud) {
-                    window.game.hud.showFollowerNotification(is3D ? 'Switched to 3D FPS Mode (Doom)' : 'Switched to 2D Top-Down Mode', true);
+                    const canvas3d = document.getElementById('gameCanvas3d');
+                    if (canvas3d) {
+                        canvas3d.style.display = is3D ? 'block' : 'none';
+                    }
+
+                    if (window.game.hud) {
+                        window.game.hud.showFollowerNotification(is3D ? 'Switched to 3D FPS Mode (Doom)' : 'Switched to 2D Top-Down Mode', true);
+                    }
                 }
             }
         });
@@ -1051,8 +1093,15 @@ function initUI() {
             const targetLoc = select ? select.value : 'airport';
             if (window.game) {
                 window.game.navigationTarget = targetLoc;
+                let formattedName = targetLoc.toUpperCase();
+                if (targetLoc === 'zippy_ds') formattedName = "ZIPPY D'S";
+                else if (targetLoc === 'goose') formattedName = "GOOSE";
+                else if (targetLoc === 'chinos_steaks') formattedName = "CHINO'S STEAKS";
+                else if (targetLoc === 'rats_steaks') formattedName = "RATS STEAKS";
+                else if (targetLoc === 'pulp mill') formattedName = "PULP MILL";
+                else if (targetLoc === 'black market') formattedName = "BLACK MARKET";
                 if (window.game.hud) {
-                    window.game.hud.showFollowerNotification(`📍 Navigation set to ${targetLoc.toUpperCase()}! Follow arrow.`, true);
+                    window.game.hud.showFollowerNotification(`📍 Navigation set to ${formattedName}! Follow arrow.`, true);
                 }
             }
             const dlg = document.getElementById('messages-log-dialog');
@@ -1226,12 +1275,22 @@ async function refreshGameState() {
         completedMafiaJobs = data.completed_mafia_jobs || 0;
         window.completedMafiaJobs = completedMafiaJobs;
         playerStats = data.stats || {};
-        window.playerStats = playerStats;
         playerCredits = data.credits !== undefined ? data.credits : 3;
         window.playerCredits = playerCredits;
         internationalFollowers = data.international_followers || 0;
+        window.internationalFollowers = internationalFollowers;
+        window.playerInternationalFollowers = internationalFollowers;
+        window.playerLids = data.lids !== undefined ? data.lids : 0;
+        window.playerStreak = data.current_streak !== undefined ? data.current_streak : 0;
+        window.playerMaxStreak = data.max_streak !== undefined ? data.max_streak : 0;
+        window.playerStreakQualified = data.streak_qualified !== undefined ? data.streak_qualified : 0;
+        window.playerLastActiveDate = data.last_active_date || null;
         window.chosenSprite = data.chosen_sprite || 'char2';
         window.playerChosenSprite = window.chosenSprite;
+        window.currentUsername = data.username || window.currentUsername || localStorage.getItem('trashMasterUsername');
+        window.currentUserAvatar = data.avatar_sticker || localStorage.getItem('trashMasterAvatar') || 'ducky_sticker.png';
+        window.currentUserBio = data.bio || 'Ready to clean up the city!';
+        localStorage.setItem('trashMasterAvatar', window.currentUserAvatar);
         window.playerUnlockedInternational = data.unlocked_international || 0;
         window.electionState = data.election_state || 'idle';
         window.roundsInState = data.rounds_in_state || 0;
@@ -1279,6 +1338,9 @@ async function refreshGameState() {
 
         updateStoreUI();
         updateModeToggles();
+        if (window.profileManager && typeof window.profileManager.updateMiniProfile === 'function') {
+            window.profileManager.updateMiniProfile(data);
+        }
 
         const followers = playerStats.total_followers || 0;
         if (followers >= 10 && window.madeManStatus === 'none') {
@@ -1350,6 +1412,47 @@ function updateStoreUI() {
     const shopBalEl = document.getElementById('shop-balance');
     if (shopBalEl) shopBalEl.innerText = `$${playerBalance.toLocaleString()}`;
 
+    const lidsEl = document.getElementById('store-lids');
+    if (lidsEl) lidsEl.innerText = (window.playerLids !== undefined ? window.playerLids : 0).toLocaleString();
+
+    const streakEl = document.getElementById('store-streak');
+    if (streakEl) streakEl.innerText = `${window.playerStreak || 0}d`;
+
+    const streakBadgeEl = document.getElementById('streak-counter-badge');
+    if (streakBadgeEl) streakBadgeEl.innerText = `🔥 ${window.playerStreak || 0} Days`;
+
+    const streakProgressEl = document.getElementById('streak-progress-bar');
+    const streakTextEl = document.getElementById('streak-progress-text');
+    const streakDescEl = document.getElementById('streak-status-desc');
+    const streakLidsCountEl = document.getElementById('streak-lids-count');
+
+    if (streakLidsCountEl) streakLidsCountEl.innerText = `${(window.playerLids || 0).toLocaleString()} Lids 🥫`;
+
+    const curStreak = window.playerStreak || 0;
+    const isQual = !!window.playerStreakQualified;
+    if (streakProgressEl && streakTextEl) {
+        if (isQual || curStreak >= 7) {
+            streakProgressEl.style.width = '100%';
+            streakProgressEl.style.background = 'linear-gradient(90deg, #00ff88, #00ffcc)';
+            streakTextEl.innerText = `🔥 UNLOCKED: 1 Lid/Game (${curStreak} Days)`;
+        } else {
+            const pct = Math.min(100, Math.round((curStreak / 7) * 100));
+            streakProgressEl.style.width = `${pct}%`;
+            streakProgressEl.style.background = 'linear-gradient(90deg, #ffaa00, #00ffcc)';
+            streakTextEl.innerText = `${curStreak} / 7 Days to Unlock`;
+        }
+    }
+    if (streakDescEl) {
+        if (isQual || curStreak >= 7) {
+            streakDescEl.innerHTML = `✅ <strong>Reward Active!</strong> Earning 1 Lid for every game played today.`;
+            streakDescEl.style.color = '#00ffcc';
+        } else {
+            const left = Math.max(1, 7 - curStreak);
+            streakDescEl.innerHTML = `🔒 <strong>Locked:</strong> Play ${left} more consecutive day${left > 1 ? 's' : ''} to unlock retroactive payout!`;
+            streakDescEl.style.color = '#ffaa00';
+        }
+    }
+
     const movEl = document.getElementById('store-movement-size');
     if (movEl) movEl.innerText = playerMovementSize.toLocaleString();
 
@@ -1357,7 +1460,7 @@ function updateStoreUI() {
     if (shopMovEl) shopMovEl.innerText = playerMovementSize.toLocaleString();
 
     const intlEl = document.getElementById('store-international-followers');
-    if (intlEl) intlEl.innerText = (window.playerInternationalFollowers || 0).toLocaleString();
+    if (intlEl) intlEl.innerText = (window.internationalFollowers !== undefined ? window.internationalFollowers : (window.playerInternationalFollowers || internationalFollowers || 0)).toLocaleString();
 
     const invEl = document.getElementById('store-inventory');
     if (invEl) {
@@ -1367,6 +1470,8 @@ function updateStoreUI() {
             if (count > 0) {
                 if (item === 'Goose Rewards Card') {
                     invEl.innerHTML += `<div style="display:flex;align-items:center;gap:6px;"><img src="assets/sprites/goose_card.png" style="width:20px;height:20px;image-rendering:pixelated;"/> ${item} (x${count})</div>`;
+                } else if (item === 'Lids') {
+                    invEl.innerHTML += `<div>🥫 ${item} (x${count})</div>`;
                 } else {
                     invEl.innerHTML += `<div>${item} (x${count})</div>`;
                 }
@@ -3318,4 +3423,114 @@ window.recordMapPlay = async function(mapId) {
         return null;
     }
 };
+
+window.unpublishMap = async function(mapId) {
+    return await apiCall(`/api/maps/${mapId}/unpublish`, 'POST');
+};
+
+// Profile & Leaderboard API Helpers
+window.fetchStickers = async function() {
+    try {
+        const res = await apiCall('/api/stickers', 'GET');
+        return res.stickers || [];
+    } catch (err) {
+        console.warn('Failed to fetch stickers from backend:', err);
+        return [];
+    }
+};
+
+window.fetchUserProfile = async function(username = null) {
+    try {
+        const endpoint = username ? `/api/user/profile/${encodeURIComponent(username)}` : '/api/user/profile';
+        const res = await apiCall(endpoint, 'GET');
+        if (res && res.profile) return res.profile;
+    } catch (err) {
+        console.warn('Backend user profile fetch failed, using local profile fallback:', err);
+    }
+
+    const currentName = username || window.currentUsername || localStorage.getItem('trashMasterUsername') || 'Player';
+    const isOwner = (!username || username === window.currentUsername || username === localStorage.getItem('trashMasterUsername'));
+    const avatar = (isOwner ? (window.currentUserAvatar || localStorage.getItem('trashMasterAvatar')) : null) || 'ducky_sticker.png';
+    const bio = (isOwner ? (window.currentUserBio || 'Ready to clean up the city!') : 'Ready to clean up the city!');
+
+    return {
+        id: 1,
+        username: currentName,
+        role: localStorage.getItem('trashMasterRole') || 'player',
+        avatar_sticker: avatar,
+        avatar_path: `assets/stickers/${avatar}`,
+        chosen_sprite: window.chosenSprite || 'char2',
+        bio: bio,
+        title: 'City Scavenger',
+        created_at: '2026-01-01',
+        is_owner: isOwner,
+        balance: window.playerBalance || 0,
+        has_truck: !!window.playerHasTruck,
+        movement_size: window.playerMovementSize || 0,
+        international_followers: window.internationalFollowers || 0,
+        made_man_status: window.madeManStatus || 'none',
+        political_office: window.politicalOffice || 'citizen',
+        completed_mafia_jobs: window.completedMafiaJobs || 0,
+        stats: {
+            stat_cumulative_trash: (window.playerStats && window.playerStats.stat_cumulative_trash) || 0,
+            stat_max_single_trash: (window.playerStats && window.playerStats.stat_max_single_trash) || 0,
+            stat_cumulative_money: (window.playerStats && window.playerStats.stat_cumulative_money) || 0,
+            stat_max_single_money: (window.playerStats && window.playerStats.stat_max_single_money) || 0,
+            stat_max_single_followers: (window.playerStats && window.playerStats.stat_max_single_followers) || 0,
+            total_rounds_played: (window.playerStats && window.playerStats.total_rounds_played) || 0
+        },
+        inventory: window.playerInventory || {},
+        buildings: window._serverOwnedBuildings || [],
+        completed_words_count: 0,
+        published_maps: [],
+        trophies: window.profileManager ? window.profileManager.calculateTrophies() : [],
+        trophy_stats: {
+            unlocked: window.profileManager ? window.profileManager.calculateTrophies().filter(t => t.unlocked).length : 0,
+            total: 14,
+            percentage: window.profileManager ? Math.round((window.profileManager.calculateTrophies().filter(t => t.unlocked).length / 14) * 100) : 0
+        }
+    };
+};
+
+window.updateUserProfile = async function(profileData) {
+    if (profileData.avatar_sticker) {
+        window.currentUserAvatar = profileData.avatar_sticker;
+        localStorage.setItem('trashMasterAvatar', profileData.avatar_sticker);
+    }
+    if (profileData.bio !== undefined) {
+        window.currentUserBio = profileData.bio;
+        localStorage.setItem('trashMasterBio', profileData.bio);
+    }
+    if (window.profileManager && typeof window.profileManager.updateMiniProfile === 'function') {
+        window.profileManager.updateMiniProfile({
+            username: window.currentUsername || localStorage.getItem('trashMasterUsername'),
+            avatar_sticker: window.currentUserAvatar,
+            bio: window.currentUserBio
+        });
+    }
+
+    try {
+        const res = await apiCall('/api/user/profile', 'POST', profileData);
+        if (res && res.user) {
+            window.currentUserAvatar = res.user.avatar_sticker || window.currentUserAvatar;
+            window.currentUserBio = res.user.bio || window.currentUserBio;
+            localStorage.setItem('trashMasterAvatar', window.currentUserAvatar);
+        }
+        return res || { success: true };
+    } catch (err) {
+        console.warn('Backend user profile update warning (saved locally):', err);
+        return { success: true, localOnly: true };
+    }
+};
+
+window.fetchLeaderboard = async function(category = 'trash') {
+    try {
+        const res = await apiCall(`/api/leaderboard?category=${encodeURIComponent(category)}`, 'GET');
+        return res;
+    } catch (err) {
+        console.error('Failed to fetch leaderboard:', err);
+        return { success: false, leaderboard: [] };
+    }
+};
+
 

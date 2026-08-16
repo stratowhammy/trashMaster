@@ -64,8 +64,8 @@ class MiniMap {
                     if (bldg.type === 'dump') {
                         color = '#8b5a2b'; // Dump: Brown
                     } else if (!window.pirateMode) {
-                        if (bldg.type === 'fast_food') {
-                            color = '#ffaa00'; // Fast Food: Orange
+                        if (['fast_food', 'goose', 'zippy_ds', 'chinos_steaks', 'rats_steaks'].includes(bldg.type)) {
+                            color = bldg.type === 'chinos_steaks' ? '#ff4444' : bldg.type === 'rats_steaks' ? '#33aaff' : bldg.type === 'zippy_ds' ? '#ffcc00' : '#ffaa00'; // Fast Food: Colored
                         } else if (bldg.type === 'hospital') {
                             color = '#ffffff'; // Hospital: White
                         } else if (bldg.type === 'city_hall' || bldg.type === 'cityhall') {

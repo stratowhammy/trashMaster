@@ -918,4 +918,51 @@ input:checked + .slider:before {
     color: #fff;
 }
 
+/* User Profile & Leaderboards Styling */
+.profile-tab-btn, .leaderboard-tab-btn {
+    background: #0f172a;
+    border: 2px solid #1e293b;
+    color: #94a3b8;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Press Start 2P', monospace;
+    transition: all 0.15s ease;
+}
+
+.profile-tab-btn:hover, .leaderboard-tab-btn:hover {
+    border-color: #00ffcc;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.profile-tab-btn.active {
+    background: linear-gradient(135deg, #0088cc, #005588) !important;
+    border-color: #00ffcc !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(0, 255, 204, 0.4);
+}
+
+.leaderboard-tab-btn.active {
+    background: linear-gradient(135deg, #9333ea, #6b21a8) !important;
+    border-color: #d896ff !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 12px rgba(216, 150, 255, 0.4);
+}
+
+.register-sticker-btn:hover {
+    border-color: #00ffcc !important;
+    transform: scale(1.05);
+}
+
+.map-author-badge:hover {
+    background: rgba(0, 255, 204, 0.15);
+}
+
+.leaderboard-row:hover {
+    transform: translateX(4px);
+    border-color: #00ffcc !important;
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+}
+
+
 

@@ -137,6 +137,9 @@ class Game {
         if (this.camera) {
             this.camera.snapTo(64 * 32, 64 * 32);
         }
+        if (this.engine3D) {
+            this.engine3D.buildMapForGame(this.gameMap, 'custom');
+        }
     }
 
     constructor(canvas) {
@@ -247,9 +250,40 @@ class Game {
         const btnBmBuyTrashBomb = document.getElementById('btn-bm-buy-trashbomb');
         const btnBmBuyPit = document.getElementById('btn-bm-buy-pit');
 
+        const btnBmSellLid1 = document.getElementById('btn-bm-sell-lid-1');
+        const btnBmSellLid5 = document.getElementById('btn-bm-sell-lid-5');
+        const btnBmSellLid10 = document.getElementById('btn-bm-sell-lid-10');
+        const btnBmSellLidAll = document.getElementById('btn-bm-sell-lid-all');
+        const btnBmSellLidCustom = document.getElementById('btn-bm-sell-lid-custom');
+        const bmLidInput = document.getElementById('bm-lid-input');
+        const bmDispatchPreview = document.getElementById('bm-dispatch-preview');
+
         if (btnBmSellOne) btnBmSellOne.addEventListener('click', () => this.sellMushroomOnBlackMarket(false));
         if (btnBmSellAll) btnBmSellAll.addEventListener('click', () => this.sellMushroomOnBlackMarket(true));
         if (btnBmClose) btnBmClose.addEventListener('click', () => this.closeBlackMarketDialog());
+
+        if (btnBmSellLid1) btnBmSellLid1.addEventListener('click', () => this.sellLidsOnBlackMarket(1));
+        if (btnBmSellLid5) btnBmSellLid5.addEventListener('click', () => this.sellLidsOnBlackMarket(5));
+        if (btnBmSellLid10) btnBmSellLid10.addEventListener('click', () => this.sellLidsOnBlackMarket(10));
+        if (btnBmSellLidAll) btnBmSellLidAll.addEventListener('click', () => this.sellLidsOnBlackMarket('all'));
+        if (btnBmSellLidCustom) btnBmSellLidCustom.addEventListener('click', () => this.sellLidsOnBlackMarket('custom'));
+
+        if (bmLidInput && bmDispatchPreview) {
+            bmLidInput.addEventListener('input', () => {
+                const val = parseInt(bmLidInput.value, 10) || 0;
+                if (val <= 0) {
+                    bmDispatchPreview.innerHTML = '(0 Cops)';
+                    bmDispatchPreview.style.color = '#00ff88';
+                } else if (val <= 10) {
+                    bmDispatchPreview.innerHTML = '✅ Safe (0 Cops)';
+                    bmDispatchPreview.style.color = '#00ff88';
+                } else {
+                    const cops = Math.floor(val / 10);
+                    bmDispatchPreview.innerHTML = `🚨 ${cops} Cop${cops > 1 ? 's' : ''}!`;
+                    bmDispatchPreview.style.color = '#ff3333';
+                }
+            });
+        }
 
         if (btnBmBuyCannon) btnBmBuyCannon.addEventListener('click', () => this.buyContrabandItem('Cannonballs', 100, 10));
         if (btnBmBuyPortal) btnBmBuyPortal.addEventListener('click', () => this.buyContrabandItem('Portal Gun', 1000, 1));
@@ -272,6 +306,9 @@ class Game {
             }
 
             if (this.state === GameState.PLAYING && this.player && !this.isPaused) {
+                if (e.code === 'Space' || e.key === ' ' || (window.isKey && window.isKey(e, 'jump'))) {
+                    e.preventDefault();
+                }
                 this.player.handleKeyDown(e);
 
                 // Q or q key to pick up trash
@@ -286,336 +323,18 @@ class Game {
                     this.pirateModeManager.firePlayerCannon(this);
                 }
 
-                // E or e key to interact with NPC or green cars, Dons or Chief
+                // E or e key to interact with NPC, doors, or grab targeted trash
                 if (window.isKey(e, 'interact') || e.key === 'e' || e.key === 'E') {
-                    if (this.engine3D && this.engine3D.enabled) this.engine3D.viewmodel.triggerAction();
-                    if (this.navigationTarget) { this._checkNavigationTargetEngaged(); }
-                    if (window.soundManager) window.soundManager.playEngageSFX();
-
-                    // Pirate Mode engage check
-                    if (window.pirateMode && this.pirateModeManager) {
-                        this.pirateModeManager.handlePlayerEngage(this);
-                    }
-                    // Crime Mode checks
-                    if (window.crimeMode && this.crimeManager) {
-                        const px = ((this.player.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
-                        const py = ((this.player.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
-                        let nearDon = null;
-                        for (const don of this.crimeManager.dons) {
-                            const wrappedDon = typeof nearestWrap === 'function' ? nearestWrap(don.x, don.y, this.player.x, this.player.y) : {x: don.x, y: don.y};
-                            const dist = Math.sqrt((this.player.x - wrappedDon.x)**2 + (this.player.y - wrappedDon.y)**2);
-                            if (dist < TILE_SIZE * 1.5) {
-                                nearDon = don;
-                                break;
-                            }
-                        }
-                        if (nearDon) {
-                            if (!this.crimeManager.madeMan) {
-                                this.crimeManager.triggerMadeManOffer(nearDon.id);
-                            } else if (!this.crimeManager.activeTask && (this.crimeManager.activeFamily === nearDon.id || this.crimeManager.activeFamily === -1)) {
-                                if (this.crimeManager.activeFamily === -1) {
-                                    this.crimeManager.activeFamily = nearDon.id;
-                                }
-                                this.crimeManager.assignNextTask(this.gameMap);
-                            } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'talk_don' && nearDon.id === this.crimeManager.activeTask.targetDonId) {
-                                this.crimeManager.completeTask(this);
-                            } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'illegal_dump' && this.crimeManager.activeFamily === nearDon.id) {
-                                if (!this.crimeManager.activeTask.dumped) {
-                                    alert("Don: 'What are you doing back? Get out there and dump the trash in the highlighted park!'");
-                                } else {
-                                    this.crimeManager.completeTask(this);
-                                }
-                            }
-                            return;
-                        }
-
-                        // Check Police Chief bribe
-                        if (this.crimeManager.madeMan && this.crimeManager.policeChief) {
-                            const chiefDist = Math.sqrt((px - this.crimeManager.policeChief.x)**2 + (py - this.crimeManager.policeChief.y)**2);
-                            if (chiefDist < TILE_SIZE * 1.5) {
-                                this.crimeManager.triggerBribeChief();
-                                return;
-                            }
-                        }
-                    }
-
-                    if (this.npcManager) {
-                        const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
-                        if (result) {
-                            if (window.crimeMode && this.crimeManager && !this.crimeManager.madeMan) {
-                                this.crimeManager.triggerMadeManOffer(Math.floor(Math.random() * 2));
-                            }
-                            if (window.frenzyMode && result.isInformant) {
-                                // Open door!
-                                this.gameMap.openBuildingDoor(result.buildingId);
-                                // Spawn pirates!
-                                const bldg = this.gameMap.buildings.find(b => b.id === result.buildingId);
-                                if (bldg && bldg.doorTiles.length > 0) {
-                                    const door = bldg.doorTiles[0];
-                                    this.pirateManager.spawnPirates(door.x, door.y);
-                                }
-                            }
-                            if (window.flowersMode && result.npcType === 'flower') {
-                                window.targetParkId = result.targetParkId;
-                                this.hud.showFollowerNotification(`Target Park Set to ${result.targetParkId}!`, true);
-                            }
-                            return; // Stop processing 'E' if interacted with an NPC
-                        }
-                    }
-
-                    // Green car interaction check
-                    if (this.carManager && this.carManager.cars) {
-                        for (const car of this.carManager.cars) {
-                            if (car.active && car.color === 'green') {
-                                const dx = this.player.x - car.x;
-                                const dy = this.player.y - car.y;
-                                const dist = Math.sqrt(dx * dx + dy * dy);
-                                if (dist < TILE_SIZE * 1.2) {
-                                    car.active = false;
-                                    const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
-                                    const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
-                                    this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);
-                                    return; // Stop processing 'E' if recruited from a car
-                                }
-                            }
-                        }
-                    }
-
-
-                    // Fast Food, Hospital, & Airport interaction
-                    if (window.fastFoodMode || window.playerUnlockedInternational || window.cultMode) {
-                        const px = wrapWorldX(this.player.x);
-                        const py = wrapWorldY(this.player.y);
-                        
-                        // Check Hospital
-                        if ((window.fastFoodMode || window.playerUnlockedInternational || window.cultMode) && !this.hasHealthInsurance) {
-                            const hospitals = this.gameMap.buildings.filter(b => b.type === 'hospital');
-                            for (const hospital of hospitals) {
-                                if (hospital.doorTiles.length > 0) {
-                                    const hDoor = hospital.doorTiles[0];
-                                    const dist = Math.sqrt((px - (hDoor.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (hDoor.y*TILE_SIZE + TILE_SIZE/2))**2);
-                                    if (dist < TILE_SIZE * 1.5) {
-                                        window.triggerHospitalOffer();
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Check Fast Food
-                        if (window.fastFoodMode || window.cultMode) {
-                            const ffBuildings = this.gameMap.buildings.filter(b => b.type === 'fast_food');
-                            for (const ffBldg of ffBuildings) {
-                                if (ffBldg && ffBldg.doorTiles.length > 0) {
-                                    const door = ffBldg.doorTiles[0];
-                                    const dist = Math.sqrt((px - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
-                                    if (dist < TILE_SIZE * 1.5) {
-                                        if (window.cultMode) {
-                                            if (this.lastEatenFastFoodId !== null && this.lastEatenFastFoodId !== ffBldg.id) {
-                                                this.visitedDifferentRestaurantSinceLastEat = true;
-                                            }
-                                        }
-                                        this.pendingFastFoodId = ffBldg.id;
-                                        window.triggerFastFoodOffer(this.getRoundTotalFollowers());
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Check Airport
-                        if (window.playerUnlockedInternational) {
-                            const airport = this.gameMap.buildings.find(b => b.type === 'airport');
-                            if (airport && airport.doorTiles.length > 0) {
-                                const aDoor = airport.doorTiles[0];
-                                const dist = Math.sqrt((px - (aDoor.x*TILE_SIZE + TILE_SIZE/2))**2 + (py - (aDoor.y*TILE_SIZE + TILE_SIZE/2))**2);
-                                if (dist < TILE_SIZE * 1.5) {
-                                const t = this.gameMap && this.gameMap.theme ? this.gameMap.theme.toLowerCase() : 'default';
-                                if (t === 'default' || t === 'filthadelphia') {
-                                    document.getElementById('btn-travel-filthadelphia').style.display = 'none';
-                                    document.getElementById('btn-travel-dahgbad').style.display = 'inline-block';
-                                    document.getElementById('btn-travel-cucaracha').style.display = 'inline-block';
-                                } else if (t === 'dahgbad') {
-                                    document.getElementById('btn-travel-filthadelphia').style.display = 'inline-block';
-                                    document.getElementById('btn-travel-dahgbad').style.display = 'none';
-                                    document.getElementById('btn-travel-cucaracha').style.display = 'inline-block';
-                                } else if (t === 'cucaracha') {
-                                    document.getElementById('btn-travel-filthadelphia').style.display = 'inline-block';
-                                    document.getElementById('btn-travel-dahgbad').style.display = 'inline-block';
-                                    document.getElementById('btn-travel-cucaracha').style.display = 'none';
-                                }
-                                document.getElementById('airport-dialog').classList.remove('hidden');
-                                this.hud.showFollowerNotification("Welcome to the Airport!", true);
-                                    return;
-                                }
-                            }
-                        }
-                    }
-
-                    // Dump interaction - Available in ALL modes
-                    const dumpBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'dump') : null;
-                    if (dumpBldg && dumpBldg.doorTiles && dumpBldg.doorTiles.length > 0) {
-                        const door = dumpBldg.doorTiles[0];
-                        const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
-                        const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
-                        const px = wrapWorldX(this.player.x);
-                        const py = wrapWorldY(this.player.y);
-                        const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
-                        const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
-                        if (dist < TILE_SIZE * 3.0) {
-                            if (this.trashCollectedInTruck > 0) {
-                                const amt = this.trashCollectedInTruck;
-                                this.trashCollectedInTruck = 0;
-                                this.trashManager.totalPoints += amt * 25;
-                                this.hud.updateScore(this.trashManager.totalPoints);
-                                const locName = window.pirateMode ? "Sea Dump Dock" : "Dump";
-                                this.hud.showFollowerNotification(`🗑️ Unloaded ${amt} trash load at the ${locName}! +$${(amt * 25).toLocaleString()}! 🏴‍☠️`, true);
-                            } else if ((this.treesCarried || 0) > 0) {
-                                this.hud.showFollowerNotification("🗑️ Dump only accepts garbage! Take cut trees to the Pulp Mill [E].", true);
-                            } else {
-                                const emptyMsg = window.pirateMode ? "Ship hold is already empty of trash." : "Garbage container is already empty.";
-                                this.hud.showFollowerNotification(emptyMsg, true);
-                            }
-                            return;
-                        }
-                    }
-
-                    // Foraging wild shrooms on park tiles
-                    if (this.gameMap && this.gameMap.shrooms) {
-                        const px = wrapWorldX(this.player.x);
-                        const py = wrapWorldY(this.player.y);
-                        for (const shroom of this.gameMap.shrooms) {
-                            if (shroom.collected) continue;
-                            const wShroom = typeof nearestWrap === 'function' ? nearestWrap(shroom.x, shroom.y, px, py) : { x: shroom.x, y: shroom.y };
-                            const dist = Math.sqrt((px - wShroom.x)**2 + (py - wShroom.y)**2);
-                            if (dist < TILE_SIZE * 1.5) {
-                                shroom.collected = true;
-                                window.playerInventory = window.playerInventory || {};
-                                window.playerInventory['Mushrooms'] = (window.playerInventory['Mushrooms'] || 0) + 1;
-                                if (window.soundManager) window.soundManager.playEngageSFX();
-                                this.hud.showFollowerNotification("🍄 Foraged Wild Mushroom! Added to inventory. (Shift+M to eat)", true);
-                                return;
-                            }
-                        }
-                    }
-
-                    // Pulp Mill interaction - Convert trees to Paper
-                    const pulpBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'pulp_mill') : null;
-                    if (pulpBldg && pulpBldg.doorTiles && pulpBldg.doorTiles.length > 0) {
-                        const door = pulpBldg.doorTiles[0];
-                        const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
-                        const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
-                        const px = wrapWorldX(this.player.x);
-                        const py = wrapWorldY(this.player.y);
-                        const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
-                        const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
-                        if (dist < TILE_SIZE * 3.0) {
-                            const trees = this.treesCarried || 0;
-                            if (trees > 0) {
-                                const paperGained = trees * 5;
-                                window.playerInventory = window.playerInventory || {};
-                                window.playerInventory['Paper'] = (window.playerInventory['Paper'] || 0) + paperGained;
-                                this.treesCarried = 0;
-                                if (window.apiCall) window.apiCall('/api/game/add-inventory', 'POST', { item_name: 'Paper', quantity: paperGained }).catch(e => console.error(e));
-                                if (window.soundManager) window.soundManager.playEngageSFX();
-                                this.hud.showFollowerNotification(`🪵 Processed ${trees} tree(s) at Pulp Mill! Gained ${paperGained} Paper! 📄`, true);
-                            } else {
-                                this.hud.showFollowerNotification("🪵 Pulp Mill: Bring cut trees here to convert into Paper! (0 trees carried)", true);
-                            }
-                            return;
-                        }
-                    }
-
-                    // Black Market interaction - Open retro dialog box to buy/sell
-                    const bmBldg = this.gameMap ? this.gameMap.buildings.find(b => b.type === 'black_market') : null;
-                    if (bmBldg && bmBldg.doorTiles && bmBldg.doorTiles.length > 0) {
-                        const door = bmBldg.doorTiles[0];
-                        const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
-                        const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
-                        const px = wrapWorldX(this.player.x);
-                        const py = wrapWorldY(this.player.y);
-                        const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
-                        const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
-                        if (dist < TILE_SIZE * 3.0) {
-                            this.openBlackMarketDialog();
-                            return;
-                        }
-                    }
+                    this.interact();
                 }
 
-                // ── Phase 3 E-key interactions (always run if E pressed) ──
-                if (e.key === 'e' || e.key === 'E') {
-                    if (this.player && this.player.characterClass === 'char1') {
-                        this._rangerTryCaptureAnimal();
+                // M or m key to open Messages & Navigation Waypoints Dialog
+                if (e.key === 'm' || e.key === 'M') {
+                    if (document.pointerLockElement) {
+                        document.exitPointerLock();
                     }
-
-
-                    // Lost Child Quest: check parent delivery first, then child pickup
-                    if (this.npcManager && this.npcManager.childNPC && !this.npcManager.childDelivered) {
-                        const parentNear = this.npcManager.checkParentInteraction(this.player.x, this.player.y);
-                        if (parentNear) {
-                            this.npcManager.childDelivered = true;
-                            this.npcManager.childFollowing = false;
-                            for (let i = 0; i < 10; i++) this.followerManager.addFollower(this.player.x, this.player.y);
-                            this.hud.followerCount = this.getRoundTotalFollowers();
-                            this.npcManager.activeDialogue = { lines: ["Our child is home! Thank you so much!", "+10 Followers!"], lineIndex: 0, timer: 240 };
-                            this.hud.showFollowerNotification('\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc66 Child delivered! +10 Followers!', true);
-                        } else {
-                            const childNear = this.npcManager.checkChildInteraction(this.player.x, this.player.y);
-                            if (childNear && !this.npcManager.childFollowing) {
-                                this.npcManager.childFollowing = true;
-                                this.npcManager.activeDialogue = { lines: ["I am looking for my parents."], lineIndex: 0, timer: 180 };
-                                this.hud.showFollowerNotification('\ud83d\udc66 The child is following you! Find their parents!', true);
-                                if (this.npcManager.childQuestBuilding) {
-                                    this._childQuestHighlightBuilding = this.npcManager.childQuestBuilding.id;
-                                }
-                            }
-                        }
-                    }
-
-                    // Builder Mode: buy building at door
-                    if (window.builderMode) {
-                        const bpx = wrapWorldX(this.player.x);
-                        const bpy = wrapWorldY(this.player.y);
-                        for (let idx = 0; idx < this.gameMap.buildings.length; idx++) {
-                            const bldg = this.gameMap.buildings[idx];
-                            if (!bldg || bldg.doorTiles.length === 0) continue;
-                            if (['bank','police','airport','hospital','dump'].includes(bldg.type)) continue;
-                            const door = bldg.doorTiles[0];
-                            const dist = Math.sqrt((bpx - (door.x*TILE_SIZE + TILE_SIZE/2))**2 + (bpy - (door.y*TILE_SIZE + TILE_SIZE/2))**2);
-                            if (dist < TILE_SIZE * 1.5) {
-                                const alreadyOwned = this.ownedBuildings.find(b => b.building_idx === idx);
-                                if (alreadyOwned) {
-                                    this.hud.showFollowerNotification(`\ud83c\udfe2 Owned: ${bldg.address || 'Building'} (${alreadyOwned.tenants || 0} tenants)`, true);
-                                } else {
-                                    if (!this.buildingPriceCache.has(idx)) {
-                                        this.buildingPriceCache.set(idx, 2000 + Math.floor(Math.random() * 1501));
-                                    }
-                                    const price = this.buildingPriceCache.get(idx);
-                                    const addr = bldg.address || `Bldg #${idx}`;
-                                    const canAfford = (window.playerBalance || 0) >= price;
-                                    if (!canAfford) {
-                                        this.hud.showFollowerNotification(`\ud83c\udfe2 ${addr}: $${price.toLocaleString()} (Need $${(price - (window.playerBalance||0)).toLocaleString()} more)`, false);
-                                    } else {
-                                        this.resetKeys();
-                                        if (confirm(`Buy ${addr} for $${price.toLocaleString()}?\nEarns $1,000/tenant/round. Max 5 tenants.`)) {
-                                            window.apiCall('/api/game/buy-building', 'POST', { building_idx: idx, address: addr, cost: price })
-                                                .then(res => {
-                                                    if (res.success) {
-                                                        window.playerBalance = res.balance;
-                                                        this.ownedBuildings.push({ building_idx: idx, address: addr, tenants: 0 });
-                                                        this.totalVacancies = (this.totalVacancies || 0) + 5;
-                                                        this.buildingPriceCache.delete(idx);
-                                                        this.hud.showFollowerNotification(`\ud83c\udfe2 Bought ${addr}! 5 vacancies open.`, true);
-                                                    }
-                                                }).catch(err => this.hud.showFollowerNotification(`\u274c Buy failed`, false));
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
+                    this.openMessagesLogDialog();
+                    return;
                 }
 
                 // A or a key: Builder mode — offer apartment to nearby NPC
@@ -1021,6 +740,16 @@ class Game {
                 }
             }
 
+            if (this.state === GameState.PLAYING && this.hud && this.hud.profileBtnBounds) {
+                const pb = this.hud.profileBtnBounds;
+                if (clickX >= pb.x && clickX <= pb.x + pb.width && clickY >= pb.y && clickY <= pb.y + pb.height) {
+                    if (window.profileManager) {
+                        window.profileManager.toggleMultiplayerScoreboard();
+                    }
+                    return;
+                }
+            }
+
             if (this.isPaused && this.pauseReturnBtnBounds) {
                 const b = this.pauseReturnBtnBounds;
                 if (clickX >= b.x && clickX <= b.x + b.w && clickY >= b.y && clickY <= b.y + b.h) {
@@ -1237,6 +966,352 @@ class Game {
         newBtnLeave.addEventListener('click', leaveAction);
     }
 
+    interact() {
+        if (this.state !== GameState.PLAYING || !this.player) return;
+
+        if (this.engine3D && this.engine3D.enabled) {
+            this.engine3D.viewmodel.triggerAction();
+            if (this.engine3D.currentCrosshairTarget && this.engine3D.currentCrosshairTarget.type === 'trash') {
+                this.pickupTrash();
+            }
+        }
+        if (this.navigationTarget) { this._checkNavigationTargetEngaged(); }
+        if (window.soundManager) window.soundManager.playEngageSFX();
+
+        // Pirate Mode engage check
+        if (window.pirateMode && this.pirateModeManager) {
+            this.pirateModeManager.handlePlayerEngage(this);
+        }
+
+        // Crime Mode checks
+        if (window.crimeMode && this.crimeManager) {
+            const px = ((this.player.x % MAP_PIXEL_W) + MAP_PIXEL_W) % MAP_PIXEL_W;
+            const py = ((this.player.y % MAP_PIXEL_H) + MAP_PIXEL_H) % MAP_PIXEL_H;
+            let nearDon = null;
+            for (const don of this.crimeManager.dons) {
+                const wrappedDon = typeof nearestWrap === 'function' ? nearestWrap(don.x, don.y, this.player.x, this.player.y) : { x: don.x, y: don.y };
+                const dist = Math.sqrt((this.player.x - wrappedDon.x)**2 + (this.player.y - wrappedDon.y)**2);
+                if (dist < TILE_SIZE * 1.5) {
+                    nearDon = don;
+                    break;
+                }
+            }
+            if (nearDon) {
+                if (!this.crimeManager.madeMan) {
+                    this.crimeManager.triggerMadeManOffer(nearDon.id);
+                } else if (!this.crimeManager.activeTask && (this.crimeManager.activeFamily === nearDon.id || this.crimeManager.activeFamily === -1)) {
+                    if (this.crimeManager.activeFamily === -1) {
+                        this.crimeManager.activeFamily = nearDon.id;
+                    }
+                    this.crimeManager.assignNextTask(this.gameMap);
+                } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'talk_don' && nearDon.id === this.crimeManager.activeTask.targetDonId) {
+                    this.crimeManager.completeTask(this);
+                } else if (this.crimeManager.activeTask && this.crimeManager.activeTask.type === 'illegal_dump' && this.crimeManager.activeFamily === nearDon.id) {
+                    if (!this.crimeManager.activeTask.dumped) {
+                        alert("Don: 'What are you doing back? Get out there and dump the trash in the highlighted park!'");
+                    } else {
+                        this.crimeManager.completeTask(this);
+                    }
+                }
+                return;
+            }
+
+            // Check Police Chief bribe
+            if (this.crimeManager.madeMan && this.crimeManager.policeChief) {
+                const chiefDist = Math.sqrt((px - this.crimeManager.policeChief.x)**2 + (py - this.crimeManager.policeChief.y)**2);
+                if (chiefDist < TILE_SIZE * 1.5) {
+                    this.crimeManager.triggerBribeChief();
+                    return;
+                }
+            }
+        }
+
+        if (this.npcManager) {
+            const result = this.npcManager.interactWithNearest(this.player.x, this.player.y);
+            if (result) {
+                if (window.crimeMode && this.crimeManager && !this.crimeManager.madeMan) {
+                    this.crimeManager.triggerMadeManOffer(Math.floor(Math.random() * 2));
+                }
+                if (window.frenzyMode && result.isInformant) {
+                    this.gameMap.openBuildingDoor(result.buildingId);
+                    const bldg = this.gameMap.buildings.find(b => b.id === result.buildingId);
+                    if (bldg && bldg.doorTiles.length > 0) {
+                        const door = bldg.doorTiles[0];
+                        this.pirateManager.spawnPirates(door.x, door.y);
+                    }
+                }
+                if (window.flowersMode && result.npcType === 'flower') {
+                    window.targetParkId = result.targetParkId;
+                    this.hud.showFollowerNotification(`Target Park Set to ${result.targetParkId}!`, true);
+                }
+                return;
+            }
+        }
+
+        // Green car interaction check
+        if (this.carManager && this.carManager.cars) {
+            for (const car of this.carManager.cars) {
+                if (car.active && car.color === 'green') {
+                    const dx = this.player.x - car.x;
+                    const dy = this.player.y - car.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < TILE_SIZE * 1.2) {
+                        car.active = false;
+                        const newFollower = this.followerManager.addFollower(this.player.x, this.player.y);
+                        const charConfig = SPRITE_CONFIG.characters.find(c => c.id === newFollower.spriteId);
+                        this.hud.showFollowerNotification(charConfig ? `${charConfig.name} joined your posse!` : 'New posse member joined your posse!', true);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // ── Direct 3D Crosshair Target Building Engagement ──
+        if (this.engine3D && this.engine3D.enabled && this.engine3D.currentCrosshairTarget) {
+            const ct = this.engine3D.currentCrosshairTarget;
+            if (ct.type === 'building' && ct.building) {
+                if (this._interactWithBuilding(ct.building)) return;
+            }
+        }
+
+        // ── Proximity Building Door Interaction (Unified 2D and 3D) ──
+        if (this.gameMap && this.gameMap.buildings) {
+            const px = wrapWorldX(this.player.x);
+            const py = wrapWorldY(this.player.y);
+            let closestBldg = null;
+            let closestDist = TILE_SIZE * 3.2;
+
+            for (const bldg of this.gameMap.buildings) {
+                if (!bldg || !bldg.doorTiles || bldg.doorTiles.length === 0) continue;
+                for (const door of bldg.doorTiles) {
+                    const doorX = door.x * TILE_SIZE + TILE_SIZE / 2;
+                    const doorY = door.y * TILE_SIZE + TILE_SIZE / 2;
+                    const wDoor = typeof nearestWrap === 'function' ? nearestWrap(doorX, doorY, px, py) : { x: doorX, y: doorY };
+                    const dist = Math.sqrt((px - wDoor.x)**2 + (py - wDoor.y)**2);
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestBldg = bldg;
+                    }
+                }
+            }
+
+            if (closestBldg) {
+                if (this._interactWithBuilding(closestBldg)) return;
+            }
+        }
+
+        // Foraging wild shrooms on park tiles
+        if (this.gameMap && this.gameMap.shrooms) {
+            const px = wrapWorldX(this.player.x);
+            const py = wrapWorldY(this.player.y);
+            for (const shroom of this.gameMap.shrooms) {
+                if (shroom.collected) continue;
+                const wShroom = typeof nearestWrap === 'function' ? nearestWrap(shroom.x, shroom.y, px, py) : { x: shroom.x, y: shroom.y };
+                const dist = Math.sqrt((px - wShroom.x)**2 + (py - wShroom.y)**2);
+                if (dist < TILE_SIZE * 1.5) {
+                    shroom.collected = true;
+                    window.playerInventory = window.playerInventory || {};
+                    window.playerInventory['Mushrooms'] = (window.playerInventory['Mushrooms'] || 0) + 1;
+                    if (window.soundManager) window.soundManager.playEngageSFX();
+                    this.hud.showFollowerNotification("🍄 Foraged Wild Mushroom! Added to inventory. (Shift+M to eat)", true);
+                    return;
+                }
+            }
+        }
+
+        // Ranger capture animal
+        if (this.player && this.player.characterClass === 'char1') {
+            this._rangerTryCaptureAnimal();
+        }
+
+        // Lost Child Quest
+        if (this.npcManager && this.npcManager.childNPC && !this.npcManager.childDelivered) {
+            const parentNear = this.npcManager.checkParentInteraction(this.player.x, this.player.y);
+            if (parentNear) {
+                this.npcManager.childDelivered = true;
+                this.npcManager.childFollowing = false;
+                for (let i = 0; i < 10; i++) this.followerManager.addFollower(this.player.x, this.player.y);
+                this.hud.followerCount = this.getRoundTotalFollowers();
+                this.npcManager.activeDialogue = { lines: ["Our child is home! Thank you so much!", "+10 Followers!"], lineIndex: 0, timer: 240 };
+                this.hud.showFollowerNotification('👨‍👩‍👦 Child delivered! +10 Followers!', true);
+            } else {
+                const childNear = this.npcManager.checkChildInteraction(this.player.x, this.player.y);
+                if (childNear && !this.npcManager.childFollowing) {
+                    this.npcManager.childFollowing = true;
+                    this.npcManager.activeDialogue = { lines: ["I am looking for my parents."], lineIndex: 0, timer: 180 };
+                    this.hud.showFollowerNotification('👦 The child is following you! Find their parents!', true);
+                    if (this.npcManager.childQuestBuilding) {
+                        this._childQuestHighlightBuilding = this.npcManager.childQuestBuilding.id;
+                    }
+                }
+            }
+        }
+    }
+
+    _interactWithBuilding(bldg) {
+        if (!bldg) return false;
+        const type = (bldg.type || '').toLowerCase();
+
+        // 1. Fast Food Restaurant (Zippy D's, Goose, Chino's Steaks, Rats Steaks)
+        if (['fast_food', 'zippy_ds', 'goose', 'chinos_steaks', 'rats_steaks'].includes(type)) {
+            if (window.cultMode) {
+                if (this.lastEatenFastFoodId !== null && this.lastEatenFastFoodId !== bldg.id) {
+                    this.visitedDifferentRestaurantSinceLastEat = true;
+                }
+            }
+            this.pendingFastFoodId = bldg.id;
+            this.pendingFastFoodBldg = bldg;
+            if (document.exitPointerLock) document.exitPointerLock();
+            window.triggerFastFoodOffer(this.getRoundTotalFollowers(), bldg);
+            return true;
+        }
+
+        // 2. Hospital
+        if (type === 'hospital') {
+            if (!this.hasHealthInsurance) {
+                if (document.exitPointerLock) document.exitPointerLock();
+                window.triggerHospitalOffer();
+            } else {
+                this.hud.showFollowerNotification("🏥 Hospital: Posse is fully covered by Health Insurance!", true);
+            }
+            return true;
+        }
+
+        // 3. Airport
+        if (type === 'airport') {
+            if (document.exitPointerLock) document.exitPointerLock();
+            const t = this.gameMap && this.gameMap.theme ? this.gameMap.theme.toLowerCase() : 'default';
+            const bFil = document.getElementById('btn-travel-filthadelphia');
+            const bDah = document.getElementById('btn-travel-dahgbad');
+            const bCuc = document.getElementById('btn-travel-cucaracha');
+            if (bFil) bFil.style.display = (t === 'default' || t === 'filthadelphia') ? 'none' : 'inline-block';
+            if (bDah) bDah.style.display = (t === 'dahgbad') ? 'none' : 'inline-block';
+            if (bCuc) bCuc.style.display = (t === 'cucaracha') ? 'none' : 'inline-block';
+
+            const airDialog = document.getElementById('airport-dialog');
+            if (airDialog) airDialog.classList.remove('hidden');
+            this.hud.showFollowerNotification("✈️ Welcome to the Airport!", true);
+            return true;
+        }
+
+        // 4. Dump
+        if (type === 'dump') {
+            if (this.trashCollectedInTruck > 0) {
+                const amt = this.trashCollectedInTruck;
+                this.trashCollectedInTruck = 0;
+                this.trashManager.totalPoints += amt * 25;
+                this.hud.updateScore(this.trashManager.totalPoints);
+                const locName = window.pirateMode ? "Sea Dump Dock" : "Dump";
+                this.hud.showFollowerNotification(`🗑️ Unloaded ${amt} trash load at the ${locName}! +$${(amt * 25).toLocaleString()}! 🏴‍☠️`, true);
+            } else if ((this.treesCarried || 0) > 0) {
+                this.hud.showFollowerNotification("🗑️ Dump only accepts garbage! Take cut trees to the Pulp Mill [E].", true);
+            } else {
+                const emptyMsg = window.pirateMode ? "Ship hold is already empty of trash." : "Garbage container is already empty.";
+                this.hud.showFollowerNotification(emptyMsg, true);
+            }
+            return true;
+        }
+
+        // 5. Pulp Mill
+        if (type === 'pulp_mill' || type === 'pulp mill') {
+            const trees = this.treesCarried || 0;
+            if (trees > 0) {
+                const paperGained = trees * 5;
+                window.playerInventory = window.playerInventory || {};
+                window.playerInventory['Paper'] = (window.playerInventory['Paper'] || 0) + paperGained;
+                this.treesCarried = 0;
+                if (window.apiCall) window.apiCall('/api/game/add-inventory', 'POST', { item_name: 'Paper', quantity: paperGained }).catch(e => console.error(e));
+                if (window.soundManager) window.soundManager.playEngageSFX();
+                this.hud.showFollowerNotification(`🪵 Processed ${trees} tree(s) at Pulp Mill! Gained ${paperGained} Paper! 📄`, true);
+            } else {
+                this.hud.showFollowerNotification("🪵 Pulp Mill: Bring cut trees here to convert into Paper! (0 trees carried)", true);
+            }
+            return true;
+        }
+
+        // 6. Black Market
+        if (type === 'black_market') {
+            if (document.exitPointerLock) document.exitPointerLock();
+            this.openBlackMarketDialog();
+            return true;
+        }
+
+        // 7. Zoo
+        if (type === 'zoo') {
+            if (this.player && this.player.capturedAnimals && this.player.capturedAnimals.length > 0) {
+                const count = this.player.capturedAnimals.length;
+                const reward = 500 * count;
+                this.trashManager.totalPoints += reward;
+                this.hud.updateScore(this.trashManager.totalPoints);
+                window.playerBalance = (window.playerBalance || 0) + reward;
+                if (typeof window.updateStoreUI === 'function') window.updateStoreUI();
+                this.player.capturedAnimals = [];
+                this.hud.showFollowerNotification(`🦁 Delivered ${count} animal(s) to the Zoo! Earned +$${reward.toLocaleString()} ($500/ea)!`, true);
+                if (window.soundManager && window.soundManager.playVictoriousEndSoundtrack) window.soundManager.playVictoriousEndSoundtrack();
+            } else {
+                this.hud.showFollowerNotification(`🦁 Zoo: Capture wild animals (Ranger mode) to deliver them here! (0 carried)`, true);
+            }
+            return true;
+        }
+
+        // 8. Bank
+        if (type === 'bank') {
+            this.hud.showFollowerNotification(`🏦 Bank Balance: $${(window.playerBalance || this.trashManager.totalPoints || 0).toLocaleString()}`, true);
+            return true;
+        }
+
+        // 9. Police Station
+        if (type === 'police') {
+            if (window.crimeMode && this.crimeManager && this.crimeManager.madeMan) {
+                this.crimeManager.triggerBribeChief();
+            } else {
+                this.hud.showFollowerNotification("👮 Police Station: Keep the city clean to avoid suspicion!", true);
+            }
+            return true;
+        }
+
+        // 10. Builder Mode / Construction Mode: Apartment / Residential building purchase
+        if (window.builderMode) {
+            const idx = this.gameMap.buildings.indexOf(bldg);
+            if (idx >= 0) {
+                const alreadyOwned = this.ownedBuildings ? this.ownedBuildings.find(b => b.building_idx === idx) : null;
+                if (alreadyOwned) {
+                    this.hud.showFollowerNotification(`🏢 Owned: ${bldg.address || 'Building'} (${alreadyOwned.tenants || 0}/5 tenants)`, true);
+                    return true;
+                }
+                if (!this.buildingPriceCache.has(idx)) {
+                    this.buildingPriceCache.set(idx, 2000 + Math.floor(Math.random() * 1501));
+                }
+                const price = this.buildingPriceCache.get(idx);
+                const addr = bldg.address || `Bldg #${idx}`;
+                const canAfford = (window.playerBalance || 0) >= price;
+                if (!canAfford) {
+                    this.hud.showFollowerNotification(`🏢 ${addr}: $${price.toLocaleString()} (Need $${(price - (window.playerBalance||0)).toLocaleString()} more)`, false);
+                } else {
+                    this.resetKeys();
+                    if (document.exitPointerLock) document.exitPointerLock();
+                    if (confirm(`Buy ${addr} for $${price.toLocaleString()}?\nEarns $1,000/tenant/round. Max 5 tenants.`)) {
+                        window.apiCall('/api/game/buy-building', 'POST', { building_idx: idx, address: addr, cost: price })
+                            .then(res => {
+                                if (res.success) {
+                                    window.playerBalance = res.balance;
+                                    this.ownedBuildings.push({ building_idx: idx, address: addr, tenants: 0 });
+                                    this.totalVacancies = (this.totalVacancies || 0) + 5;
+                                    this.buildingPriceCache.delete(idx);
+                                    this.hud.showFollowerNotification(`🏢 Bought ${addr}! 5 vacancies open.`, true);
+                                }
+                            }).catch(err => this.hud.showFollowerNotification(`❌ Buy failed`, false));
+                    }
+                }
+                return true;
+            }
+        }
+
+        // 11. Generic Residence Door
+        this.hud.showFollowerNotification(`🚪 Knocked on ${bldg.address || 'residence'}. Nobody is home!`, true);
+        return true;
+    }
+
     pickupTrash() {
         if (this.state !== GameState.PLAYING || !this.player) return;
 
@@ -1368,14 +1443,94 @@ class Game {
     updateBlackMarketDialogUI(logText = '') {
         const statusEl = document.getElementById('bm-status-info');
         const logEl = document.getElementById('bm-log');
+        const lidsCountEl = document.getElementById('bm-lids-count');
         const mCount = (window.playerInventory && window.playerInventory['Mushrooms']) || 0;
+        const lidsCount = (window.playerLids !== undefined ? window.playerLids : ((window.playerInventory && window.playerInventory['Lids']) || 0));
         const bal = window.playerBalance || 0;
 
         if (statusEl) {
-            statusEl.innerHTML = `MUSHROOMS IN STOCK: <strong>${mCount}</strong> | BALANCE: <strong>$${bal.toLocaleString()}</strong>`;
+            statusEl.innerHTML = `MUSHROOMS: <strong>${mCount}</strong> | LIDS IN VAULT: <strong>${lidsCount}</strong> | CASH: <strong>$${bal.toLocaleString()}</strong>`;
+        }
+        if (lidsCountEl) {
+            lidsCountEl.innerText = lidsCount;
         }
         if (logEl && logText !== undefined) {
             logEl.innerHTML = logText;
+        }
+    }
+
+    async sellLidsOnBlackMarket(amount) {
+        let currentLids = (window.playerLids !== undefined ? window.playerLids : ((window.playerInventory && window.playerInventory['Lids']) || 0));
+        let count = 0;
+        if (amount === 'all') {
+            count = currentLids;
+        } else if (amount === 'custom') {
+            const input = document.getElementById('bm-lid-input');
+            count = parseInt(input ? input.value : 0, 10) || 0;
+        } else {
+            count = parseInt(amount, 10) || 0;
+        }
+
+        if (count <= 0) {
+            this.updateBlackMarketDialogUI("❌ Please specify at least 1 Lid to sell!");
+            return;
+        }
+        if (currentLids < count) {
+            this.updateBlackMarketDialogUI(`❌ Insufficient Lids! You have ${currentLids} Lids in vault, tried to sell ${count}.`);
+            return;
+        }
+
+        try {
+            if (window.apiCall) {
+                const res = await window.apiCall('/api/game/black-market/sell-lids', 'POST', { count: count });
+                if (res && res.error) {
+                    this.updateBlackMarketDialogUI(`❌ ${res.error}`);
+                    return;
+                }
+                if (res && res.success) {
+                    window.playerLids = res.new_lids;
+                    window.playerInventory = window.playerInventory || {};
+                    window.playerInventory['Lids'] = res.new_lids;
+                    window.playerBalance = res.new_balance;
+                    this.trashManager.totalPoints += res.cash_earned;
+                    this.hud.updateScore(this.trashManager.totalPoints);
+                    if (typeof window.updateStoreUI === 'function') window.updateStoreUI();
+
+                    const cops = res.officers_dispatched || 0;
+                    if (cops > 0) {
+                        this.blackMarketPenalized = true;
+                        this.poisonPoliceChaseTimer = Math.max(this.poisonPoliceChaseTimer || 0, 60.0 + cops * 15.0);
+                        if (this.crimeManager) {
+                            this.crimeManager.policeActive = true;
+                            this.crimeManager.policeActiveTimer = this.poisonPoliceChaseTimer;
+                            const station = this.gameMap ? this.gameMap.buildings[1] : null;
+                            let sx = this.player ? this.player.x : 0;
+                            let sy = this.player ? this.player.y : 0;
+                            if (station && station.doorTiles && station.doorTiles.length > 0) {
+                                sx = station.doorTiles[0].x * TILE_SIZE;
+                                sy = station.doorTiles[0].y * TILE_SIZE;
+                            }
+                            for (let c = 0; c < cops; c++) {
+                                this.crimeManager.police.push(new PoliceOfficer(sx, sy, true));
+                            }
+                        }
+                        if (window.soundManager && typeof window.soundManager.playSirenSFX === 'function') {
+                            window.soundManager.playSirenSFX();
+                        }
+                        const alertMsg = `🚨 BLACK MARKET RAID! Dispatched ${cops} Police Officer(s) for selling ${count} Lids! 🚨`;
+                        if (this.hud) this.hud.showFollowerNotification(alertMsg, false);
+                        this.updateBlackMarketDialogUI(`🚨 Sold ${count} Lids for +$${res.cash_earned.toLocaleString()}! <strong>POLICE RAID DISPATCHED ${cops} OFFICER(S)!</strong> 🚨`);
+                    } else {
+                        const safeMsg = `🥫 Sold ${count} Lid(s) safely for +$${res.cash_earned.toLocaleString()}! (0 officers alerted)`;
+                        if (this.hud) this.hud.showFollowerNotification(safeMsg, true);
+                        if (window.soundManager) window.soundManager.playCashRegisterSFX();
+                        this.updateBlackMarketDialogUI(`✅ ${safeMsg}`);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Black market lid sell failed:", e);
+            this.updateBlackMarketDialogUI(`❌ Error selling Lids: ${e.message}`);
         }
     }
 
@@ -2086,6 +2241,10 @@ class Game {
             this.engine3D.update(dt);
         }
         
+        if (this.navigationTarget) {
+            this._checkNavigationTargetEngaged();
+        }
+        
         // Update flowers
         if (window.flowersMode) {
             for (const flower of this.flowers) {
@@ -2321,7 +2480,7 @@ class Game {
         }
 
         // Crime, Politics, Price Fixing, or Black Market Penalty updates
-        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized || (this.poisonPoliceChaseTimer > 0)) && this.crimeManager) {
+        if ((window.crimeMode || (window.politicsMode && this.acceptedMafiaVotes) || this.priceFixingActive || this.blackMarketPenalized || (this.poisonPoliceChaseTimer > 0) || (this.crimeManager && this.crimeManager.police && this.crimeManager.police.length > 0)) && this.crimeManager) {
             if (window.crimeMode) {
                 this.npcManager.update();
                 this.npcManager.checkInteraction(this.player.x, this.player.y);
@@ -3363,15 +3522,14 @@ class Game {
         this.camera.snapTo(this.player.x, this.player.y);
         if (window.gameLog) window.gameLog(`_startGame: camera snapped to x=${this.camera.x}, y=${this.camera.y}, size: w=${this.camera.width}, h=${this.camera.height}`);
 
-        this._resizeCanvas();
-
-        // Initialize 3D Retro FPS Engine & Build 3D Map
+        // Initialize 3D Retro FPS Engine & Build 3D Map, but start round in 2D Retro Mode
         if (window.Engine3D) {
             if (!this.engine3D) {
                 const canvas3d = document.getElementById('gameCanvas3d') || this.canvas;
                 this.engine3D = new Engine3D(canvas3d, this);
             }
             if (this.engine3D) {
+                this.engine3D.enabled = false; // Always start every round in 2D Retro Mode
                 let theme = 'filthadelphia';
                 if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
                 else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
@@ -3379,6 +3537,17 @@ class Game {
                 this.engine3D.buildMapForGame(this.gameMap, theme);
             }
         }
+
+        const canvas3d = document.getElementById('gameCanvas3d');
+        if (canvas3d) canvas3d.style.display = 'none';
+        const btnFpsToggle = document.getElementById('btn-fps-toggle');
+        if (btnFpsToggle) {
+            btnFpsToggle.innerHTML = '🕹️ 2D RETRO';
+            btnFpsToggle.style.borderColor = '#ffaa00';
+            btnFpsToggle.style.color = '#ffaa00';
+        }
+
+        this._resizeCanvas();
 
         if (window.dragonHoCheat || window.dragonMode) {
             const isCheat = window.dragonHoCheat;
@@ -3697,6 +3866,11 @@ class Game {
             if (result && result.multiplier && result.multiplier > 1) {
                 alert(`🎱 Magic 8-Ball Activated! Your score was multiplied by ${result.multiplier}x!`);
             }
+            if (result && result.retroactive_payout) {
+                alert(`🥫 7-DAY STREAK UNLOCKED! 🥫\n\nYou earned ${result.lids_awarded} Lids retroactively for all games played across days 1 through 7! Trade them on the Black Market or save them in your vault.`);
+            } else if (result && result.lids_awarded > 0) {
+                alert(`🥫 +${result.lids_awarded} Lid earned for your Day ${result.current_streak} active streak!`);
+            }
         } catch(e) {
             console.error("End round sync failed:", e);
         }
@@ -3803,6 +3977,13 @@ class Game {
         this.miniMap.buildStatic(this.gameMap);
         this.player = null;
         this.state = GameState.CHARACTER_SELECT;
+        if (this.engine3D) {
+            let theme = 'filthadelphia';
+            if (window.travelDestination === 'dahgbad') theme = 'dahgbad';
+            else if (window.travelDestination === 'cucaracha') theme = 'cucaracha';
+            else if (window.pirateMode) theme = 'pirate';
+            this.engine3D.buildMapForGame(this.gameMap, theme);
+        }
     }
 
     _renderGame(ctx, w, h) {
@@ -3822,6 +4003,8 @@ class Game {
         if (this.engine3D && this.engine3D.enabled) {
             ctx.clearRect(0, 0, w, h);
             this.engine3D.render(ctx);
+            // Render directional navigation arrow guide
+            this.renderNavigationArrow(ctx, w, h);
             // Render floating notifications and alert texts
             this.hud.renderNotifications(ctx, w, h);
             this.hud.renderFloatingTexts(ctx);
@@ -3861,9 +4044,16 @@ class Game {
                     ctx.fillStyle = '#ff0000';
                     ctx.fillRect(screen.x - 6, screen.y - 20, 12, 40);
                     ctx.fillRect(screen.x - 20, screen.y - 6, 40, 12);
-                } else if (bldg.type === 'fast_food' && ffImg) {
-                    // Draw it much larger and centered
-                    ctx.drawImage(ffImg, screen.x - 64, screen.y - 64, 128, 128);
+                } else if (['fast_food', 'zippy_ds', 'goose', 'chinos_steaks', 'rats_steaks'].includes(bldg.type)) {
+                    let spriteKey = 'goose';
+                    if (bldg.type === 'zippy_ds') spriteKey = 'zippy_ds';
+                    else if (bldg.type === 'chinos_steaks') spriteKey = 'chinos_steaks';
+                    else if (bldg.type === 'rats_steaks') spriteKey = 'rats_steaks';
+
+                    const rImg = this.spriteManager.getImage(spriteKey) || ffImg;
+                    if (rImg) {
+                        ctx.drawImage(rImg, screen.x - 64, screen.y - 64, 128, 128);
+                    }
                 } else if (bldg.type === 'airport' && this.spriteManager) {
                     const aptImg = this.spriteManager.getImage('airport');
                     if (aptImg) {
@@ -5675,17 +5865,37 @@ class Game {
         }
     }
 
-    _checkNavigationTargetEngaged() {
-        if (!this.navigationTarget || !this.player || !this.gameMap) return;
-        const targetType = this.navigationTarget.toLowerCase().trim();
-        const bldg = this.gameMap.buildings.find(b => {
+    _getNavDisplayName(targetType) {
+        const t = (targetType || '').toLowerCase().trim();
+        if (t === 'zippy_ds' || t === 'zippy ds' || t === 'zippy') return "ZIPPY D'S";
+        if (t === 'goose') return "GOOSE";
+        if (t === 'chinos_steaks' || t === 'chinos' || t === 'chinos steaks' || t === "chino's" || t === "chino's steaks") return "CHINO'S STEAKS";
+        if (t === 'rats_steaks' || t === 'rats' || t === 'rats steaks' || t === "rat's" || t === "rats steaks") return "RATS STEAKS";
+        if (t === 'pulp_mill' || t === 'pulp mill') return "PULP MILL";
+        if (t === 'black_market' || t === 'black market') return "BLACK MARKET";
+        return (targetType || '').toUpperCase();
+    }
+
+    _findNavBuilding(targetType) {
+        if (!this.gameMap || !this.gameMap.buildings || !targetType) return null;
+        const t = targetType.toLowerCase().trim();
+        return this.gameMap.buildings.find(b => {
             if (!b || !b.type) return false;
             const bt = b.type.toLowerCase();
-            if (targetType === 'pulp mill' || targetType === 'pulp_mill') {
-                return bt === 'pulp_mill' || bt === 'pulp mill';
-            }
-            return bt === targetType;
+            if (t === 'pulp mill' || t === 'pulp_mill') return bt === 'pulp_mill' || bt === 'pulp mill';
+            if (t === 'black market' || t === 'black_market') return bt === 'black_market' || bt === 'black market';
+            if (t === 'zippy_ds' || t === 'zippy ds' || t === 'zippy') return bt === 'zippy_ds';
+            if (t === 'goose') return bt === 'goose' || bt === 'fast_food';
+            if (t === 'chinos_steaks' || t === 'chinos' || t === 'chinos steaks' || t === "chino's" || t === "chino's steaks") return bt === 'chinos_steaks';
+            if (t === 'rats_steaks' || t === 'rats' || t === 'rats steaks' || t === "rat's" || t === "rats steaks") return bt === 'rats_steaks';
+            if (t === 'fast food' || t === 'fast_food') return ['fast_food', 'goose', 'zippy_ds', 'chinos_steaks', 'rats_steaks'].includes(bt);
+            return bt === t || bt.replace(/\s+/g, '_') === t.replace(/\s+/g, '_');
         });
+    }
+
+    _checkNavigationTargetEngaged() {
+        if (!this.navigationTarget || !this.player || !this.gameMap) return;
+        const bldg = this._findNavBuilding(this.navigationTarget);
 
         if (bldg) {
             let targetX = bldg.x + bldg.width / 2;
@@ -5697,7 +5907,15 @@ class Game {
 
             const px = typeof wrapWorldX === 'function' ? wrapWorldX(this.player.x) : this.player.x;
             const py = typeof wrapWorldY === 'function' ? wrapWorldY(this.player.y) : this.player.y;
-            const dist = Math.hypot(px - targetX, py - targetY);
+            let dx = wrapWorldX(targetX) - px;
+            let dy = wrapWorldY(targetY) - py;
+            if (!window.pirateMode) {
+                if (dx > MAP_PIXEL_W / 2) dx -= MAP_PIXEL_W;
+                else if (dx < -MAP_PIXEL_W / 2) dx += MAP_PIXEL_W;
+                if (dy > MAP_PIXEL_H / 2) dy -= MAP_PIXEL_H;
+                else if (dy < -MAP_PIXEL_H / 2) dy += MAP_PIXEL_H;
+            }
+            const dist = Math.hypot(dx, dy);
 
             let isAtTarget = dist < TILE_SIZE * 3.5;
             if (!isAtTarget) {
@@ -5708,7 +5926,7 @@ class Game {
             }
 
             if (isAtTarget) {
-                const locName = this.navigationTarget.toUpperCase();
+                const locName = this._getNavDisplayName(this.navigationTarget);
                 this.navigationTarget = null;
                 if (this.hud) {
                     this.hud.showFollowerNotification("🎯 Engaged " + locName + "! Navigation complete.", true);
@@ -5720,16 +5938,7 @@ class Game {
     renderNavigationArrow(ctx, canvasWidth, canvasHeight) {
         if (!this.navigationTarget || !this.player || !this.gameMap) return;
 
-        const targetType = this.navigationTarget.toLowerCase().trim();
-        let bldg = this.gameMap.buildings.find(b => {
-            if (!b || !b.type) return false;
-            const bt = b.type.toLowerCase();
-            if (targetType === 'pulp mill' || targetType === 'pulp_mill') {
-                return bt === 'pulp_mill' || bt === 'pulp mill';
-            }
-            return bt === targetType;
-        });
-
+        const bldg = this._findNavBuilding(this.navigationTarget);
         if (!bldg) return;
 
         let targetX = bldg.x + bldg.width / 2;
@@ -5739,17 +5948,34 @@ class Game {
             targetY = bldg.doorTiles[0].y * TILE_SIZE + TILE_SIZE / 2;
         }
 
-        const px = this.player.x;
-        const py = this.player.y;
-        const dx = targetX - px;
-        const dy = targetY - py;
+        const px = typeof wrapWorldX === 'function' ? wrapWorldX(this.player.x) : this.player.x;
+        const py = typeof wrapWorldY === 'function' ? wrapWorldY(this.player.y) : this.player.y;
+        let dx = wrapWorldX(targetX) - px;
+        let dy = wrapWorldY(targetY) - py;
+        if (!window.pirateMode) {
+            if (dx > MAP_PIXEL_W / 2) dx -= MAP_PIXEL_W;
+            else if (dx < -MAP_PIXEL_W / 2) dx += MAP_PIXEL_W;
+            if (dy > MAP_PIXEL_H / 2) dy -= MAP_PIXEL_H;
+            else if (dy < -MAP_PIXEL_H / 2) dy += MAP_PIXEL_H;
+        }
         const dist = Math.round(Math.hypot(dx, dy));
-        const angle = Math.atan2(dy, dx);
+        const worldAngle = Math.atan2(dy, dx);
+
+        const is3D = (this.engine3D && this.engine3D.enabled);
+        let arrowAngle = worldAngle;
+
+        if (is3D) {
+            // Compute relative angle in camera's horizontal view
+            let relAngle = worldAngle + this.engine3D.yaw + Math.PI / 2;
+            while (relAngle > Math.PI) relAngle -= Math.PI * 2;
+            while (relAngle < -Math.PI) relAngle += Math.PI * 2;
+            arrowAngle = relAngle - Math.PI / 2;
+        }
 
         ctx.save();
 
         // 1. HUD Banner at Top Center
-        const bannerW = 280;
+        const bannerW = 320;
         const bannerH = 34;
         const bannerX = (canvasWidth - bannerW) / 2;
         const bannerY = 15;
@@ -5770,13 +5996,13 @@ class Game {
         ctx.font = 'bold 8px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const displayName = this.navigationTarget.toUpperCase();
+        const displayName = this._getNavDisplayName(this.navigationTarget);
         ctx.fillText("📍 NAV: " + displayName + " (" + dist + "m)", bannerX + bannerW / 2 + 10, bannerY + bannerH / 2);
 
         // Mini rotating arrow inside banner
         ctx.save();
         ctx.translate(bannerX + 22, bannerY + bannerH / 2);
-        ctx.rotate(angle);
+        ctx.rotate(arrowAngle);
         ctx.fillStyle = '#ffcc00';
         ctx.beginPath();
         ctx.moveTo(10, 0);
@@ -5787,52 +6013,82 @@ class Game {
         ctx.fill();
         ctx.restore();
 
-        // 2. Large Directional Arrow Around Player
-        const playerScreen = this.camera ? this.camera.worldToScreen(px, py) : { x: canvasWidth / 2, y: canvasHeight / 2 };
-        const radius = 60;
-        const arrowX = playerScreen.x + Math.cos(angle) * radius;
-        const arrowY = playerScreen.y + Math.sin(angle) * radius;
-
         const pulse = Math.sin(Date.now() / 150) * 3;
 
-        ctx.save();
-        ctx.translate(arrowX, arrowY);
-        ctx.rotate(angle);
+        if (is3D) {
+            // 2. 3D FPS Mode: Directional Arrow Pointer around center of screen / crosshair
+            const cx = canvasWidth / 2;
+            const cy = canvasHeight / 2 - 20;
+            const radius = 100;
+            const arrowX = cx + Math.cos(arrowAngle) * radius;
+            const arrowY = cy + Math.sin(arrowAngle) * radius;
 
-        ctx.shadowColor = '#ffcc00';
-        ctx.shadowBlur = 10;
-
-        ctx.fillStyle = '#ffcc00';
-        ctx.beginPath();
-        ctx.moveTo(14 + pulse, 0);
-        ctx.lineTo(-10, -10);
-        ctx.lineTo(-4, 0);
-        ctx.lineTo(-10, 10);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.restore();
-
-        // 3. If target building is visible on screen, render beacon arrow right over the building/door
-        if (this.camera && this.camera.isVisible(targetX - 32, targetY - 32, 64, 64)) {
-            const targetScreen = this.camera.worldToScreen(targetX, targetY);
-            const bob = Math.sin(Date.now() / 200) * 8;
-            
             ctx.save();
-            ctx.fillStyle = '#00ffcc';
-            ctx.shadowColor = '#00ffcc';
-            ctx.shadowBlur = 12;
-            ctx.font = 'bold 20px "Press Start 2P", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('⬇', targetScreen.x, targetScreen.y - 35 + bob);
+            ctx.translate(arrowX, arrowY);
+            ctx.rotate(arrowAngle);
 
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '7px "Press Start 2P", monospace';
-            ctx.fillText(displayName, targetScreen.x, targetScreen.y - 50 + bob);
+            ctx.shadowColor = '#ffcc00';
+            ctx.shadowBlur = 12;
+
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            ctx.moveTo(16 + pulse, 0);
+            ctx.lineTo(-12, -10);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(-12, 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
             ctx.restore();
+        } else {
+            // 2. 2D Retro Mode: Large Directional Arrow Around Player
+            const playerScreen = this.camera ? this.camera.worldToScreen(px, py) : { x: canvasWidth / 2, y: canvasHeight / 2 };
+            const radius = 60;
+            const arrowX = playerScreen.x + Math.cos(worldAngle) * radius;
+            const arrowY = playerScreen.y + Math.sin(worldAngle) * radius;
+
+            ctx.save();
+            ctx.translate(arrowX, arrowY);
+            ctx.rotate(worldAngle);
+
+            ctx.shadowColor = '#ffcc00';
+            ctx.shadowBlur = 10;
+
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            ctx.moveTo(14 + pulse, 0);
+            ctx.lineTo(-10, -10);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-10, 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+
+            // 3. If target building is visible on screen, render beacon arrow right over the building/door
+            if (this.camera && this.camera.isVisible(targetX - 32, targetY - 32, 64, 64)) {
+                const targetScreen = this.camera.worldToScreen(targetX, targetY);
+                const bob = Math.sin(Date.now() / 200) * 8;
+                
+                ctx.save();
+                ctx.fillStyle = '#00ffcc';
+                ctx.shadowColor = '#00ffcc';
+                ctx.shadowBlur = 12;
+                ctx.font = 'bold 20px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('⬇', targetScreen.x, targetScreen.y - 35 + bob);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.fillText(displayName, targetScreen.x, targetScreen.y - 50 + bob);
+                ctx.restore();
+            }
         }
 
         ctx.restore();
@@ -6152,6 +6408,7 @@ class GameOrganizer {
 
 
 window.triggerHospitalOffer = function() {
+    if (document.exitPointerLock) document.exitPointerLock();
     if (window.game) {
         window.game.state = GameState.UI_OVERLAY;
         window.game.player.keys = { up: false, down: false, left: false, right: false };
@@ -6165,18 +6422,130 @@ window.triggerHospitalOffer = function() {
     if (dialog) dialog.classList.remove('hidden');
 };
 
-window.triggerFastFoodOffer = function(posseCount) {
+const FAST_FOOD_TIERS = {
+    zippy_ds: {
+        tier: 1,
+        tierName: 'Tier 1 Fast Food',
+        restaurantName: "Zippy D's",
+        foodName: 'SnackRap',
+        sprite: 'assets/sprites/ZippyDs.png',
+        borderColor: '#ffcc00',
+        costMultiplier: 0.5,
+        hungerMinPct: 0.25,
+        hungerMaxPct: 0.45,
+        happinessMin: 8,
+        happinessMax: 18,
+        suspensionTime: 8.0,
+        poisonChance: 0.15,
+        effectsDesc: '🌯 SnackRap (Tier 1): Refills 25%-45% Hunger & +8-18% Happiness'
+    },
+    goose: {
+        tier: 2,
+        tierName: 'Tier 2 Fast Food',
+        restaurantName: 'Goose',
+        foodName: 'Classic Hoagie',
+        sprite: 'assets/sprites/goose.png',
+        borderColor: '#ffaa00',
+        costMultiplier: 1.0,
+        hungerMinPct: 0.55,
+        hungerMaxPct: 0.80,
+        happinessMin: 20,
+        happinessMax: 35,
+        suspensionTime: 15.0,
+        poisonChance: 0.05,
+        effectsDesc: '🥪 Classic Hoagie (Tier 2): Refills 55%-80% Hunger & +20-35% Happiness (25% off w/ Goose Card)'
+    },
+    fast_food: {
+        tier: 2,
+        tierName: 'Tier 2 Fast Food',
+        restaurantName: 'Goose',
+        foodName: 'Classic Hoagie',
+        sprite: 'assets/sprites/goose.png',
+        borderColor: '#ffaa00',
+        costMultiplier: 1.0,
+        hungerMinPct: 0.55,
+        hungerMaxPct: 0.80,
+        happinessMin: 20,
+        happinessMax: 35,
+        suspensionTime: 15.0,
+        poisonChance: 0.05,
+        effectsDesc: '🥪 Classic Hoagie (Tier 2): Refills 55%-80% Hunger & +20-35% Happiness (25% off w/ Goose Card)'
+    },
+    chinos_steaks: {
+        tier: 3,
+        tierName: 'Tier 3 Gourmet Cheesesteak',
+        restaurantName: "Chino's Steaks",
+        foodName: 'Cheesesteak',
+        sprite: 'assets/sprites/Chinos_Steaks.png',
+        borderColor: '#ff3333',
+        costMultiplier: 2.2,
+        hungerMinPct: 0.90,
+        hungerMaxPct: 1.00,
+        happinessMin: 45,
+        happinessMax: 70,
+        suspensionTime: 25.0,
+        poisonChance: 0.0,
+        effectsDesc: "🥩 Cheesesteak (Tier 3): Refills 90%-100% Hunger & +45-70% Happiness (South Philly Style!)"
+    },
+    rats_steaks: {
+        tier: 3,
+        tierName: 'Tier 3 Gourmet Cheesesteak',
+        restaurantName: 'Rats Steaks',
+        foodName: 'Cheesesteak',
+        sprite: 'assets/sprites/Rats_Steaks.png',
+        borderColor: '#3399ff',
+        costMultiplier: 2.2,
+        hungerMinPct: 0.90,
+        hungerMaxPct: 1.00,
+        happinessMin: 45,
+        happinessMax: 70,
+        suspensionTime: 25.0,
+        poisonChance: 0.0,
+        effectsDesc: "🥩 Cheesesteak (Tier 3): Refills 90%-100% Hunger & +45-70% Happiness (South Philly Style!)"
+    }
+};
+
+window.triggerFastFoodOffer = function(posseCount, bldg) {
+    if (document.exitPointerLock) document.exitPointerLock();
     if (window.game) {
         window.game.state = GameState.UI_OVERLAY;
         window.game.player.keys = { up: false, down: false, left: false, right: false };
     }
     const dialog = document.getElementById('fast-food-dialog');
+    const cardBox = document.getElementById('fast-food-card-box');
+    const imgEl = document.getElementById('fast-food-dialog-img');
+    const titleEl = document.getElementById('fast-food-title');
+    const itemEl = document.getElementById('fast-food-item-name');
+    const effectsEl = document.getElementById('fast-food-effects-text');
     const costText = document.getElementById('fast-food-cost-text');
     const warnText = document.getElementById('fast-food-warning-text');
     const btnYes = document.getElementById('btn-fast-food-yes');
     const btnNo = document.getElementById('btn-fast-food-no');
     
+    const targetBldg = bldg || (window.game && window.game.pendingFastFoodBldg);
+    const bldgType = (targetBldg && targetBldg.type) ? targetBldg.type.toLowerCase() : 'goose';
+    const tierConfig = FAST_FOOD_TIERS[bldgType] || FAST_FOOD_TIERS.goose;
+    window.currentFastFoodConfig = tierConfig;
+    window.currentFastFoodBldg = targetBldg;
+
     if (dialog) {
+        if (cardBox) {
+            cardBox.style.borderColor = tierConfig.borderColor;
+        }
+        if (imgEl) {
+            imgEl.src = tierConfig.sprite;
+        }
+        if (titleEl) {
+            titleEl.innerText = tierConfig.restaurantName;
+            titleEl.style.color = tierConfig.borderColor;
+        }
+        if (itemEl) {
+            itemEl.innerText = `${tierConfig.foodName} (${tierConfig.tierName})`;
+        }
+        if (effectsEl) {
+            effectsEl.innerText = tierConfig.effectsDesc;
+        }
+
         let isBlocked = false;
         if (window.cultMode && window.game) {
             const lastEaten = window.game.lastEatenFastFoodId;
@@ -6196,27 +6565,28 @@ window.triggerFastFoodOffer = function(posseCount) {
             }
         } else {
             if (btnYes) btnYes.style.display = 'inline-block';
-            if (btnNo) btnNo.innerText = 'No';
+            if (btnNo) btnNo.innerText = 'Leave';
             if (costText) {
                 const trashWorth = Math.max(1, Math.round(Math.sqrt(16 * posseCount)));
-                let cost = posseCount * trashWorth;
-                const giftCards = (window.playerInventory && (window.playerInventory['Goose Gift Card'] || 0)) || 0;
-                const rewardsCards = (window.playerInventory && (window.playerInventory['Goose Rewards Card'] || 0)) || 0;
-                const totalGooseCards = giftCards + rewardsCards;
+                let rawCost = Math.max(5, Math.round(posseCount * trashWorth * tierConfig.costMultiplier));
                 
                 let discounted = false;
-                if (totalGooseCards > 0) {
-                    cost = Math.round(cost * 0.75); // 25% off
-                    discounted = true;
+                let discountText = '';
+                if (tierConfig.tier === 2 || bldgType === 'goose' || bldgType === 'fast_food') {
+                    const giftCards = (window.playerInventory && (window.playerInventory['Goose Gift Card'] || 0)) || 0;
+                    const rewardsCards = (window.playerInventory && (window.playerInventory['Goose Rewards Card'] || 0)) || 0;
+                    const totalGooseCards = giftCards + rewardsCards;
+                    if (totalGooseCards > 0) {
+                        rawCost = Math.round(rawCost * 0.75); // 25% off
+                        discounted = true;
+                        discountText = ` (25% OFF w/ Goose Card! [${totalGooseCards} left])`;
+                    }
                 }
-                window.currentFastFoodCost = cost;
+                
+                window.currentFastFoodCost = rawCost;
                 window.currentFastFoodUsedGooseCard = discounted;
                 
-                if (discounted) {
-                    costText.innerText = `Cost: $${cost.toLocaleString()} (25% OFF w/ Goose Card! [${totalGooseCards} left])`;
-                } else {
-                    costText.innerText = `Cost: $${cost.toLocaleString()}`;
-                }
+                costText.innerText = `Cost: $${rawCost.toLocaleString()}${discountText}`;
                 costText.style.display = 'block';
             }
             if (warnText) {
@@ -6263,6 +6633,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (window.game) {
             window.game.state = GameState.PLAYING;
             const cost = window.currentFastFoodCost || 0;
+            const config = window.currentFastFoodConfig || FAST_FOOD_TIERS.goose;
 
             // Consume Goose Gift Card / Rewards Card if used
             if (window.currentFastFoodUsedGooseCard && window.playerInventory) {
@@ -6277,22 +6648,29 @@ window.addEventListener('DOMContentLoaded', () => {
             window.game.trashManager.totalPoints = Math.max(0, window.game.trashManager.totalPoints - cost);
             window.game.hud.updateScore(window.game.trashManager.totalPoints);
             
-            window.game.hungerTimer = 45.0;
+            const maxHunger = 45.0;
+            // Sample random hunger refill from tier's probability range
+            const hungerPct = Math.random() * (config.hungerMaxPct - config.hungerMinPct) + config.hungerMinPct;
+            const hungerRefillSecs = hungerPct * maxHunger;
+            window.game.hungerTimer = Math.min(maxHunger, (window.game.hungerTimer || 0) + hungerRefillSecs);
             window.game.hungerWarned25 = false;
             window.game.hungerWarned10 = false;
-            window.game.fastFoodSuspensionTimer = 15.0;
+            window.game.fastFoodSuspensionTimer = config.suspensionTime;
+
+            // Sample random happiness boost from tier's probability range
+            const happinessBoost = Math.floor(Math.random() * (config.happinessMax - config.happinessMin + 1)) + config.happinessMin;
             
-            if (Math.random() < 0.20) {
+            if (Math.random() < config.poisonChance) {
                 if (window.game.hasHealthInsurance) {
                     window.game.mushroomTimer = 20.0; // Same as mushroom
                     window.game.hud.timerSpeed = 0.5; // Actually apply the slow down
-                    window.game.hud.showFollowerNotification('Food poisoning! Luckily you had insurance. (Speed reduced)', false);
+                    window.game.hud.showFollowerNotification(`Food poisoning from ${config.foodName}! Luckily you had insurance. (Speed reduced)`, false);
                 } else {
                     const count = window.game.followerManager.getFollowerCount();
                     for (let i = 0; i < count; i++) {
                         window.game.followerManager.removeFollower();
                     }
-                    window.game.hud.showFollowerNotification('Food poisoning! Entire posse died without insurance!', false);
+                    window.game.hud.showFollowerNotification(`Food poisoning from ${config.foodName}! Entire posse died without insurance!`, false);
                 }
             } else {
                 if (window.cultMode) {
@@ -6300,20 +6678,18 @@ window.addEventListener('DOMContentLoaded', () => {
                     window.game.visitedDifferentRestaurantSinceLastEat = false;
                     
                     const currentH = window.game.happiness || 0;
-                    const totalBoost = Math.round(15 + (1 - (currentH / 100)) * 20);
-                    
-                    // Immediate boost of 5%
-                    const immediateBoost = 5;
+                    const immediateBoost = Math.min(happinessBoost, Math.max(5, Math.round(happinessBoost * 0.35)));
                     window.game.happiness = Math.min(100, currentH + immediateBoost);
                     
-                    // Pending boost stacked
-                    const remainingBoost = Math.max(0, totalBoost - immediateBoost);
+                    const remainingBoost = Math.max(0, happinessBoost - immediateBoost);
                     window.game.pendingHappinessBoost = (window.game.pendingHappinessBoost || 0) + remainingBoost;
                     window.game.cultHappinessBufferTimer = 10.0;
                     
-                    window.game.hud.showFollowerNotification(`Fed posse! +5% Happiness instantly! Digesting remainder (+${remainingBoost}%) in 10s!`, true);
+                    const refillPctDisplay = Math.round(hungerPct * 100);
+                    window.game.hud.showFollowerNotification(`Fed posse ${config.foodName} from ${config.restaurantName}! +${refillPctDisplay}% Hunger, +${immediateBoost}% Happiness (+${remainingBoost}% in 10s)!`, true);
                 } else {
-                    window.game.hud.showFollowerNotification(`Fed posse for $${cost}! Trash requirement suspended for 15s.`, true);
+                    const refillPctDisplay = Math.round(hungerPct * 100);
+                    window.game.hud.showFollowerNotification(`Fed posse ${config.foodName} from ${config.restaurantName} for $${cost}! +${refillPctDisplay}% Hunger refilled!`, true);
                 }
             }
         }

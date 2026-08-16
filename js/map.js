@@ -101,6 +101,8 @@ const BUILDING_COLORS = [
 
 class BaseMap {
     constructor() {
+        this.width = MAP_WIDTH;
+        this.height = MAP_HEIGHT;
         this.tiles = [];
         this.buildingMeta = [];
         this.buildings = []; // { id, address, tiles: [{x,y}], doorTiles: [{x,y}] }
@@ -771,7 +773,7 @@ class BaseMap {
 
         if (this.islandTiles && this.islandTiles.has(`${tx},${ty}`) && !window.pirateMode) {
             const bldg = this.getBuildingAtTile(tx, ty);
-            if (bldg && bldg.type === 'fast_food') {
+            if (bldg && (bldg.type === 'fast_food' || bldg.type === 'goose' || bldg.type === 'zippy_ds' || bldg.type === 'chinos_steaks' || bldg.type === 'rats_steaks')) {
                 if (tile === TileType.BUILDING_DOOR) {
                     ctx.fillStyle = '#ffaa00';
                     ctx.fillRect(sx, sy, s, s);
@@ -1158,21 +1160,6 @@ class BaseMap {
                 availableIds = availableIds.filter(id => id !== centerBldg.id);
             }
             
-            const assignRandom = (type, amt) => {
-                for (let i = 0; i < amt; i++) {
-                    if (availableIds.length === 0) break;
-                    const r = Math.floor(Math.random() * availableIds.length);
-                    const bId = availableIds.splice(r, 1)[0];
-                    const b = this.buildings.find(x => x.id === bId);
-                    if (b) b.type = type;
-                }
-            };
-            
-            assignRandom('hospital', 1);
-            assignRandom('airport', 1);
-            assignRandom('zoo', 1);
-            assignRandom('fastfood', 8);
-            
             for (let i = availableIds.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [availableIds[i], availableIds[j]] = [availableIds[j], availableIds[i]];
@@ -1188,6 +1175,9 @@ class BaseMap {
                 this.buildings[availableIds.pop()].type = 'hospital';
             }
             if (availableIds.length > 0) {
+                this.buildings[availableIds.pop()].type = 'airport';
+            }
+            if (availableIds.length > 0) {
                 this.buildings[availableIds.pop()].type = 'dump';
             }
             if (availableIds.length > 0) {
@@ -1199,15 +1189,33 @@ class BaseMap {
             if (availableIds.length > 0) {
                 this.buildings[availableIds.pop()].type = 'zoo';
             }
-            for (let i = 0; i < 8; i++) {
-                if (availableIds.length > 0) {
-                    this.buildings[availableIds.pop()].type = 'fast_food';
+            // Assign Chino's Steaks and Rats Steaks directly across from each other at an intersection
+            this._assignChinosAndRats(availableIds);
+
+            // Assign Zippy D's (Tier 1, 1 location) and Goose (Tier 2, 1 location)
+            // Exactly 4 restaurants total on the map: 1 Zippy D's, 1 Goose, 1 Chino's Steaks, 1 Rats Steaks
+            if (availableIds.length > 0) {
+                const nextId = availableIds.pop();
+                const b = this.buildings.find(x => x.id === nextId);
+                if (b) {
+                    b.type = 'zippy_ds';
+                    b.address = "ZIPPY D'S";
+                }
+            }
+            if (availableIds.length > 0) {
+                const nextId = availableIds.pop();
+                const b = this.buildings.find(x => x.id === nextId);
+                if (b) {
+                    b.type = 'goose';
+                    b.address = "GOOSE";
                 }
             }
             
             // Guarantee a dump building exists on every map
             if (this.buildings.length > 0 && !this.buildings.some(b => b.type === 'dump')) {
-                this.buildings[this.buildings.length - 1].type = 'dump';
+                const availableBldg = this.buildings.find(b => b.type === 'default' || b.type === 'normal');
+                if (availableBldg) availableBldg.type = 'dump';
+                else this.buildings[this.buildings.length - 1].type = 'dump';
             }
 
             // Guarantee a zoo building exists on every map
@@ -1223,14 +1231,153 @@ class BaseMap {
             }
             // Guarantee a pulp_mill building exists on every map
             if (this.buildings.length > 1 && !this.buildings.some(b => b.type === 'pulp_mill')) {
-                const nonDump = this.buildings.find(b => b.type !== 'dump');
+                const nonDump = this.buildings.find(b => b.type === 'default' || b.type === 'normal' || (!['dump', 'chinos_steaks', 'rats_steaks', 'zippy_ds', 'goose', 'fast_food'].includes(b.type)));
                 if (nonDump) nonDump.type = 'pulp_mill';
             }
             // Guarantee a black_market building exists on every map
             if (this.buildings.length > 2 && !this.buildings.some(b => b.type === 'black_market')) {
-                const availableBldg = this.buildings.find(b => !['dump', 'pulp_mill'].includes(b.type));
+                const availableBldg = this.buildings.find(b => b.type === 'default' || b.type === 'normal' || (!['dump', 'pulp_mill', 'chinos_steaks', 'rats_steaks', 'zippy_ds', 'goose', 'fast_food', 'bank', 'police', 'hospital', 'airport', 'zoo'].includes(b.type)));
                 if (availableBldg) availableBldg.type = 'black_market';
             }
+        }
+    }
+
+    _assignChinosAndRats(availableIds) {
+        if (!this.buildings || this.buildings.length < 2) return;
+
+        // Find all crosswalk intersections
+        const intersections = [];
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (this.tiles[y][x] === TileType.CROSSWALK) {
+                    if (y === 0 || this.tiles[y - 1][x] !== TileType.CROSSWALK) {
+                        if (x === 0 || this.tiles[y][x - 1] !== TileType.CROSSWALK) {
+                            intersections.push({ x: x + 1, y: y + 1 });
+                        }
+                    }
+                }
+            }
+        }
+
+        let bestPair = null;
+        let bestScore = Infinity;
+
+        // Try intersections to find two opposing or adjacent corner buildings across the street
+        for (const inter of intersections) {
+            const ix = inter.x;
+            const iy = inter.y;
+
+            // Quadrants around intersection
+            const quads = { nw: null, ne: null, sw: null, se: null };
+
+            for (const bId of availableIds) {
+                const b = this.buildings.find(x => x.id === bId);
+                if (!b || !b.tiles || b.tiles.length === 0) continue;
+
+                let minD = Infinity;
+                let closestTile = null;
+                for (const t of b.tiles) {
+                    const d = Math.hypot(t.x - ix, t.y - iy);
+                    if (d < minD) {
+                        minD = d;
+                        closestTile = t;
+                    }
+                }
+
+                if (minD <= 10 && closestTile) {
+                    const qKey = (closestTile.y < iy ? 'n' : 's') + (closestTile.x < ix ? 'w' : 'e');
+                    if (!quads[qKey] || minD < quads[qKey].minD) {
+                        quads[qKey] = { bldg: b, minD, closestTile };
+                    }
+                }
+            }
+
+            // Check pairs across intersection (diagonals, horizontal across street, vertical across street)
+            const pairs = [
+                [quads.nw, quads.se],
+                [quads.ne, quads.sw],
+                [quads.nw, quads.ne],
+                [quads.sw, quads.se],
+                [quads.nw, quads.sw],
+                [quads.ne, quads.se]
+            ];
+
+            for (const [p1, p2] of pairs) {
+                if (p1 && p2 && p1.bldg.id !== p2.bldg.id) {
+                    const score = p1.minD + p2.minD;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestPair = { b1: p1.bldg, b2: p2.bldg, inter };
+                    }
+                }
+            }
+        }
+
+        // Fallback if no intersection pairs found
+        if (!bestPair) {
+            let minPairDist = Infinity;
+            for (let i = 0; i < availableIds.length; i++) {
+                for (let j = i + 1; j < availableIds.length; j++) {
+                    const b1 = this.buildings.find(x => x.id === availableIds[i]);
+                    const b2 = this.buildings.find(x => x.id === availableIds[j]);
+                    if (!b1 || !b2) continue;
+                    const d = Math.hypot(b1.x - b2.x, b1.y - b2.y) / TILE_SIZE;
+                    if (d < minPairDist) {
+                        minPairDist = d;
+                        bestPair = { b1, b2, inter: { x: (b1.x + b2.x) / (2 * TILE_SIZE), y: (b1.y + b2.y) / (2 * TILE_SIZE) } };
+                    }
+                }
+            }
+        }
+
+        if (bestPair) {
+            const { b1, b2, inter } = bestPair;
+            b1.type = 'chinos_steaks';
+            b1.address = "CHINO'S STEAKS";
+            b2.type = 'rats_steaks';
+            b2.address = "RATS STEAKS";
+
+            const orientDoor = (bldg) => {
+                let bestTile = null;
+                let minDist = Infinity;
+                for (const tile of bldg.tiles) {
+                    const neighbors = [
+                        { x: tile.x + 1, y: tile.y },
+                        { x: tile.x - 1, y: tile.y },
+                        { x: tile.x, y: tile.y + 1 },
+                        { x: tile.x, y: tile.y - 1 }
+                    ];
+                    const isAdj = neighbors.some(n => {
+                        const wx = wrapTileX(n.x);
+                        const wy = wrapTileY(n.y);
+                        return this.tiles[wy][wx] === TileType.SIDEWALK || this.tiles[wy][wx] === TileType.CROSSWALK;
+                    });
+                    if (isAdj) {
+                        const d = Math.hypot(tile.x - inter.x, tile.y - inter.y);
+                        if (d < minDist) {
+                            minDist = d;
+                            bestTile = tile;
+                        }
+                    }
+                }
+                if (bestTile) {
+                    if (bldg.doorTiles) {
+                        for (const od of bldg.doorTiles) {
+                            this.tiles[od.y][od.x] = TileType.BUILDING;
+                        }
+                    }
+                    this.tiles[bestTile.y][bestTile.x] = TileType.BUILDING_DOOR;
+                    bldg.doorTiles = [bestTile];
+                }
+            };
+
+            orientDoor(b1);
+            orientDoor(b2);
+
+            const idx1 = availableIds.indexOf(b1.id);
+            if (idx1 !== -1) availableIds.splice(idx1, 1);
+            const idx2 = availableIds.indexOf(b2.id);
+            if (idx2 !== -1) availableIds.splice(idx2, 1);
         }
     }
 }
@@ -1544,7 +1691,11 @@ class CustomMap extends BaseMap {
         this.title = data.title || 'Custom Map';
         this.restrictedMode = data.restricted_mode || 'all';
 
-        if (data.tiles) this.tiles = data.tiles;
+        if (data.tiles) {
+            this.tiles = data.tiles;
+            this.height = data.tiles.length;
+            this.width = data.tiles[0] ? data.tiles[0].length : MAP_WIDTH;
+        }
         if (data.buildingMeta) this.buildingMeta = data.buildingMeta;
         if (data.buildings) this.buildings = data.buildings;
         if (data.trees) this.trees = data.trees;

@@ -144,6 +144,8 @@ class MapBrowser {
 
             const modeBadge = modeLabels[mapObj.restricted_mode] || '🌐 CUSTOM';
 
+            const authorAvatar = mapObj.author_avatar_path || (mapObj.author_avatar ? `assets/stickers/${mapObj.author_avatar}` : 'assets/stickers/ducky_sticker.png');
+
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div style="font-size:11px; color:#00ffcc; line-height:1.3;">${mapObj.title || 'Untitled Map'}</div>
@@ -156,8 +158,11 @@ class MapBrowser {
                     ${mapObj.description || 'No description provided.'}
                 </div>
 
-                <div style="font-size:7px; color:#667a9a; display:flex; justify-content:space-between; border-top:1px solid #1a283e; padding-top:8px;">
-                    <span>👤 ${mapObj.author_username || 'Anonymous'}</span>
+                <div style="font-size:7px; color:#667a9a; display:flex; justify-content:space-between; align-items:center; border-top:1px solid #1a283e; padding-top:8px;">
+                    <div class="map-author-badge" style="display:flex; align-items:center; gap:6px; cursor:pointer; padding:2px 4px; border-radius:4px; transition:background 0.15s;" title="View ${mapObj.author_username || 'Author'}'s Profile">
+                        <img src="${authorAvatar}" style="width:20px; height:20px; object-fit:contain; image-rendering:pixelated; border-radius:3px; border:1px solid #00ffcc; background:#050a12;" />
+                        <span style="color:#38bdf8; text-decoration:underline;">${mapObj.author_username || 'Anonymous'}</span>
+                    </div>
                     <span>▶️ ${mapObj.play_count || 0} Plays</span>
                 </div>
 
@@ -166,6 +171,16 @@ class MapBrowser {
                     <button class="btn edit-map-btn secondary" style="flex:1; font-size:7px; padding:8px 0;">EDIT COPY ✏️</button>
                 </div>
             `;
+
+            const authorEl = card.querySelector('.map-author-badge');
+            if (authorEl && mapObj.author_username) {
+                authorEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (window.profileManager) {
+                        window.profileManager.openProfile(mapObj.author_username);
+                    }
+                });
+            }
 
             card.querySelector('.play-map-btn').addEventListener('click', async () => {
                 let fullData = mapObj.map_data;

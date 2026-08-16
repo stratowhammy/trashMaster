@@ -1,6 +1,6 @@
 // ============================================================
 // map_builder3d.js — 16-Bit Retro Texture & 3D Map Extrusion Engine
-// Authentic Swatch-Based 16-Bit Textures for Buildings & Streets
+// Infinite Toroidal 3x3 Repeating World Architecture
 // ============================================================
 
 class MapBuilder3D {
@@ -10,6 +10,7 @@ class MapBuilder3D {
         this.materials = {};
         this.mapMeshGroup = new THREE.Group();
         this.scene.add(this.mapMeshGroup);
+        this.skyMesh = null;
 
         this.TILE_SIZE_3D = 4; // 3D units per 2D tile
         this.WALL_HEIGHT = 5.5; // Height of building walls in 3D
@@ -44,9 +45,8 @@ class MapBuilder3D {
         this.textures.brick_terra_cotta = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#b44322';
             ctx.fillRect(0, 0, w, h);
-            ctx.fillStyle = '#6e230f'; // Dark mortar
+            ctx.fillStyle = '#6e230f';
             this._drawBrickMortar(ctx, w, h, 8, 4);
-            // Texture noise & highlight
             for (let i = 0; i < 180; i++) {
                 ctx.fillStyle = Math.random() > 0.5 ? 'rgba(235, 110, 75, 0.25)' : 'rgba(70, 20, 10, 0.2)';
                 ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 2);
@@ -95,7 +95,6 @@ class MapBuilder3D {
             ctx.fillRect(0, 0, w, h);
             ctx.fillStyle = '#0f1f33';
             this._drawBrickMortar(ctx, w, h, 8, 4);
-            // Paint distress flecks
             for (let i = 0; i < 100; i++) {
                 ctx.fillStyle = 'rgba(70, 130, 190, 0.25)';
                 ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 1);
@@ -120,7 +119,6 @@ class MapBuilder3D {
             ctx.fillRect(0, 0, w, h);
             ctx.fillStyle = '#40140e';
             this._drawBrickMortar(ctx, w, h, 8, 4);
-            // Darker age stains
             ctx.fillStyle = 'rgba(20, 10, 5, 0.3)';
             ctx.fillRect(4, 8, 20, 16);
             ctx.fillRect(36, 32, 24, 20);
@@ -132,7 +130,6 @@ class MapBuilder3D {
             ctx.fillRect(0, 0, w, h);
             ctx.fillStyle = '#4a150e';
             this._drawBrickMortar(ctx, w, h, 8, 4);
-            // Dark jagged fracture crack line
             ctx.fillStyle = '#1a0503';
             const crackPoints = [[10, 0], [18, 16], [14, 28], [28, 42], [32, 54], [44, 64]];
             for (let p = 0; p < crackPoints.length - 1; p++) {
@@ -144,7 +141,7 @@ class MapBuilder3D {
         // 🏢 SWATCH 2: 16-BIT MODERN BUILDING FAÇADES
         // ============================================================
 
-        // 9. Corten Steel (Rusted Oxidized Metal)
+        // 9. Corten Steel
         this.textures.facade_corten_steel = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#9c441a';
             ctx.fillRect(0, 0, w, h);
@@ -162,13 +159,11 @@ class MapBuilder3D {
         this.textures.facade_aluminum = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#cbd5e1';
             ctx.fillRect(0, 0, w, h);
-            // Panel seam grid
             ctx.fillStyle = '#64748b';
             ctx.fillRect(0, 0, w, 2);
             ctx.fillRect(0, 32, w, 2);
             ctx.fillRect(0, 0, 2, h);
             ctx.fillRect(32, 0, 2, h);
-            // Metallic gradient sheen
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.fillRect(4, 4, 24, 6);
             ctx.fillRect(36, 4, 24, 6);
@@ -176,7 +171,7 @@ class MapBuilder3D {
             ctx.fillRect(36, 36, 24, 6);
         });
 
-        // 11. Spider Glass (Glass Curtain Wall with Corner Fittings)
+        // 11. Spider Glass (Glass Curtain Wall)
         this.textures.facade_spider_glass = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#0284c7';
             ctx.fillRect(0, 0, w, h);
@@ -185,17 +180,13 @@ class MapBuilder3D {
             ctx.fillRect(34, 2, 28, 28);
             ctx.fillRect(2, 34, 28, 28);
             ctx.fillRect(34, 34, 28, 28);
-            // Glass shine glare
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
             ctx.beginPath();
             ctx.moveTo(2, 20); ctx.lineTo(20, 2); ctx.lineTo(26, 2); ctx.lineTo(2, 26);
             ctx.fill();
-            // Center Spider Fitting (Stainless Steel '+')
             ctx.fillStyle = '#e2e8f0';
             ctx.fillRect(30, 28, 4, 8);
             ctx.fillRect(28, 30, 8, 4);
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(31, 31, 2, 2);
         });
 
         // 12. Reflective Blue Skyscraper Glass
@@ -204,12 +195,10 @@ class MapBuilder3D {
             ctx.fillRect(0, 0, w, h);
             ctx.fillStyle = '#0284c7';
             ctx.fillRect(4, 4, 56, 56);
-            // Diagonal cloud reflection streak
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
             ctx.beginPath();
             ctx.moveTo(0, 48); ctx.lineTo(48, 0); ctx.lineTo(64, 0); ctx.lineTo(0, 64);
             ctx.fill();
-            // Window Mullions
             ctx.fillStyle = '#082f49';
             ctx.fillRect(0, 0, w, 2);
             ctx.fillRect(0, h - 2, w, 2);
@@ -217,7 +206,7 @@ class MapBuilder3D {
             ctx.fillRect(w - 2, 0, 2, h);
         });
 
-        // 13. Timber Cladding (Vertical Wood Slats)
+        // 13. Timber Cladding
         this.textures.facade_timber = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#854d0e';
             ctx.fillRect(0, 0, w, h);
@@ -226,11 +215,11 @@ class MapBuilder3D {
                 ctx.fillStyle = x % 16 === 0 ? '#a16207' : '#713f12';
                 ctx.fillRect(x + 1, 0, slatW - 2, h);
                 ctx.fillStyle = '#3f2206';
-                ctx.fillRect(x + slatW - 1, 0, 1, h); // Slat shadow
+                ctx.fillRect(x + slatW - 1, 0, 1, h);
             }
         });
 
-        // 14. Louver Panel (Horizontal Dark Ventilation Slats)
+        // 14. Louver Panel
         this.textures.facade_louver = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#1e293b';
             ctx.fillRect(0, 0, w, h);
@@ -242,7 +231,7 @@ class MapBuilder3D {
             }
         });
 
-        // 15. Exposed Concrete (Architectural Concrete Panels)
+        // 15. Exposed Concrete
         this.textures.facade_exposed_concrete = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#64748b';
             ctx.fillRect(0, 0, w, h);
@@ -250,7 +239,6 @@ class MapBuilder3D {
             ctx.strokeRect(1, 1, w - 2, h - 2);
             ctx.fillRect(0, 32, w, 2);
             ctx.fillRect(32, 0, 2, h);
-            // Form-tie tie holes (4 circular pits)
             const holes = [[8, 8], [56, 8], [8, 56], [56, 56], [8, 38], [56, 38], [38, 8], [38, 56]];
             ctx.fillStyle = '#1e293b';
             holes.forEach(([hx, hy]) => {
@@ -260,7 +248,7 @@ class MapBuilder3D {
             });
         });
 
-        // 16. Green Living Wall (Dense Foliage & Vines)
+        // 16. Green Living Wall
         this.textures.facade_green_wall = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#14532d';
             ctx.fillRect(0, 0, w, h);
@@ -272,107 +260,96 @@ class MapBuilder3D {
             }
         });
 
+        // Fast Food Restaurant Facade
+        this.textures.building_fast_food = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(4, 4, w - 8, h - 8);
+            for (let x = 0; x < w; x += 8) {
+                ctx.fillStyle = (x % 16 === 0) ? '#dc2626' : '#ffffff';
+                ctx.fillRect(x, 4, 8, 12);
+            }
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(8, 22, w - 16, h - 28);
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fillRect(10, 24, 18, 6);
+        });
+
+        // Roof Surface
+        this.textures.roof_surface = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeRect(1, 1, w - 2, h - 2);
+            for (let i = 0; i < 200; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#334155' : '#111827';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 2, 2);
+            }
+        });
+
         // ============================================================
-        // 🛣️ SWATCH 3: 16-BIT RETRO-CITY STREETS & PAVEMENT
+        // 🛣️ SWATCH 3: STREETS, SIDEWALKS & SURFACES
         // ============================================================
 
-        // 17. Cracked Asphalt Street (with Dashed Yellow Line)
-        this.textures.street_cracked_asphalt = this._createPixelTexture((ctx, w, h) => {
-            ctx.fillStyle = '#1e2024';
+        // 17. Clean Asphalt Road (Standard)
+        this.textures.road_asphalt = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#26292e';
             ctx.fillRect(0, 0, w, h);
-            // Asphalt grain
-            for (let i = 0; i < 400; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? '#131417' : '#2b2e35';
+            for (let i = 0; i < 300; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#1b1d22' : '#32363d';
                 ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 1, 1);
             }
-            // Fine crack
-            ctx.fillStyle = '#0d0e10';
-            ctx.beginPath();
-            ctx.moveTo(8, 4); ctx.lineTo(24, 18); ctx.lineTo(38, 14); ctx.lineTo(52, 28);
-            ctx.stroke();
-            // Dashed yellow centerline
+        });
+
+        // 18. Horizontal Road (Dashed Center Yellow Line along X)
+        this.textures.road_h = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#26292e';
+            ctx.fillRect(0, 0, w, h);
+            for (let i = 0; i < 250; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#1b1d22' : '#32363d';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 1, 1);
+            }
             ctx.fillStyle = '#eab308';
-            ctx.fillRect(w / 2 - 2, 8, 4, 16);
-            ctx.fillRect(w / 2 - 2, 40, 4, 16);
+            ctx.fillRect(8, h / 2 - 2, 18, 4);
+            ctx.fillRect(38, h / 2 - 2, 18, 4);
         });
 
-        // 18. Polished Cobblestone
-        this.textures.street_cobblestone = this._createPixelTexture((ctx, w, h) => {
-            ctx.fillStyle = '#334155'; // Dark mortar
+        // 19. Vertical Road (Dashed Center Yellow Line along Y)
+        this.textures.road_v = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#26292e';
             ctx.fillRect(0, 0, w, h);
-            for (let r = 0; r < 4; r++) {
-                for (let c = 0; c < 4; c++) {
-                    const cx = c * 16 + (r % 2) * 8;
-                    const cy = r * 16;
-                    ctx.fillStyle = (r + c) % 3 === 0 ? '#64748b' : ((r + c) % 2 === 0 ? '#475569' : '#526071');
-                    ctx.beginPath();
-                    ctx.roundRect(cx + 1, cy + 1, 14, 14, 4);
-                    ctx.fill();
-                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                    ctx.fillRect(cx + 3, cy + 3, 5, 4);
-                }
+            for (let i = 0; i < 250; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#1b1d22' : '#32363d';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 1, 1);
+            }
+            ctx.fillStyle = '#eab308';
+            ctx.fillRect(w / 2 - 2, 8, 4, 18);
+            ctx.fillRect(w / 2 - 2, 38, 4, 18);
+        });
+
+        // 20. Road Crosswalk (Zebra Stripes)
+        this.textures.road_crosswalk = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#26292e';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#e2e8f0';
+            for (let x = 6; x < w - 6; x += 14) {
+                ctx.fillRect(x, 4, 8, h - 8);
             }
         });
 
-        // 19. Blok-Pavers (Herringbone Red & Gray Pavers)
-        this.textures.street_blok_pavers = this._createPixelTexture((ctx, w, h) => {
-            ctx.fillStyle = '#475569';
+        // 21. Sidewalk (Clean Concrete Paving)
+        this.textures.sidewalk = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#8c98a8';
             ctx.fillRect(0, 0, w, h);
-            for (let y = 0; y < h; y += 16) {
-                for (let x = 0; x < w; x += 16) {
-                    // Horizontal paver
-                    ctx.fillStyle = '#9e382b';
-                    ctx.fillRect(x + 1, y + 1, 14, 6);
-                    // Vertical paver
-                    ctx.fillStyle = '#64748b';
-                    ctx.fillRect(x + 1, y + 8, 6, 7);
-                    ctx.fillStyle = '#b44322';
-                    ctx.fillRect(x + 8, y + 8, 7, 7);
-                }
-            }
-        });
-
-        // 20. Sidewalk with Drainage Grate
-        this.textures.street_sidewalk = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#64748b';
-            ctx.fillRect(0, 0, w, h);
-            ctx.fillStyle = '#475569';
             ctx.strokeRect(1, 1, w - 2, h - 2);
             ctx.fillRect(w / 2, 0, 1, h);
             ctx.fillRect(0, h / 2, w, 1);
-            // Concrete grain
-            for (let i = 0; i < 150; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? '#78889b' : '#3d4856';
+            for (let i = 0; i < 120; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#a0aec0' : '#718096';
                 ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 1, 1);
             }
-        });
-
-        // 21. Manhole Cover Pavement ("CITY SEWER")
-        this.textures.street_manhole = this._createPixelTexture((ctx, w, h) => {
-            ctx.fillStyle = '#1e2024';
-            ctx.fillRect(0, 0, w, h);
-            // Outer rim
-            ctx.fillStyle = '#374151';
-            ctx.beginPath();
-            ctx.arc(32, 32, 22, 0, Math.PI * 2);
-            ctx.fill();
-            // Inner cast iron
-            ctx.fillStyle = '#1f2937';
-            ctx.beginPath();
-            ctx.arc(32, 32, 18, 0, Math.PI * 2);
-            ctx.fill();
-            // Crosshatch
-            ctx.fillStyle = '#4b5563';
-            for (let x = 18; x <= 46; x += 4) {
-                ctx.fillRect(x, 18, 1, 28);
-            }
-            for (let y = 18; y <= 46; y += 4) {
-                ctx.fillRect(18, y, 28, 1);
-            }
-            ctx.fillStyle = '#e5e7eb';
-            ctx.font = 'bold 5px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('SEWER', 32, 34);
         });
 
         // 22. Park Grass Lawn
@@ -385,7 +362,31 @@ class MapBuilder3D {
             }
         });
 
-        // 23. Ocean Water
+        // 23. Park Path (Pea Gravel)
+        this.textures.park_path = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#b45309';
+            ctx.fillRect(0, 0, w, h);
+            for (let y = 0; y < h; y += 16) {
+                for (let x = 0; x < w; x += 16) {
+                    ctx.fillStyle = (x + y) % 32 === 0 ? '#d97706' : '#92400e';
+                    ctx.fillRect(x + 1, y + 1, 14, 14);
+                }
+            }
+        });
+
+        // 24. Beach Sand
+        this.textures.beach_sand = this._createPixelTexture((ctx, w, h) => {
+            ctx.fillStyle = '#ca8a04';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#eab308';
+            ctx.fillRect(2, 2, w - 4, h - 4);
+            for (let i = 0; i < 200; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#fef08a' : '#a16207';
+                ctx.fillRect(Math.floor(Math.random() * w), Math.floor(Math.random() * h), 1, 1);
+            }
+        });
+
+        // 25. Ocean Water
         this.textures.ocean_water = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#0284c7';
             ctx.fillRect(0, 0, w, h);
@@ -398,11 +399,11 @@ class MapBuilder3D {
             }
         });
 
-        // 24. Dump Facility Texture
+        // 26. Dump Facility Texture
         this.textures.facility_dump = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#1c1917';
             ctx.fillRect(0, 0, w, h);
-            ctx.fillStyle = '#facc15'; // Caution stripes
+            ctx.fillStyle = '#facc15';
             for (let i = 0; i < w + h; i += 16) {
                 ctx.beginPath();
                 ctx.moveTo(i, 0); ctx.lineTo(i + 8, 0); ctx.lineTo(i - h + 8, h); ctx.lineTo(i - h, h);
@@ -415,7 +416,7 @@ class MapBuilder3D {
             ctx.fillText('DUMP', 18, 36);
         });
 
-        // 25. Zoo Facility Texture
+        // 27. Zoo Facility Texture
         this.textures.facility_zoo = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#064e3b';
             ctx.fillRect(0, 0, w, h);
@@ -430,7 +431,7 @@ class MapBuilder3D {
             }
         });
 
-        // 26. Interactive Door
+        // 28. Interactive Door
         this.textures.door = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#1e1b4b';
             ctx.fillRect(0, 0, w, h);
@@ -480,12 +481,12 @@ class MapBuilder3D {
 
         if (!gameMap || !gameMap.tiles) return;
 
-        const mapW = gameMap.width || 128;
-        const mapH = gameMap.height || 128;
+        const mapW = (gameMap && gameMap.width) ? gameMap.width : (typeof MAP_WIDTH !== 'undefined' ? MAP_WIDTH : 128);
+        const mapH = (gameMap && gameMap.height) ? gameMap.height : (typeof MAP_HEIGHT !== 'undefined' ? MAP_HEIGHT : 128);
         const S = this.TILE_SIZE_3D;
         const wallH = this.WALL_HEIGHT;
 
-        // Building Materials Palette from Swatches
+        // Building Materials Palette
         const buildingMaterials = [
             this.materials.brick_terra_cotta,
             this.materials.brick_sienna,
@@ -508,68 +509,148 @@ class MapBuilder3D {
         // Coordinate collection maps for InstancedMesh Batching
         const floorBuckets = new Map();
         const wallBuckets = new Map();
+        const roofBuckets = [];
 
         const getFloorMatKey = (tileType, x, y) => {
             if (window.pirateMode || tileType === (window.TileType ? TileType.WATER : 99) || tileType === 99) {
                 return 'ocean_water';
             }
-            if (tileType === (window.TileType ? TileType.PARK_PATH : 6) || tileType === (window.TileType ? TileType.GRASS : 2)) {
-                return (x + y) % 7 === 0 ? 'street_cobblestone' : 'park_grass';
+            if (gameMap.islandTiles && gameMap.islandTiles.has(`${x},${y}`)) {
+                if (tileType === (window.TileType ? TileType.SIDEWALK : 1)) return 'beach_sand';
+                return 'ocean_water';
             }
-            if (tileType === (window.TileType ? TileType.SIDEWALK : 1) || tileType === (window.TileType ? TileType.CROSSWALK : 5)) {
-                return (x * y) % 9 === 0 ? 'street_blok_pavers' : 'street_sidewalk';
+            if (tileType === (window.TileType ? TileType.PARK_PATH : 6)) {
+                return 'park_path';
             }
-            // Road tiles
-            if ((x + y) % 31 === 0) return 'street_manhole';
-            return 'street_cracked_asphalt';
+            if (tileType === (window.TileType ? TileType.GRASS : 2)) {
+                return 'park_grass';
+            }
+            if (tileType === (window.TileType ? TileType.SIDEWALK : 1)) {
+                return 'sidewalk';
+            }
+            if (tileType === (window.TileType ? TileType.CROSSWALK : 5)) {
+                return 'road_crosswalk';
+            }
+            if (tileType === (window.TileType ? TileType.ROAD_UP : 7) || tileType === (window.TileType ? TileType.ROAD_DOWN : 8)) {
+                return 'road_v';
+            }
+            if (tileType === (window.TileType ? TileType.ROAD_LEFT : 9) || tileType === (window.TileType ? TileType.ROAD_RIGHT : 10)) {
+                return 'road_h';
+            }
+            if (tileType === (window.TileType ? TileType.ROAD : 0)) {
+                return (y % 2 === 0 || y % 2 === 1) ? 'road_h' : 'road_v';
+            }
+            return 'road_asphalt';
         };
 
-        const getWallMatKey = (x, y) => {
-            // Assign varied 16-bit building swatch based on block coordinates
-            const blockId = Math.floor(x / 4) * 31 + Math.floor(y / 4);
-            const index = Math.abs(blockId) % buildingMaterials.length;
-            return index;
+        const getBuildingMaterial = (x, y) => {
+            const bldg = gameMap.getBuildingAtTile ? gameMap.getBuildingAtTile(x, y) : null;
+            if (bldg && bldg.type) {
+                if (['fast_food', 'goose', 'zippy_ds', 'chinos_steaks', 'rats_steaks'].includes(bldg.type)) return this.materials.building_fast_food;
+                if (bldg.type === 'dump') return this.materials.facility_dump;
+                if (bldg.type === 'zoo') return this.materials.facility_zoo;
+                if (bldg.type === 'bank') return this.materials.brick_buff;
+                if (bldg.type === 'hospital') return this.materials.facade_aluminum;
+                if (bldg.type === 'police') return this.materials.brick_painted_navy;
+                if (bldg.type === 'airport') return this.materials.facade_spider_glass;
+                if (bldg.type === 'pulp_mill') return this.materials.facade_timber;
+                if (bldg.type === 'black_market') return this.materials.brick_cracked;
+            }
+
+            let bldgId = 0;
+            if (bldg && bldg.id !== undefined) {
+                bldgId = bldg.id;
+            } else if (gameMap.buildingMeta && gameMap.buildingMeta[y] && gameMap.buildingMeta[y][x] >= 0) {
+                bldgId = gameMap.buildingMeta[y][x];
+            } else {
+                bldgId = Math.floor(x / 10) * 13 + Math.floor(y / 10);
+            }
+            const wallIdx = Math.abs(bldgId) % buildingMaterials.length;
+            return buildingMaterials[wallIdx];
         };
 
         const dummy = new THREE.Object3D();
 
-        // 1. Classify all map tiles into batch buckets
-        for (let y = 0; y < mapH; y++) {
-            for (let x = 0; x < mapW; x++) {
-                const tileType = gameMap.getTile(x, y);
-                const worldX = (x - mapW / 2) * S + S / 2;
-                const worldZ = (y - mapH / 2) * S + S / 2;
+        // 3x3 Infinite Toroidal Chunks (9 seamless adjacent replicas)
+        const chunks = window.pirateMode ? [{ cx: 0, cz: 0 }] : [
+            { cx: -1, cz: -1 }, { cx: 0, cz: -1 }, { cx: 1, cz: -1 },
+            { cx: -1, cz:  0 }, { cx: 0, cz:  0 }, { cx: 1, cz:  0 },
+            { cx: -1, cz:  1 }, { cx: 0, cz:  1 }, { cx: 1, cz:  1 }
+        ];
 
-                // Floor
-                const floorKey = getFloorMatKey(tileType, x, y);
-                if (!floorBuckets.has(floorKey)) floorBuckets.set(floorKey, []);
-                floorBuckets.get(floorKey).push({ x: worldX, z: worldZ });
+        // 1. Classify all map tiles into batch buckets across all 3x3 chunks
+        chunks.forEach(({ cx, cz }) => {
+            const offsetX = cx * mapW * S;
+            const offsetZ = cz * mapH * S;
 
-                // Wall / Building
-                const isBuilding = tileType === (window.TileType ? TileType.BUILDING : 3) ||
-                                   tileType === (window.TileType ? TileType.WALL : 98) ||
-                                   tileType === 3;
+            for (let y = 0; y < mapH; y++) {
+                for (let x = 0; x < mapW; x++) {
+                    const tileType = gameMap.getTile ? gameMap.getTile(x, y) : 0;
+                    const worldX = (x - mapW / 2) * S + S / 2 + offsetX;
+                    const worldZ = (y - mapH / 2) * S + S / 2 + offsetZ;
 
-                const isDoor = tileType === (window.TileType ? TileType.BUILDING_DOOR : 4) ||
-                               tileType === 4;
+                    // Floor
+                    const floorKey = getFloorMatKey(tileType, x, y);
+                    if (!floorBuckets.has(floorKey)) floorBuckets.set(floorKey, []);
+                    floorBuckets.get(floorKey).push({ x: worldX, z: worldZ });
 
-                if (isBuilding) {
-                    const wallIdx = getWallMatKey(x, y);
-                    if (!wallBuckets.has(wallIdx)) wallBuckets.set(wallIdx, []);
-                    wallBuckets.get(wallIdx).push({ x: worldX, z: worldZ, height: wallH });
-                } else if (isDoor) {
-                    if (!wallBuckets.has('door')) wallBuckets.set('door', []);
-                    wallBuckets.get('door').push({ x: worldX, z: worldZ, height: this.DOOR_HEIGHT });
+                    // Wall / Building
+                    const isBuilding = tileType === (window.TileType ? TileType.BUILDING : 3) ||
+                                       tileType === (window.TileType ? TileType.WALL : 98) ||
+                                       tileType === 3;
+
+                    const isDoor = tileType === (window.TileType ? TileType.BUILDING_DOOR : 4) ||
+                                   tileType === 4;
+
+                    if (isBuilding) {
+                        const mat = getBuildingMaterial(x, y);
+                        if (!wallBuckets.has(mat)) wallBuckets.set(mat, []);
+                        wallBuckets.get(mat).push({ x: worldX, z: worldZ, height: wallH });
+
+                        // Roof tile on top of building
+                        roofBuckets.push({ x: worldX, z: worldZ });
+                    } else if (isDoor) {
+                        if (!wallBuckets.has(this.materials.door)) wallBuckets.set(this.materials.door, []);
+                        wallBuckets.get(this.materials.door).push({ x: worldX, z: worldZ, height: this.DOOR_HEIGHT });
+                    }
                 }
             }
-        }
 
-        // 2. Create InstancedMesh for Floor Buckets (4-6 draw calls total!)
+            // Place Landmark 3D Entrance Portals & Signboards for this chunk
+            if (gameMap.buildings) {
+                for (const bldg of gameMap.buildings) {
+                    if (!bldg || !bldg.doorTiles || bldg.doorTiles.length === 0) continue;
+                    const door = bldg.doorTiles[0];
+                    const dx = (door.x - mapW / 2) * S + S / 2 + offsetX;
+                    const dz = (door.y - mapH / 2) * S + S / 2 + offsetZ;
+
+                    let signLabel = '🚪 ENTRANCE';
+                    if (bldg.type === 'dump') signLabel = '🗑️ DUMP';
+                    else if (bldg.type === 'zoo') signLabel = '🦁 ZOO';
+                    else if (bldg.type === 'police') signLabel = '👮 POLICE';
+                    else if (bldg.type === 'bank') signLabel = '🏦 BANK';
+                    else if (bldg.type === 'zippy_ds') signLabel = '🌯 ZIPPY D\'S';
+                    else if (bldg.type === 'goose' || bldg.type === 'fast_food') signLabel = '🥪 GOOSE';
+                    else if (bldg.type === 'chinos_steaks') signLabel = '🥩 CHINO\'S STEAKS';
+                    else if (bldg.type === 'rats_steaks') signLabel = '🥩 RATS STEAKS';
+                    else if (bldg.type === 'airport') signLabel = '✈️ AIRPORT';
+                    else if (bldg.type === 'hospital') signLabel = '🏥 HOSPITAL';
+                    else if (bldg.type === 'pulp_mill') signLabel = '🪵 PULP MILL';
+                    else if (bldg.type === 'black_market') signLabel = '☠️ BLACK MARKET';
+
+                    const signSprite = this._createSignSprite(signLabel);
+                    signSprite.position.set(dx, this.DOOR_HEIGHT + 1.2, dz);
+                    this.mapMeshGroup.add(signSprite);
+                }
+            }
+        });
+
+        // 2. Create InstancedMesh for Floor Buckets
         const floorPlaneGeo = new THREE.PlaneGeometry(S, S);
         floorPlaneGeo.rotateX(-Math.PI / 2);
 
         floorBuckets.forEach((coords, floorKey) => {
-            const mat = this.materials[floorKey] || this.materials.street_cracked_asphalt;
+            const mat = this.materials[floorKey] || this.materials.road_asphalt;
             const count = coords.length;
             const instMesh = new THREE.InstancedMesh(floorPlaneGeo, mat, count);
 
@@ -585,19 +666,13 @@ class MapBuilder3D {
             this.mapMeshGroup.add(instMesh);
         });
 
-        // 3. Create InstancedMesh for Wall Buckets (15 draw calls total!)
+        // 3. Create InstancedMesh for Wall Buckets
         const wallBoxGeo = new THREE.BoxGeometry(S, wallH, S);
         const doorBoxGeo = new THREE.BoxGeometry(S, this.DOOR_HEIGHT, S);
 
-        wallBuckets.forEach((coords, key) => {
-            let mat = this.materials.door;
-            let geo = doorBoxGeo;
-
-            if (key !== 'door') {
-                mat = buildingMaterials[key];
-                geo = wallBoxGeo;
-            }
-
+        wallBuckets.forEach((coords, mat) => {
+            const isDoorMat = (mat === this.materials.door);
+            const geo = isDoorMat ? doorBoxGeo : wallBoxGeo;
             const count = coords.length;
             const instMesh = new THREE.InstancedMesh(geo, mat, count);
 
@@ -613,56 +688,25 @@ class MapBuilder3D {
             this.mapMeshGroup.add(instMesh);
         });
 
-        // 4. Add Landmark 3D Entrance Portals & Signboards
-        if (gameMap.buildings) {
-            for (const bldg of gameMap.buildings) {
-                if (!bldg || !bldg.doorTiles || bldg.doorTiles.length === 0) continue;
-                const door = bldg.doorTiles[0];
-                const dx = (door.x - mapW / 2) * S + S / 2;
-                const dz = (door.y - mapH / 2) * S + S / 2;
+        // 4. Create InstancedMesh for Building Roofs
+        if (roofBuckets.length > 0) {
+            const roofPlaneGeo = new THREE.PlaneGeometry(S, S);
+            roofPlaneGeo.rotateX(-Math.PI / 2);
+            const roofInstMesh = new THREE.InstancedMesh(roofPlaneGeo, this.materials.roof_surface, roofBuckets.length);
 
-                let specialMat = this.materials.door;
-                let signLabel = bldg.type ? bldg.type.toUpperCase() : 'ENTER';
+            roofBuckets.forEach((coord, i) => {
+                dummy.position.set(coord.x, wallH, coord.z);
+                dummy.rotation.set(0, 0, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                roofInstMesh.setMatrixAt(i, dummy.matrix);
+            });
 
-                if (bldg.type === 'dump') {
-                    specialMat = this.materials.facility_dump;
-                    signLabel = '🗑️ DUMP';
-                } else if (bldg.type === 'zoo') {
-                    specialMat = this.materials.facility_zoo;
-                    signLabel = '🦁 ZOO';
-                } else if (bldg.type === 'police') {
-                    specialMat = this.materials.facade_aluminum;
-                    signLabel = '👮 POLICE';
-                } else if (bldg.type === 'bank') {
-                    specialMat = this.materials.brick_buff;
-                    signLabel = '🏦 BANK';
-                } else if (bldg.type === 'airport') {
-                    specialMat = this.materials.facade_spider_glass;
-                    signLabel = '✈️ AIRPORT';
-                } else if (bldg.type === 'hospital') {
-                    specialMat = this.materials.brick_sienna;
-                    signLabel = '🏥 HOSPITAL';
-                } else if (bldg.type === 'pulp_mill') {
-                    specialMat = this.materials.facade_timber;
-                    signLabel = '🪵 PULP MILL';
-                } else if (bldg.type === 'black_market') {
-                    specialMat = this.materials.brick_cracked;
-                    signLabel = '☠️ BLACK MARKET';
-                }
-
-                // Place special doorway block
-                const specialDoorMesh = new THREE.Mesh(new THREE.BoxGeometry(S * 1.05, this.DOOR_HEIGHT, S * 1.05), specialMat);
-                specialDoorMesh.position.set(dx, this.DOOR_HEIGHT / 2, dz);
-                this.mapMeshGroup.add(specialDoorMesh);
-
-                // Add 3D Floating Neon Sign above door
-                const signSprite = this._createSignSprite(signLabel);
-                signSprite.position.set(dx, this.DOOR_HEIGHT + 1.2, dz);
-                this.mapMeshGroup.add(signSprite);
-            }
+            roofInstMesh.instanceMatrix.needsUpdate = true;
+            this.mapMeshGroup.add(roofInstMesh);
         }
 
-        // 5. Create Retro Sky Dome / Horizon
+        // 5. Create Retro Sky Dome
         this._createSkyDome(theme);
     }
 
@@ -682,7 +726,7 @@ class MapBuilder3D {
 
         // Text
         ctx.fillStyle = '#00ffcc';
-        ctx.font = 'bold 18px "Press Start 2P", monospace';
+        ctx.font = 'bold 16px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, 128, 34);
@@ -691,39 +735,35 @@ class MapBuilder3D {
         tex.magFilter = THREE.NearestFilter;
         tex.minFilter = THREE.NearestFilter;
 
-        const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+        const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 });
         const sprite = new THREE.Sprite(spriteMat);
         sprite.scale.set(4, 1, 1);
         return sprite;
     }
 
     _createSkyDome(theme) {
-        const skyGeo = new THREE.SphereGeometry(300, 16, 16);
-        let skyColor = '#1e3a8a'; // Bright 16-bit city daylight/dusk
-        if (theme === 'dahgbad') skyColor = '#9a3412'; // Desert sunset
-        else if (theme === 'cucaracha') skyColor = '#581c87'; // Purple twilight
-        else if (theme === 'pirate') skyColor = '#0369a1'; // Caribbean blue
+        let skyHex = 0x1e3a8a; // Bright 16-bit city daylight/dusk
+        if (theme === 'dahgbad') skyHex = 0x9a3412; // Desert sunset
+        else if (theme === 'cucaracha') skyHex = 0x581c87; // Purple twilight
+        else if (theme === 'pirate') skyHex = 0x0369a1; // Caribbean blue
 
+        if (this.scene) {
+            this.scene.background = new THREE.Color(skyHex);
+            if (this.scene.fog) {
+                this.scene.fog.color.setHex(skyHex);
+                this.scene.fog.near = 120;
+                this.scene.fog.far = 420;
+            }
+        }
+
+        const skyGeo = new THREE.SphereGeometry(900, 16, 16);
         const skyMat = new THREE.MeshBasicMaterial({
-            color: skyColor,
+            color: skyHex,
             side: THREE.BackSide
         });
-        const skyMesh = new THREE.Mesh(skyGeo, skyMat);
-        skyMesh.position.set(0, 0, 0);
-        this.mapMeshGroup.add(skyMesh);
-    }
-
-    world2DTo3D(tileX, tileY, mapW = 128, mapH = 128) {
-        const S = this.TILE_SIZE_3D;
-        const x3d = (tileX - mapW / 2) * S;
-        const z3d = (tileY - mapH / 2) * S;
-        return { x: x3d, z: z3d };
-    }
-
-    coords2DTo3D(pixelX, pixelY, mapW = 128, mapH = 128) {
-        const tileX = pixelX / TILE_SIZE;
-        const tileY = pixelY / TILE_SIZE;
-        return this.world2DTo3D(tileX, tileY, mapW, mapH);
+        this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
+        this.skyMesh.position.set(0, 0, 0);
+        this.mapMeshGroup.add(this.skyMesh);
     }
 }
 

@@ -190,7 +190,7 @@ class FPSViewmodel {
         this.actionTimer = 0.25; // 250ms action grab
     }
 
-    update(dt, isMoving, speed = 1.0) {
+    update(dt, isMoving, speed = 1.0, jumpHeight = 0) {
         if (isMoving) {
             this.bobTime += dt * 10 * speed;
             this.bobAmountX = Math.cos(this.bobTime) * 12;
@@ -199,6 +199,12 @@ class FPSViewmodel {
             // Smoothly return to center
             this.bobAmountX *= 0.85;
             this.bobAmountY *= 0.85;
+        }
+
+        if (jumpHeight > 0) {
+            this.jumpOffset = Math.min(25, jumpHeight * 0.4);
+        } else {
+            this.jumpOffset = 0;
         }
 
         if (this.isActing) {
@@ -225,7 +231,7 @@ class FPSViewmodel {
 
         const size = Math.min(screenWidth, screenHeight) * 0.45;
         const x = screenWidth / 2 - size / 2 + this.bobAmountX;
-        const y = screenHeight - size - 45 + this.bobAmountY + (this.isActing ? -15 : 0);
+        const y = screenHeight - size - 45 + this.bobAmountY + (this.isActing ? -15 : 0) + (this.jumpOffset || 0);
 
         ctx.drawImage(toolImg, x, y, size, size);
     }

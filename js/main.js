@@ -765,6 +765,28 @@ class Game {
             }
 
             if (this.state === GameState.PLAYING && !this.isPaused) {
+                const isNpestaCube = this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7');
+
+                // Check speed changer click in 2D or 3D
+                if (isNpestaCube && this.gameMap && this.gameMap.speedChangers) {
+                    if (this.engine3D && this.engine3D.enabled) {
+                        if (this.engine3D.currentCrosshairTarget && this.engine3D.currentCrosshairTarget.type === 'speed_changer') {
+                            this.activateSpeedChanger(this.engine3D.currentCrosshairTarget.changer);
+                            return;
+                        }
+                    } else if (this.camera) {
+                        const worldClick = this.camera.screenToWorld(clickX, clickY);
+                        for (const ch of this.gameMap.speedChangers) {
+                            const wrapped = nearestWrap(ch.x, ch.y, this.camera.getCenterX(), this.camera.getCenterY());
+                            const dist = Math.sqrt((worldClick.x - wrapped.x)**2 + (worldClick.y - wrapped.y)**2);
+                            if (dist <= 36) {
+                                this.activateSpeedChanger(ch);
+                                return;
+                            }
+                        }
+                    }
+                }
+
                 if (this.engine3D && this.engine3D.enabled) {
                     this.engine3D.viewmodel.triggerAction();
                     if (this.engine3D.currentCrosshairTarget) {
@@ -997,8 +1019,13 @@ class Game {
 
         if (this.engine3D && this.engine3D.enabled) {
             this.engine3D.viewmodel.triggerAction();
-            if (this.engine3D.currentCrosshairTarget && this.engine3D.currentCrosshairTarget.type === 'trash') {
-                this.pickupTrash();
+            if (this.engine3D.currentCrosshairTarget) {
+                if (this.engine3D.currentCrosshairTarget.type === 'trash') {
+                    this.pickupTrash();
+                } else if (this.engine3D.currentCrosshairTarget.type === 'speed_changer') {
+                    this.activateSpeedChanger(this.engine3D.currentCrosshairTarget.changer);
+                    return;
+                }
             }
         }
         if (this.navigationTarget) { this._checkNavigationTargetEngaged(); }
@@ -1399,6 +1426,35 @@ class Game {
                 this.hud.showFollowerNotification('💊 Medication level is stable. No dose required yet!', true);
             }
             return false;
+        }
+    }
+
+    activateSpeedChanger(changer) {
+        if (!this.player || !changer) return;
+        const multiplier = changer.speedMultiplier || 1.0;
+        this.player.speedMultiplier = multiplier;
+
+        if (window.soundManager && typeof window.soundManager.playSpeedPortalSFX === 'function') {
+            window.soundManager.playSpeedPortalSFX(multiplier);
+        } else if (window.soundManager && typeof window.soundManager.playEngageSFX === 'function') {
+            window.soundManager.playEngageSFX();
+        }
+
+        let msg = '';
+        if (multiplier === 0.5) {
+            msg = '🟡 0.5x SPEED! (Half Speed Slow-Mo) ⏳';
+        } else if (multiplier === 2.0) {
+            msg = '🟢 2.0x SPEED! (2x Double Speed) ⚡';
+        } else if (multiplier === 3.0) {
+            msg = '🟣 3.0x SPEED! (3x Hyper Speed) 🚀';
+        } else if (multiplier === 4.0) {
+            msg = '🔴 4.0x SPEED! (4x Ludicrous Overdrive!) 💥';
+        } else {
+            msg = `⚡ Speed multiplier set to ${multiplier}x!`;
+        }
+
+        if (this.hud) {
+            this.hud.showFollowerNotification(msg, true);
         }
     }
 
@@ -2875,9 +2931,24 @@ class Game {
         // Update player
         this.player.update(this.gameMap, dt);
 
-        // Geometry Dash Cube perk: Auto-collect trash without hitting Q
+        // Geometry Dash Cube perk: Auto-collect trash without hitting Q & trigger speed changers
         if (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')) {
             this.pickupTrash();
+
+            if (this.gameMap && this.gameMap.speedChangers) {
+                const px = wrapWorldX(this.player.x);
+                const py = wrapWorldY(this.player.y);
+                for (const ch of this.gameMap.speedChangers) {
+                    const wCh = typeof nearestWrap === 'function' ? nearestWrap(ch.x, ch.y, px, py) : { x: ch.x, y: ch.y };
+                    const dist = Math.sqrt((px - wCh.x)**2 + (py - wCh.y)**2);
+                    if (dist < 28) {
+                        if (this.player.speedMultiplier !== ch.speedMultiplier) {
+                            this.activateSpeedChanger(ch);
+                        }
+                        break;
+                    }
+                }
+            }
         }
 
         // Update traffic cars
@@ -3540,6 +3611,10 @@ class Game {
         }
 
         console.log(`Spawning player at tile (${spawnX}, ${spawnY}), world (${spawnX * TILE_SIZE}, ${spawnY * TILE_SIZE}), tile type: ${this.gameMap.getTile(spawnX, spawnY)}`);
+
+        if (this.gameMap && typeof this.gameMap.ensureNearbySpeedChangers === 'function') {
+            this.gameMap.ensureNearbySpeedChangers(spawnX, spawnY);
+        }
 
         this.player = new Player(spawnX, spawnY, effectiveSprite);
         this.followerManager = new FollowerManager();
@@ -4709,6 +4784,59 @@ class Game {
                     ctx.font = '7px monospace';
                     ctx.textAlign = 'center';
                     ctx.fillText(isRecruit ? '📢' : '🔥', screen.x, screen.y + 4);
+                }
+            }
+        }
+
+        // ── Render Geometry Dash Speed Changers (visible when playing as Npesta / GD Cube) ──
+        const isNpestaCube = this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7');
+        if (isNpestaCube && this.gameMap && this.gameMap.speedChangers) {
+            const now = performance.now() / 1000;
+            const glowColors = {
+                yellow: '#ffcc00',
+                green: '#00ff44',
+                pink: '#ff44ff',
+                red: '#ff2222'
+            };
+
+            for (const ch of this.gameMap.speedChangers) {
+                const wrapped = nearestWrap(ch.x, ch.y, this.camera.getCenterX(), this.camera.getCenterY());
+                if (this.camera.isVisible(wrapped.x - 30, wrapped.y - 30, 60, 60)) {
+                    const screen = this.camera.worldToScreen(wrapped.x, wrapped.y);
+                    const bob = Math.sin(now * 4 + (ch.animOffset || 0)) * 5;
+                    const drawY = screen.y + bob;
+                    const color = glowColors[ch.type] || '#ffffff';
+
+                    // Glow circle
+                    ctx.save();
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 12;
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(screen.x, drawY, 20, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Sprite or fallback
+                    const img = this.spriteManager.getImage(ch.spriteKey);
+                    if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+                        ctx.drawImage(img, screen.x - 18, drawY - 18, 36, 36);
+                    } else {
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.moveTo(screen.x - 10, drawY - 14);
+                        ctx.lineTo(screen.x + 10, drawY);
+                        ctx.lineTo(screen.x - 10, drawY + 14);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    ctx.restore();
+
+                    // Speed multiplier label
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(ch.label, screen.x, drawY - 24);
                 }
             }
         }

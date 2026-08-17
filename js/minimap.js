@@ -272,6 +272,24 @@ class MiniMap {
             }
         }
 
+        // Draw GD Cube Speed Changers on minimap if playing as GD Cube
+        const isNpestaCube = player && (player.spriteId === 'char7' || player.characterClass === 'char7');
+        if (isNpestaCube && gameMap && gameMap.speedChangers) {
+            const mmColors = {
+                yellow: '#ffcc00',
+                green: '#00ff44',
+                pink: '#ff44ff',
+                red: '#ff2222'
+            };
+            for (const ch of gameMap.speedChangers) {
+                const pos = getMinimapPos(ch.x, ch.y);
+                if (pos.visible) {
+                    ctx.fillStyle = mmColors[ch.type] || '#ffffff';
+                    ctx.fillRect(pos.x - 2, pos.y - 2, 4, 4);
+                }
+            }
+        }
+
         // Draw Dump, Black Market, Library, Landmarks
         if (gameMap && gameMap.buildings) {
             for (const bldg of gameMap.buildings) {

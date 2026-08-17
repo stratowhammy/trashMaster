@@ -83,6 +83,13 @@ class Sprites3D {
             case 'animal': canvas = this._drawAnimal(); break;
             case 'third_eye': canvas = this._drawThirdEye(); break;
 
+            // Speed Changers (Geometry Dash Speed Portals)
+            case 'speed_yellow':
+            case 'speed_green':
+            case 'speed_pink':
+            case 'speed_red':
+                return this._getSpeedChangerTexture(key);
+
             default:
                 canvas = this._drawStudent();
                 break;
@@ -93,6 +100,55 @@ class Sprites3D {
         texture.minFilter = THREE.NearestFilter;
         this.cache.set(key, texture);
         return texture;
+    }
+
+    _getSpeedChangerTexture(key) {
+        if (this.cache.has(key)) {
+            return this.cache.get(key);
+        }
+        const spriteMgr = (window.game && window.game.spriteManager) || window.spriteManager;
+        const img = spriteMgr && spriteMgr.images ? spriteMgr.images[key] : null;
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const renderChanger = () => {
+            ctx.clearRect(0, 0, 128, 128);
+            if (img && (img.complete || img.naturalWidth > 0 || img.width > 0)) {
+                ctx.drawImage(img, 0, 0, 128, 128);
+            } else {
+                const colors = {
+                    speed_yellow: '#ffcc00',
+                    speed_green: '#00ff44',
+                    speed_pink: '#ff44ff',
+                    speed_red: '#ff2222'
+                };
+                ctx.fillStyle = colors[key] || '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(30, 20); ctx.lineTo(80, 64); ctx.lineTo(30, 108);
+                ctx.lineTo(50, 108); ctx.lineTo(100, 64); ctx.lineTo(50, 20);
+                ctx.closePath();
+                ctx.fill();
+            }
+        };
+
+        renderChanger();
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+
+        if (img && !img.complete && typeof img.addEventListener === 'function') {
+            img.addEventListener('load', () => {
+                renderChanger();
+                tex.needsUpdate = true;
+            });
+        }
+
+        this.cache.set(key, tex);
+        return tex;
     }
 
     _getLeatherdaddyFrogTexture() {

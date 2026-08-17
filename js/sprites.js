@@ -97,7 +97,11 @@ const SPRITE_CONFIG = {
         { id: 'leatherdaddy_frog', name: 'Leatherdaddy Frog', src: 'assets/sprites/leatherdaddy_frog.png', color: '#22c55e' },
         { id: 'library', name: 'City Library', src: 'assets/sprites/library.png', color: '#60a5fa' },
         { id: 'book_of_knowledge', name: 'Big Book of Knowledge', src: 'assets/sprites/book_of_knowledge.png', color: '#9333ea' },
-        { id: 'third_eye', name: 'Third Eye', src: 'assets/sprites/third_eye.png', color: '#06b6d4' }
+        { id: 'third_eye', name: 'Third Eye', src: 'assets/sprites/third_eye.png', color: '#06b6d4' },
+        { id: 'speed_yellow', name: 'Speed Changer Yellow (0.5x)', src: 'assets/sprites/speed_yellow.png', color: '#ffcc00' },
+        { id: 'speed_green', name: 'Speed Changer Green (2x)', src: 'assets/sprites/speed_green.png', color: '#00ff44' },
+        { id: 'speed_pink', name: 'Speed Changer Pink (3x)', src: 'assets/sprites/speed_pink.png', color: '#ff44ff' },
+        { id: 'speed_red', name: 'Speed Changer Red (4x)', src: 'assets/sprites/speed_red.png', color: '#ff2222' }
     ]
 };
 
@@ -561,6 +565,18 @@ class SpriteManager {
 
             ctx.fillStyle = flagColor;
             ctx.fillRect(28, 6, 14, 8);
+        } else if (sprite.id.startsWith('speed_')) {
+            // Speed Changer fallback chevron
+            const colors = { speed_yellow: '#ffcc00', speed_green: '#00ff44', speed_pink: '#ff44ff', speed_red: '#ff2222' };
+            ctx.fillStyle = colors[sprite.id] || '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(16, 10); ctx.lineTo(44, 32); ctx.lineTo(16, 54);
+            ctx.lineTo(26, 54); ctx.lineTo(54, 32); ctx.lineTo(26, 10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
         } else if (sprite.id.startsWith('char')) {
             // Character fallback: colored circle with initial
             const color = sprite.color || '#888';

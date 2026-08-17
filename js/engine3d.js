@@ -231,6 +231,38 @@ class Engine3D {
         const p = this.game.player;
         const maxDist = 3.5 * TILE_SIZE; // Proximity reach for raycast target
 
+        // Check nearest Speed Changer for Npesta / GD Cube
+        const isNpesta = p && (p.spriteId === 'char7' || p.characterClass === 'char7');
+        if (isNpesta && this.game.gameMap && this.game.gameMap.speedChangers) {
+            let closestChanger = null;
+            let closestDist = maxDist;
+
+            for (const ch of this.game.gameMap.speedChangers) {
+                let dx = wrapWorldX(ch.x) - wrapWorldX(p.x);
+                let dy = wrapWorldY(ch.y) - wrapWorldY(p.y);
+                if (!window.pirateMode) {
+                    if (dx > MAP_PIXEL_W / 2) dx -= MAP_PIXEL_W;
+                    else if (dx < -MAP_PIXEL_W / 2) dx += MAP_PIXEL_W;
+                    if (dy > MAP_PIXEL_H / 2) dy -= MAP_PIXEL_H;
+                    else if (dy < -MAP_PIXEL_H / 2) dy += MAP_PIXEL_H;
+                }
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestChanger = ch;
+                }
+            }
+
+            if (closestChanger) {
+                this.currentCrosshairTarget = {
+                    type: 'speed_changer',
+                    changer: closestChanger,
+                    label: `[CLICK] / [E] SET SPEED TO ${closestChanger.label.toUpperCase()} ⚡`
+                };
+                return;
+            }
+        }
+
         // Check nearest uncollected trash item with toroidal distance
         if (this.game.trashManager) {
             const trashList = this.game.trashManager.items || this.game.trashManager.trashItems || [];

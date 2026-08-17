@@ -110,6 +110,7 @@ class BaseMap {
         this.openDoors = new Set(); // Set of building IDs whose doors are open (walkable)
         this.theme = 'default';
         this.roadDirections = [];
+        this.speedChangers = [];
     }
 
     getTileAttribute(x, y) {
@@ -273,11 +274,151 @@ class BaseMap {
         ctx.fillRect(x + 2, y - 5, 2, 2);
     }
 
+    _spawnSpeedChangers() {
+        this.speedChangers = [];
+        const walkableTiles = [];
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                const tile = this.tiles[y] ? this.tiles[y][x] : null;
+                const attr = this.getTileAttribute(x, y);
+                // Select walkable ground: sidewalk, road, crosswalk, grass, park
+                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.GRASS || tile === TileType.PARK_PATH || attr === 'park tile') {
+                    if (tile !== TileType.BUILDING && tile !== TileType.LAKE) {
+                        walkableTiles.push({ x, y });
+                    }
+                }
+            }
+        }
+
+        // Shuffle walkable tiles
+        for (let i = walkableTiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]];
+        }
+
+        // Weighted distribution: 2x (green) and 0.5x (yellow) are abundant; 3x (pink) and 4x (red) are rare
+        const weightedPool = [
+            'green',  'green',  'green',  'green',  'green',  'green',  'green',  'green',  'green',  'green',
+            'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow',
+            'pink',   'pink',
+            'red'
+        ];
+
+        // Shuffle walkable tiles
+        for (let i = walkableTiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]];
+        }
+
+        const multipliers = {
+            yellow: 0.5,
+            green: 2.0,
+            pink: 3.0,
+            red: 4.0
+        };
+        const spriteKeys = {
+            yellow: 'speed_yellow',
+            green: 'speed_green',
+            pink: 'speed_pink',
+            red: 'speed_red'
+        };
+        const labels = {
+            yellow: '0.5x',
+            green: '2x',
+            pink: '3x',
+            red: '4x'
+        };
+
+        const count = Math.min(walkableTiles.length, 60);
+        let changerId = 1;
+        for (let i = 0; i < count; i++) {
+            const t = walkableTiles[i];
+            const type = weightedPool[i % weightedPool.length];
+            this.speedChangers.push({
+                id: changerId++,
+                type: type,
+                speedMultiplier: multipliers[type],
+                spriteKey: spriteKeys[type],
+                label: labels[type],
+                tileX: t.x,
+                tileY: t.y,
+                x: t.x * TILE_SIZE + TILE_SIZE / 2,
+                y: t.y * TILE_SIZE + TILE_SIZE / 2,
+                size: 32,
+                animOffset: (i * 1.3) % (Math.PI * 2)
+            });
+        }
+    }
+
+    ensureNearbySpeedChangers(spawnX, spawnY) {
+        if (!this.speedChangers) this.speedChangers = [];
+        
+        const hasNearbyGreen = this.speedChangers.some(ch => ch.type === 'green' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
+        const hasNearbyYellow = this.speedChangers.some(ch => ch.type === 'yellow' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
+
+        const offsets = [
+            { dx: 3, dy: 0 }, { dx: -3, dy: 0 }, { dx: 0, dy: 3 }, { dx: 0, dy: -3 },
+            { dx: 4, dy: 3 }, { dx: -4, dy: 3 }, { dx: 3, dy: -4 }, { dx: -3, dy: -4 }
+        ];
+
+        let changerId = this.speedChangers.length + 100;
+
+        if (!hasNearbyGreen) {
+            for (const off of offsets) {
+                const tx = wrapTileX(spawnX + off.dx);
+                const ty = wrapTileY(spawnY + off.dy);
+                const tile = this.getTile(tx, ty);
+                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.GRASS) {
+                    this.speedChangers.unshift({
+                        id: changerId++,
+                        type: 'green',
+                        speedMultiplier: 2.0,
+                        spriteKey: 'speed_green',
+                        label: '2x',
+                        tileX: tx,
+                        tileY: ty,
+                        x: tx * TILE_SIZE + TILE_SIZE / 2,
+                        y: ty * TILE_SIZE + TILE_SIZE / 2,
+                        size: 32,
+                        animOffset: 0
+                    });
+                    break;
+                }
+            }
+        }
+
+        if (!hasNearbyYellow) {
+            for (const off of offsets) {
+                const tx = wrapTileX(spawnX - off.dx);
+                const ty = wrapTileY(spawnY - off.dy);
+                const tile = this.getTile(tx, ty);
+                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.GRASS) {
+                    this.speedChangers.unshift({
+                        id: changerId++,
+                        type: 'yellow',
+                        speedMultiplier: 0.5,
+                        spriteKey: 'speed_yellow',
+                        label: '0.5x',
+                        tileX: tx,
+                        tileY: ty,
+                        x: tx * TILE_SIZE + TILE_SIZE / 2,
+                        y: ty * TILE_SIZE + TILE_SIZE / 2,
+                        size: 32,
+                        animOffset: 1.5
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
     regenerate() {
         this.generate();
         this._catalogBuildings();
         this._spawnTrees();
         this._spawnShrooms();
+        this._spawnSpeedChangers();
     }
 
     _placeProceduralBuildings() {

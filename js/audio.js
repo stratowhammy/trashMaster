@@ -230,6 +230,48 @@ class SoundManager {
         noise.stop(now + 0.12);
     }
 
+    playSpeedPortalSFX(multiplier = 1.0) {
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        let baseFreq = 440;
+        let endFreq = 880;
+        let dur = 0.25;
+
+        if (multiplier <= 0.5) {
+            baseFreq = 660;
+            endFreq = 220;
+            dur = 0.35;
+        } else if (multiplier <= 2.0) {
+            baseFreq = 440;
+            endFreq = 880;
+            dur = 0.22;
+        } else if (multiplier <= 3.0) {
+            baseFreq = 587;
+            endFreq = 1174;
+            dur = 0.20;
+        } else {
+            baseFreq = 880;
+            endFreq = 1760;
+            dur = 0.18;
+        }
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + dur);
+        
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + dur);
+    }
+
     playDingSFX() {
         if (!this.isSFXEnabled('ding')) return;
         if (!this.ctx) this._initAudio();

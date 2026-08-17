@@ -20,6 +20,7 @@ class BillboardManager3D {
         this.animalSprites = new Map();
         this.shroomSprites = [];
         this.flowerSprites = [];
+        this.speedChangerSprites = [];
         this.floatingTextSprites = [];
         this.buildingBillboardMap = new Map();
         this.buildingTextures = new Map();
@@ -489,6 +490,41 @@ class BillboardManager3D {
                 }
                 sprite.visible = true;
                 sprite.position.set(pos.x, 0.7, pos.z);
+            }
+        }
+
+        // Speed Changers (Geometry Dash Speed Portals - visible for Npesta / GD Cube)
+        const isNpesta = player && (player.spriteId === 'char7' || player.characterClass === 'char7');
+        if (game.gameMap && game.gameMap.speedChangers && isNpesta) {
+            const changers = game.gameMap.speedChangers;
+            while (this.speedChangerSprites.length < changers.length) {
+                const idx = this.speedChangerSprites.length;
+                const ch = changers[idx];
+                const tex = this._getTexture(ch.spriteKey);
+                const sprite = this._createSprite(tex, 2.2, 2.2);
+                sprite.userData = { type: 'speed_changer', changer: ch };
+                this.billboardGroup.add(sprite);
+                this.speedChangerSprites.push(sprite);
+            }
+            const now = performance.now() / 1000;
+            for (let i = 0; i < changers.length; i++) {
+                const ch = changers[i];
+                const sprite = this.speedChangerSprites[i];
+                const pos = this._getToroidal3DPos(ch.x, ch.y, player, p3dX, p3dZ, S);
+                if (pos.distSq > 380 * 380) {
+                    sprite.visible = false;
+                    continue;
+                }
+                sprite.visible = true;
+                const bob = Math.sin(now * 3 + (ch.animOffset || 0)) * 0.25;
+                sprite.position.set(pos.x, 1.4 + bob, pos.z);
+            }
+            for (let i = changers.length; i < this.speedChangerSprites.length; i++) {
+                this.speedChangerSprites[i].visible = false;
+            }
+        } else {
+            for (let i = 0; i < this.speedChangerSprites.length; i++) {
+                this.speedChangerSprites[i].visible = false;
             }
         }
     }

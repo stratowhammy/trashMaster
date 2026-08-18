@@ -1719,6 +1719,67 @@ def made_man_choice():
     db.commit()
     return jsonify({'success': True, 'made_man_status': choice})
 
+@app.route('/api/game/erase-account-progress', methods=['POST'])
+def erase_account_progress():
+    user_data = verify_token(request)
+    if not user_data:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    uid = user_data['user_id']
+    db = get_db()
+    
+    # 1. Reset user table columns to default values
+    db.execute("""
+        UPDATE users SET
+            balance = 0,
+            has_truck = 0,
+            movement_size = 0,
+            employee_death_penalty = 1.0,
+            unlocked_fastfood = 0,
+            unlocked_crime = 0,
+            unlocked_cult = 0,
+            unlocked_builder = 0,
+            unlocked_fantasy = 0,
+            stat_max_single_trash = 0,
+            stat_cumulative_trash = 0,
+            stat_max_single_money = 0,
+            stat_cumulative_money = 0,
+            stat_max_single_followers = 0,
+            made_man_status = 'none',
+            political_office = 'citizen',
+            completed_mafia_jobs = 0,
+            times_caught = 0,
+            credits = 3,
+            international_followers = 0,
+            total_rounds_played = 0,
+            election_state = 'idle',
+            rounds_in_state = 0,
+            unlocked_international = 0,
+            travel_destination = 'filthadelphia',
+            chosen_sprite = 'char2',
+            politics_banned = 0,
+            happiness = 100.0,
+            cult_leaves_cumulative = 0,
+            streak_count = 0,
+            max_streak = 0,
+            lids_balance = 0
+        WHERE id = ?
+    """, (uid,))
+    
+    # 2. Clear all associated user progress records
+    db.execute("DELETE FROM inventory WHERE user_id = ?", (uid,))
+    db.execute("DELETE FROM user_buildings WHERE user_id = ?", (uid,))
+    db.execute("DELETE FROM user_word_game WHERE user_id = ?", (uid,))
+    db.execute("DELETE FROM user_round_stats WHERE user_id = ?", (uid,))
+    db.execute("DELETE FROM gameplay_logs WHERE user_id = ?", (uid,))
+    db.execute("DELETE FROM black_market_transactions WHERE user_id = ?", (uid,))
+    db.commit()
+    
+    return jsonify({
+        'status': 'success',
+        'message': 'All account progress has been permanently wiped by the Cheese Monster.'
+    })
+
 @app.route('/api/game/political-choice', methods=['POST'])
 def political_choice():
     user_data = verify_token(request)

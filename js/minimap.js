@@ -290,6 +290,17 @@ class MiniMap {
             }
         }
 
+        // Draw GD Spikes on minimap if playing as GD Cube
+        if (isNpestaCube && gameMap && gameMap.spikes) {
+            for (const cluster of gameMap.spikes) {
+                const pos = getMinimapPos(cluster.centerX, cluster.centerY);
+                if (pos.visible) {
+                    ctx.fillStyle = cluster.count === 4 ? '#ff0055' : (cluster.count === 3 ? '#ffaa00' : '#ffffff');
+                    ctx.fillRect(pos.x - (cluster.count >= 3 ? 2 : 1), pos.y - 1, cluster.count >= 3 ? 4 : 3, 3);
+                }
+            }
+        }
+
         // Draw Dump, Black Market, Library, Landmarks
         if (gameMap && gameMap.buildings) {
             for (const bldg of gameMap.buildings) {

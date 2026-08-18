@@ -20,6 +20,7 @@ class HUD {
         this.followerNotificationTimer = 0;
         this.roundMessages = [];
         this.medicationBtnBounds = null;
+        this.isInfinite = false;
     }
 
     reset() {
@@ -40,6 +41,7 @@ class HUD {
         this.leaderboard = [];
         this.roundMessages = [];
         this.medicationBtnBounds = null;
+        this.isInfinite = false;
     }
 
     updateScore(newScore) {
@@ -66,9 +68,69 @@ class HUD {
         }
     }
 
+    getGDFaceInfo(trashCount) {
+        const isNpesta = !!(window.npestaActivated || (typeof localStorage !== 'undefined' && localStorage.getItem('npestaActivated') === 'true'));
+        if (!isNpesta) return null;
+
+        // With npesta activated: countdown extends to 10 pieces.
+        // Starts with Blue smiley face (10+), then Green (7-9), Yellow (5-6), Red (3-4), Purple (0-2) before losing a posse member.
+        if (trashCount >= 10) {
+            return {
+                key: 'gd_face_blue',
+                color: '#00d2ff',
+                label: 'EASY',
+                name: 'Blue Smile'
+            };
+        } else if (trashCount >= 7) {
+            return {
+                key: 'gd_face_green',
+                color: '#00ff44',
+                label: 'NORMAL',
+                name: 'Green Smile'
+            };
+        } else if (trashCount >= 5) {
+            return {
+                key: 'gd_face_yellow',
+                color: '#ffcc00',
+                label: 'HARD',
+                name: 'Yellow Worry'
+            };
+        } else if (trashCount >= 3) {
+            return {
+                key: 'gd_face_red',
+                color: '#ff3300',
+                label: 'HARDER',
+                name: 'Red Angry'
+            };
+        } else {
+            return {
+                key: 'gd_face_purple',
+                color: '#ff00cc',
+                label: 'INSANE',
+                name: 'Purple Rage'
+            };
+        }
+    }
+
+    getGDFaceImage(key) {
+        if (window.game && window.game.spriteManager) {
+            const img = window.game.spriteManager.getImage(key);
+            if (img && (img.complete || img instanceof HTMLCanvasElement)) return img;
+        }
+        if (!this.gdFaceImages) this.gdFaceImages = {};
+        if (!this.gdFaceImages[key]) {
+            const img = new Image();
+            img.src = `assets/sprites/${key}.png`;
+            this.gdFaceImages[key] = img;
+        }
+        return this.gdFaceImages[key];
+    }
+
     update(deltaTime) {
-        this.timeRemaining -= deltaTime * this.timerSpeed;
-        if (this.timeRemaining < 0) this.timeRemaining = 0;
+        if (!this.isInfinite && !window.infiniteRoundActive) {
+            this.timeRemaining -= deltaTime * this.timerSpeed;
+            if (this.timeRemaining < 0) this.timeRemaining = 0;
+        }
 
         // Animate score pop
         if (this.scorePop > 0) {
@@ -83,10 +145,12 @@ class HUD {
     }
 
     isTimeUp() {
+        if (this.isInfinite || window.infiniteRoundActive) return false;
         return this.timeRemaining <= 0;
     }
 
     getTimeString() {
+        if (this.isInfinite || window.infiniteRoundActive) return '∞:∞';
         const mins = Math.floor(this.timeRemaining / 60);
         const secs = Math.floor(this.timeRemaining % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -110,25 +174,26 @@ class HUD {
         ctx.beginPath();
         ctx.roundRect(timerX - 140, timerY - 10, 150, boxHeight, 8);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(100,200,255,0.2)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = (this.isInfinite || window.infiniteRoundActive) ? '#00ffff' : 'rgba(100,200,255,0.2)';
+        ctx.lineWidth = (this.isInfinite || window.infiniteRoundActive) ? 2 : 1;
         ctx.beginPath();
         ctx.roundRect(timerX - 140, timerY - 10, 150, boxHeight, 8);
         ctx.stroke();
 
-        ctx.fillStyle = '#ff4444';
+        ctx.fillStyle = (this.isInfinite || window.infiniteRoundActive) ? '#00ffff' : '#ff4444';
         ctx.font = '16px serif';
         ctx.textAlign = 'left';
-        ctx.fillText('⏱️', timerX - 130, timerY + 12);
+        ctx.fillText((this.isInfinite || window.infiniteRoundActive) ? '♾️' : '⏱️', timerX - 130, timerY + 12);
 
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = (this.isInfinite || window.infiniteRoundActive) ? '#00ffff' : '#fff';
         ctx.font = 'bold 12px "Press Start 2P", monospace';
         ctx.textAlign = 'right';
-        ctx.fillText(Math.ceil(this.timeRemaining).toString() + 's', timerX - 10, timerY + 12);
+        const timeText = (this.isInfinite || window.infiniteRoundActive) ? '∞' : (Math.ceil(this.timeRemaining).toString() + 's');
+        ctx.fillText(timeText, timerX - 10, timerY + 12);
         
         ctx.fillStyle = '#888';
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillText('TIMER', timerX - 10, timerY + 32);
+        ctx.fillText((this.isInfinite || window.infiniteRoundActive) ? 'INFINITE' : 'TIMER', timerX - 10, timerY + 32);
         
         if (window.fastFoodMode && window.game) {
             if (susTimer > 0) {
@@ -199,15 +264,43 @@ class HUD {
         ctx.fillText('$' + this.score.toString(), 0, 0);
         ctx.restore();
 
-        // Next follower progress
+        // Next follower progress & trash countdown
+        const isNpesta = window.gdCubeUnlocked || localStorage.getItem('gdCubeUnlocked') === 'true';
         const evalTime = Math.ceil(this.evalTimer || 0);
-        ctx.fillStyle = '#888';
-        ctx.font = '8px "Press Start 2P", monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(`Next eval: ${evalTime}s`, scoreX - 5, scoreY + 28);
-        
-        ctx.fillStyle = (this.trashInWindow >= 7) ? '#0f8' : (this.trashInWindow >= 5 ? '#ffcc00' : '#f44');
-        ctx.fillText(`Trash: ${this.trashInWindow || 0}/7`, scoreX - 5, scoreY + 40);
+        const evalTrash = this.trashInWindow || 0;
+        const gdFace = this.getGDFaceInfo(evalTrash);
+
+        if (gdFace) {
+            // Draw GD difficulty face badge with glowing border and /10 countdown
+            const faceImg = this.getGDFaceImage(gdFace.key);
+            const fSize = 28;
+            const fX = scoreX - 164;
+            const fY = scoreY + 20;
+
+            if (faceImg && (faceImg.complete || faceImg instanceof HTMLCanvasElement)) {
+                ctx.save();
+                ctx.shadowColor = gdFace.color;
+                ctx.shadowBlur = 8;
+                ctx.drawImage(faceImg, fX, fY, fSize, fSize);
+                ctx.restore();
+            }
+
+            ctx.fillStyle = '#888';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Next eval: ${evalTime}s`, scoreX - 5, scoreY + 28);
+
+            ctx.fillStyle = gdFace.color;
+            ctx.fillText(`Trash: ${evalTrash}/10`, scoreX - 5, scoreY + 42);
+        } else {
+            ctx.fillStyle = '#888';
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Next eval: ${evalTime}s`, scoreX - 5, scoreY + 28);
+            
+            ctx.fillStyle = (evalTrash >= 7) ? '#0f8' : (evalTrash >= 5 ? '#ffcc00' : '#f44');
+            ctx.fillText(`Trash: ${evalTrash}/7`, scoreX - 5, scoreY + 40);
+        }
 
         // ── Gold Rush Banner (Top-Center) ──
         if (window.game && window.game.goldRushActive) {
@@ -899,10 +992,31 @@ class HUD {
         ctx.textAlign = 'right';
         ctx.fillText(`TRASH:${totalRoundTrash}`, currX + p1W - 8, panelY + 44);
 
-        ctx.fillStyle = (evalTrash >= 7) ? '#00ff88' : (evalTrash >= 5 ? '#facc15' : '#f87171');
-        ctx.font = '6.5px "Press Start 2P", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`EVAL: ${evalTrash}/7`, currX + p1W / 2, panelY + 58);
+        const isNpesta = window.gdCubeUnlocked || localStorage.getItem('gdCubeUnlocked') === 'true';
+        const gdFace = this.getGDFaceInfo(evalTrash);
+
+        if (gdFace) {
+            const faceImg = this.getGDFaceImage(gdFace.key);
+            const fSize = 20;
+            const fX = currX + 8;
+            const fY = panelY + 45;
+            if (faceImg && (faceImg.complete || faceImg instanceof HTMLCanvasElement)) {
+                ctx.save();
+                ctx.shadowColor = gdFace.color;
+                ctx.shadowBlur = 6;
+                ctx.drawImage(faceImg, fX, fY, fSize, fSize);
+                ctx.restore();
+            }
+            ctx.fillStyle = gdFace.color;
+            ctx.font = '6.5px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`EVAL: ${evalTrash}/10`, currX + p1W / 2 + 10, panelY + 58);
+        } else {
+            ctx.fillStyle = (evalTrash >= 7) ? '#00ff88' : (evalTrash >= 5 ? '#facc15' : '#f87171');
+            ctx.font = '6.5px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`EVAL: ${evalTrash}/7`, currX + p1W / 2, panelY + 58);
+        }
 
         currX += p1W + 8;
 
@@ -1039,7 +1153,7 @@ class HUD {
 
             // Countdown timer & progress bar
             const timerLeft = Math.max(0, window.game.medicationAlertTimer || 0);
-            const maxTime = window.game.medicationAlertMaxDuration || 12;
+            const maxTime = window.game.medicationAlertMaxDuration || 10;
             const progress = timerLeft / maxTime;
 
             const barW = bannerW - 32;

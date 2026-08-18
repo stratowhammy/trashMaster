@@ -101,7 +101,13 @@ const SPRITE_CONFIG = {
         { id: 'speed_yellow', name: 'Speed Changer Yellow (0.5x)', src: 'assets/sprites/speed_yellow.png', color: '#ffcc00' },
         { id: 'speed_green', name: 'Speed Changer Green (2x)', src: 'assets/sprites/speed_green.png', color: '#00ff44' },
         { id: 'speed_pink', name: 'Speed Changer Pink (3x)', src: 'assets/sprites/speed_pink.png', color: '#ff44ff' },
-        { id: 'speed_red', name: 'Speed Changer Red (4x)', src: 'assets/sprites/speed_red.png', color: '#ff2222' }
+        { id: 'speed_red', name: 'Speed Changer Red (4x)', src: 'assets/sprites/speed_red.png', color: '#ff2222' },
+        { id: 'gd_face_blue', name: 'GD Easy Face', src: 'assets/sprites/gd_face_blue.png', color: '#00d2ff' },
+        { id: 'gd_face_green', name: 'GD Normal Face', src: 'assets/sprites/gd_face_green.png', color: '#00ff44' },
+        { id: 'gd_face_yellow', name: 'GD Hard Face', src: 'assets/sprites/gd_face_yellow.png', color: '#ffcc00' },
+        { id: 'gd_face_red', name: 'GD Harder Face', src: 'assets/sprites/gd_face_red.png', color: '#ff3300' },
+        { id: 'gd_face_purple', name: 'GD Insane Face', src: 'assets/sprites/gd_face_purple.png', color: '#ff00cc' },
+        { id: 'gd_spike', name: 'Geometry Dash Spike', src: 'assets/sprites/gd_spike.png', color: '#1e3a8a' }
     ]
 };
 
@@ -577,6 +583,46 @@ class SpriteManager {
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 2;
             ctx.stroke();
+        } else if (sprite.id === 'gd_spike') {
+            // Authentic Geometry Dash Default Spike matching uploaded design
+            const gradient = ctx.createLinearGradient(size / 2, 4, size / 2, size - 4);
+            gradient.addColorStop(0, '#000000');
+            gradient.addColorStop(0.45, '#000000');
+            gradient.addColorStop(0.55, '#0f2b66');
+            gradient.addColorStop(1, '#1d4ed8');
+
+            ctx.beginPath();
+            ctx.moveTo(size / 2, 4);
+            ctx.lineTo(size - 6, size - 4);
+            ctx.lineTo(6, size - 4);
+            ctx.closePath();
+
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3.5;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            ctx.strokeStyle = '#60a5fa';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        } else if (sprite.id.startsWith('gd_face_')) {
+            // GD difficulty face fallback
+            const colors = { gd_face_blue: '#00d2ff', gd_face_green: '#00ff44', gd_face_yellow: '#ffcc00', gd_face_red: '#ff3300', gd_face_purple: '#ff00cc' };
+            ctx.fillStyle = colors[sprite.id] || '#00ff44';
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(size / 2 - 6, size / 2 - 4, 3, 0, Math.PI * 2);
+            ctx.arc(size / 2 + 6, size / 2 - 4, 3, 0, Math.PI * 2);
+            ctx.fill();
         } else if (sprite.id.startsWith('char')) {
             // Character fallback: colored circle with initial
             const color = sprite.color || '#888';

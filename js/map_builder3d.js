@@ -276,6 +276,54 @@ class MapBuilder3D {
             ctx.fillRect(10, 24, 18, 6);
         });
 
+        // Psychosis Cheese Building Texture (Swiss & Cheddar)
+        this.textures.facade_cheese_swiss = this._createPixelTexture((ctx, w, h) => {
+            // Golden Cheddar / Swiss Base
+            ctx.fillStyle = '#ffb703';
+            ctx.fillRect(0, 0, w, h);
+
+            // Cheese rind & porous shading
+            ctx.fillStyle = '#fb8500';
+            for (let i = 0; i < 60; i++) {
+                const rx = (i * 17) % w;
+                const ry = (i * 29) % h;
+                ctx.fillRect(rx, ry, 2, 2);
+            }
+
+            // Swiss Cheese Holes with inner shadow & top highlight
+            const holes = [
+                { x: 14, y: 14, r: 8 },
+                { x: 46, y: 18, r: 10 },
+                { x: 26, y: 38, r: 12 },
+                { x: 50, y: 48, r: 7 },
+                { x: 10, y: 50, r: 6 },
+                { x: 38, y: 56, r: 5 }
+            ];
+
+            holes.forEach(hole => {
+                ctx.fillStyle = '#b45309';
+                ctx.beginPath();
+                ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#92400e';
+                ctx.beginPath();
+                ctx.arc(hole.x + 1, hole.y + 1, Math.max(1, hole.r - 2), 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fde047';
+                ctx.beginPath();
+                ctx.arc(hole.x + 2, hole.y + 2, Math.max(1, hole.r - 4), 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(hole.x, hole.y, hole.r, Math.PI * 0.8, Math.PI * 1.8);
+                ctx.stroke();
+            });
+        });
+
         // Roof Surface
         this.textures.roof_surface = this._createPixelTexture((ctx, w, h) => {
             ctx.fillStyle = '#1e293b';
@@ -824,6 +872,9 @@ class MapBuilder3D {
         };
 
         const getBuildingMaterial = (x, y) => {
+            if (window.game && window.game.medsMissedCount >= 2 && this.materials.facade_cheese_swiss) {
+                return this.materials.facade_cheese_swiss;
+            }
             const bldg = gameMap.getBuildingAtTile ? gameMap.getBuildingAtTile(x, y) : null;
             if (bldg && bldg.type) {
                 if (['fast_food', 'goose', 'zippy_ds', 'chinos_steaks', 'rats_steaks'].includes(bldg.type)) return this.materials.building_fast_food;

@@ -24,10 +24,18 @@ class Camera {
         this.y = targetY - this.height / 2;
     }
 
+    setTarget(targetX, targetY) {
+        this.snapTo(targetX, targetY);
+    }
+
     resize(width, height) { this.width = width; this.height = height; }
 
     worldToScreen(worldX, worldY) {
         return { x: worldX - this.x, y: worldY - this.y };
+    }
+
+    screenToWorld(screenX, screenY) {
+        return { x: screenX + this.x, y: screenY + this.y };
     }
 
     getCenterX() { return this.x + this.width / 2; }

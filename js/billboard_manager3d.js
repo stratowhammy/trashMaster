@@ -21,11 +21,13 @@ class BillboardManager3D {
         this.shroomSprites = [];
         this.flowerSprites = [];
         this.speedChangerSprites = [];
+        this.spikeSprites = [];
         this.floatingTextSprites = [];
         this.buildingBillboardMap = new Map();
         this.buildingTextures = new Map();
         this.playerSprite = null;
         this.thirdEyeSprite = null;
+        this.cheeseMonsterSprite = null;
 
         this.TILE_SIZE_3D = 4;
     }
@@ -114,6 +116,34 @@ class BillboardManager3D {
 
         // 10. Synchronize 3D Player Avatar & Third Eye Billboard in Aerial View
         this._syncPlayerAvatar(game, mapW, mapH, S, time, player, p3dX, p3dZ);
+
+        // 11. Synchronize Cheese Monster Billboard in 3D
+        this._syncCheeseMonster(game, mapW, mapH, S, time, player, p3dX, p3dZ);
+    }
+
+    _syncCheeseMonster(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
+        if (!game.cheeseMonster || !game.cheeseMonster.active) {
+            if (this.cheeseMonsterSprite) this.cheeseMonsterSprite.visible = false;
+            return;
+        }
+
+        const m = game.cheeseMonster;
+        const pos = this._getToroidal3DPos(m.x, m.y, player, p3dX, p3dZ, S);
+
+        if (!this.cheeseMonsterSprite) {
+            const tex = this._getTexture('cheese_monster');
+            this.cheeseMonsterSprite = this._createSprite(tex, 3.4, 3.4);
+            this.billboardGroup.add(this.cheeseMonsterSprite);
+        }
+
+        if (pos.distSq > 400 * 400) {
+            this.cheeseMonsterSprite.visible = false;
+            return;
+        }
+
+        this.cheeseMonsterSprite.visible = true;
+        const bob = Math.sin(time * 6) * 0.12;
+        this.cheeseMonsterSprite.position.set(pos.x, 1.7 + bob, pos.z);
     }
 
     _syncPlayerAvatar(game, mapW, mapH, S, time, player, p3dX, p3dZ) {
@@ -510,6 +540,13 @@ class BillboardManager3D {
             for (let i = 0; i < changers.length; i++) {
                 const ch = changers[i];
                 const sprite = this.speedChangerSprites[i];
+                const tex = this._getTexture(ch.spriteKey);
+                if (sprite.material.map !== tex) {
+                    sprite.material.map = tex;
+                    sprite.material.needsUpdate = true;
+                }
+                sprite.userData = { type: 'speed_changer', changer: ch };
+
                 const pos = this._getToroidal3DPos(ch.x, ch.y, player, p3dX, p3dZ, S);
                 if (pos.distSq > 380 * 380) {
                     sprite.visible = false;
@@ -525,6 +562,43 @@ class BillboardManager3D {
         } else {
             for (let i = 0; i < this.speedChangerSprites.length; i++) {
                 this.speedChangerSprites[i].visible = false;
+            }
+        }
+
+        // Geometry Dash Spikes (visible for Npesta / GD Cube)
+        if (game.gameMap && game.gameMap.spikes && isNpesta) {
+            const allIndividualSpikes = [];
+            for (const cluster of game.gameMap.spikes) {
+                for (const sp of cluster.spikes) {
+                    allIndividualSpikes.push(sp);
+                }
+            }
+
+            while (this.spikeSprites.length < allIndividualSpikes.length) {
+                const tex = this._getTexture('gd_spike');
+                const sprite = this._createSprite(tex, 1.8, 1.8);
+                sprite.userData = { type: 'gd_spike' };
+                this.billboardGroup.add(sprite);
+                this.spikeSprites.push(sprite);
+            }
+
+            for (let i = 0; i < allIndividualSpikes.length; i++) {
+                const sp = allIndividualSpikes[i];
+                const sprite = this.spikeSprites[i];
+                const pos = this._getToroidal3DPos(sp.x, sp.y, player, p3dX, p3dZ, S);
+                if (pos.distSq > 380 * 380) {
+                    sprite.visible = false;
+                    continue;
+                }
+                sprite.visible = true;
+                sprite.position.set(pos.x, 0.9, pos.z);
+            }
+            for (let i = allIndividualSpikes.length; i < this.spikeSprites.length; i++) {
+                this.spikeSprites[i].visible = false;
+            }
+        } else {
+            for (let i = 0; i < this.spikeSprites.length; i++) {
+                this.spikeSprites[i].visible = false;
             }
         }
     }

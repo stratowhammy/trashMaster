@@ -56,6 +56,7 @@ const DEFAULT_KEYBINDS = {
     useBottomlessPit: 'B',
     eatShroom: 'e',
     takeMeds: 'Shift+M',
+    biteCheese: 'Shift+E',
 
     // Audio Controls
     toggleMusic: 'm',
@@ -75,7 +76,8 @@ const ACTION_CONFIG = [
             { id: 'pickupTrash', label: 'Pick Up Trash' },
             { id: 'interact', label: 'Interact / Enter Building / Deliver' },
             { id: 'harvestTree', label: 'Harvest Tree (Cut Wood)' },
-            { id: 'takeMeds', label: 'Take Medication 💊 (Shift+M)' }
+            { id: 'takeMeds', label: 'Take Medication 💊 (Shift+M)' },
+            { id: 'biteCheese', label: 'Bite Cheese Building 🧀 (Shift+E)' }
         ]
     },
     {

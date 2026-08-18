@@ -427,6 +427,15 @@ class Engine3D {
     cyclePerspective() {
         const hasThirdEye = !!(window.playerThirdEye || (this.game && this.game.playerHasThirdEye));
         if (!this.enabled) {
+            // 🧀 10% chance of Cheese Monster killing you when entering 3D FPS
+            if (this.game && this.game.cheeseMonster && this.game.cheeseMonster.active) {
+                if (Math.random() < 0.10) {
+                    if (typeof this.game.killByCheeseMonster === 'function') {
+                        this.game.killByCheeseMonster('fps_ambush');
+                        return 'killed';
+                    }
+                }
+            }
             this.enabled = true;
             this.cameraMode = 'fps';
             return 'fps';
@@ -481,24 +490,26 @@ class Engine3D {
         else ctx.rect(tBoxX, tBoxY, tBoxW, tBoxH);
         ctx.stroke();
 
-        ctx.fillStyle = '#ff4444';
+        const isInf = !!(hud.isInfinite || window.infiniteRoundActive);
+        ctx.fillStyle = isInf ? '#00ffff' : '#ff4444';
         ctx.font = '16px serif';
         ctx.textAlign = 'left';
-        ctx.fillText('⏱️', tBoxX + 10, tBoxY + 22);
+        ctx.fillText(isInf ? '♾️' : '⏱️', tBoxX + 10, tBoxY + 22);
 
         const timeLeft = Math.max(0, hud.timeRemaining !== undefined ? hud.timeRemaining : 120);
         const mins = Math.floor(timeLeft / 60);
         const secs = Math.floor(timeLeft % 60);
         const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+        const timeDisplay = isInf ? '∞:∞ (∞)' : `${timeStr} (${Math.ceil(timeLeft)}s)`;
 
-        ctx.fillStyle = timeLeft < 30 ? '#ef4444' : '#ffffff';
+        ctx.fillStyle = isInf ? '#00ffff' : (timeLeft < 30 ? '#ef4444' : '#ffffff');
         ctx.font = 'bold 11px "Press Start 2P", monospace';
         ctx.textAlign = 'right';
-        ctx.fillText(`${timeStr} (${Math.ceil(timeLeft)}s)`, tBoxX + tBoxW - 10, tBoxY + 22);
+        ctx.fillText(timeDisplay, tBoxX + tBoxW - 10, tBoxY + 22);
 
         ctx.fillStyle = '#94a3b8';
         ctx.font = '7.5px "Press Start 2P", monospace';
-        ctx.fillText('TIMER', tBoxX + tBoxW - 10, tBoxY + 40);
+        ctx.fillText(isInf ? 'INFINITE' : 'TIMER', tBoxX + tBoxW - 10, tBoxY + 40);
 
         if (window.fastFoodMode && susTimer > 0) {
             ctx.fillStyle = '#00ff88';
@@ -546,14 +557,30 @@ class Engine3D {
         const totalRoundTrash = (this.game.trashCollectedInRound !== undefined) ? this.game.trashCollectedInRound : 0;
         const trashInWindow = (this.game.trashCollectedInWindow !== undefined) ? this.game.trashCollectedInWindow : (hud.trashInWindow || 0);
         const evalTime = Math.ceil(hud.evalTimer || 0);
+        const isNpesta = !!(window.npestaActivated || (typeof localStorage !== 'undefined' && localStorage.getItem('npestaActivated') === 'true'));
+        const gdFace = hud.getGDFaceInfo ? hud.getGDFaceInfo(trashInWindow) : null;
 
         ctx.fillStyle = '#38bdf8';
         ctx.font = '7.5px "Press Start 2P", monospace';
         ctx.fillText(`TRASH: ${totalRoundTrash}`, sBoxX + sBoxW - 10, sBoxY + 38);
 
-        ctx.fillStyle = (trashInWindow >= 7) ? '#00ff88' : (trashInWindow >= 5 ? '#facc15' : '#f87171');
-        ctx.font = '6.5px "Press Start 2P", monospace';
-        ctx.fillText(`Eval: ${trashInWindow}/7 (${evalTime}s)`, sBoxX + sBoxW - 10, sBoxY + 52);
+        if (gdFace) {
+            const faceImg = hud.getGDFaceImage ? hud.getGDFaceImage(gdFace.key) : null;
+            if (faceImg && (faceImg.complete || faceImg instanceof HTMLCanvasElement)) {
+                ctx.save();
+                ctx.shadowColor = gdFace.color;
+                ctx.shadowBlur = 6;
+                ctx.drawImage(faceImg, sBoxX + 10, sBoxY + 28, 20, 20);
+                ctx.restore();
+            }
+            ctx.fillStyle = gdFace.color;
+            ctx.font = '6.5px "Press Start 2P", monospace';
+            ctx.fillText(`Eval: ${trashInWindow}/10 (${evalTime}s)`, sBoxX + sBoxW - 10, sBoxY + 52);
+        } else {
+            ctx.fillStyle = (trashInWindow >= 7) ? '#00ff88' : (trashInWindow >= 5 ? '#facc15' : '#f87171');
+            ctx.font = '6.5px "Press Start 2P", monospace';
+            ctx.fillText(`Eval: ${trashInWindow}/7 (${evalTime}s)`, sBoxX + sBoxW - 10, sBoxY + 52);
+        }
 
         // ── 3. Navigation & Messages Button (Under Timer Box) ──
         const msgBtnW = 150;

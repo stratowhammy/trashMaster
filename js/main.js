@@ -210,9 +210,10 @@ class Game {
         this.medicationSchedule = [];
         this.medicationAlertActive = false;
         this.medicationAlertTimer = 0;
-        this.medicationAlertMaxDuration = 12.0;
+        this.medicationAlertMaxDuration = 10.0;
         this.medsMissed = false;
         this.medsTakenCount = 0;
+        this.cheeseMonster = null;
 
         // Debug info
         this.debugKeys = '';
@@ -312,6 +313,11 @@ class Game {
                 if ((window.isKey(e, 'pirateCannon') || e.key === 'c' || e.key === 'C') && window.pirateMode && this.pirateModeManager) {
                     if (this.engine3D && this.engine3D.enabled) this.engine3D.viewmodel.triggerAction();
                     this.pirateModeManager.firePlayerCannon(this);
+                }
+
+                // Shift+E (or biteCheese keybind) to take a bite of the cheese building
+                if ((e.shiftKey && (e.key === 'e' || e.key === 'E' || e.code === 'KeyE')) || (window.isKey && window.isKey(e, 'biteCheese'))) {
+                    if (this.tryBiteCheeseBuilding && this.tryBiteCheeseBuilding()) return;
                 }
 
                 // E or e key to interact with NPC, doors, or grab targeted trash
@@ -775,7 +781,9 @@ class Game {
                             return;
                         }
                     } else if (this.camera) {
-                        const worldClick = this.camera.screenToWorld(clickX, clickY);
+                        const worldClick = (typeof this.camera.screenToWorld === 'function') 
+                            ? this.camera.screenToWorld(clickX, clickY) 
+                            : { x: clickX + (this.camera.x || 0), y: clickY + (this.camera.y || 0) };
                         for (const ch of this.gameMap.speedChangers) {
                             const wrapped = nearestWrap(ch.x, ch.y, this.camera.getCenterX(), this.camera.getCenterY());
                             const dist = Math.sqrt((worldClick.x - wrapped.x)**2 + (worldClick.y - wrapped.y)**2);
@@ -1381,14 +1389,20 @@ class Game {
             return true;
         }
 
-        // Allow taking medication if alert is active OR if player is currently in missed-meds / psychosis state
-        if (this.medicationAlertActive || this.medsMissed || this.medsMissedCount > 0) {
+        // Only allow taking medication BEFORE the bar hits 0% (while alert is actively ticking down)
+        // Any time the meds bar is there, Shift + M will turn the game/screen back to normal!
+        // Once the bar reaches 0% (or when no alert is active), hitting Shift+M will not do anything.
+        if (this.medicationAlertActive && this.medicationAlertTimer > 0) {
             this.medicationAlertActive = false;
+            this.medicationAlertTimer = 0;
             this.medsTakenCount = (this.medsTakenCount || 0) + 1;
 
-            // If screen was previously inverted/rotated from a missed dose, restore back to normal!
+            // Turn screen and audio back to normal if previously distorted from missed dose
             const wasDistorted = this.medsMissed;
             this.medsMissed = false;
+            const hadCheeseBuildings = (this.medsMissedCount >= 2);
+            this.medsMissedCount = 0;
+            if (this.cheeseMonster) this.cheeseMonster.active = false;
 
             if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
                 window.soundManager.stopEarPiercingLoop();
@@ -1398,6 +1412,10 @@ class Game {
                 viewport.style.filter = '';
                 viewport.style.transform = '';
                 viewport.style.transformOrigin = '';
+            }
+
+            if (hadCheeseBuildings && this.engine3D && typeof this.engine3D.buildMapForGame === 'function') {
+                this.engine3D.buildMapForGame(this.gameMap, this.gameMap.theme);
             }
 
             if (this.medicationSchedule) {
@@ -1421,12 +1439,246 @@ class Game {
                 }
             }
             return true;
-        } else {
+        }
+
+        // If bar reached 0% (meds missed) or alert is not active, hitting Shift+M does nothing
+        return false;
+    }
+
+    tryBiteCheeseBuilding() {
+        if (this.state !== GameState.PLAYING || this.isPaused || !this.player || !this.gameMap) return false;
+
+        // Only works if missed meds twice (psychosis makes buildings cheese!)
+        if ((this.medsMissedCount || 0) < 2) {
             if (this.hud) {
-                this.hud.showFollowerNotification('💊 Medication level is stable. No dose required yet!', true);
+                this.hud.showFollowerNotification('🏢 Buildings are made of brick and concrete. Take your medication! 💊', false);
             }
             return false;
         }
+
+        const px = this.player.x;
+        const py = this.player.y;
+        const pTX = (typeof this.player.getTileX === 'function') ? this.player.getTileX() : Math.floor(px / TILE_SIZE);
+        const pTY = (typeof this.player.getTileY === 'function') ? this.player.getTileY() : Math.floor(py / TILE_SIZE);
+
+        // Check neighboring adjacent tiles (cardinal and diagonal) for any building
+        const offsets = [
+            {dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0},
+            {dx: -1, dy: -1}, {dx: 1, dy: -1}, {dx: -1, dy: 1}, {dx: 1, dy: 1},
+            {dx: 0, dy: 0}
+        ];
+
+        let foundTile = null;
+        for (const off of offsets) {
+            const tx = (typeof wrapTileX === 'function') ? wrapTileX(pTX + off.dx) : (pTX + off.dx);
+            const ty = (typeof wrapTileY === 'function') ? wrapTileY(pTY + off.dy) : (pTY + off.dy);
+            const tType = (this.gameMap.tiles && this.gameMap.tiles[ty]) ? this.gameMap.tiles[ty][tx] : null;
+            if (tType === TileType.BUILDING || tType === TileType.BUILDING_DOOR) {
+                foundTile = { tx, ty };
+                break;
+            }
+        }
+
+        // Also check direct 3D crosshair target in FPS mode
+        if (!foundTile && this.engine3D && this.engine3D.enabled && this.engine3D.currentCrosshairTarget) {
+            const ct = this.engine3D.currentCrosshairTarget;
+            if (ct.type === 'building' && ct.building) {
+                foundTile = { tx: pTX, ty: pTY };
+            }
+        }
+
+        if (foundTile) {
+            this.cheeseBitesTaken = (this.cheeseBitesTaken || 0) + 1;
+
+            if (!this.gameMap.cheeseBites) this.gameMap.cheeseBites = new Map();
+            const key = `${foundTile.tx},${foundTile.ty}`;
+            const curBites = (this.gameMap.cheeseBites.get(key) || 0) + 1;
+            this.gameMap.cheeseBites.set(key, curBites);
+
+            if (window.soundManager && typeof window.soundManager.playCheeseBiteSFX === 'function') {
+                window.soundManager.playCheeseBiteSFX();
+            }
+
+            if (this.trashManager) {
+                this.trashManager.totalPoints += 50;
+                if (this.hud) this.hud.updateScore(this.trashManager.totalPoints);
+            }
+
+            if (this.player) {
+                this.player.stamina = Math.min(100, (this.player.stamina || 0) + 25);
+            }
+
+            if (this.engine3D && this.engine3D.viewmodel && typeof this.engine3D.viewmodel.triggerAction === 'function') {
+                this.engine3D.viewmodel.triggerAction();
+            }
+
+            if (this.hud) {
+                const cheeseTypes = ['Sharp Cheddar', 'Aged Swiss', 'Creamy Gouda', 'Smoked Provolone', 'Wisconsin Colby-Jack', 'Melted Mozzarella', 'Parmigiano-Reggiano'];
+                const cheese = cheeseTypes[Math.floor(Math.random() * cheeseTypes.length)];
+                this.hud.showFollowerNotification(`🧀 *CHOMP!* You took a delicious bite of the ${cheese} building! (+50 pts, +25 stamina) ✨`, true);
+            }
+            return true;
+        } else {
+            if (this.hud) {
+                this.hud.showFollowerNotification('🧀 Walk up to the side of any cheese building to take a bite! [Shift + E]', false);
+            }
+            return true;
+        }
+    }
+
+    _spawnCheeseMonster() {
+        if (!this.player) return;
+        const spawnX = typeof wrapWorldX === 'function' ? wrapWorldX(this.player.x + (Math.random() > 0.5 ? 260 : -260)) : (this.player.x + 260);
+        const spawnY = typeof wrapWorldY === 'function' ? wrapWorldY(this.player.y + (Math.random() > 0.5 ? 200 : -200)) : (this.player.y + 200);
+        this.cheeseMonster = {
+            x: spawnX,
+            y: spawnY,
+            speed: 2.3,
+            width: 40,
+            height: 40,
+            active: true,
+            attackCooldown: 0
+        };
+        if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+            window.soundManager.playPsychosisSFX();
+        }
+    }
+
+    async killByCheeseMonster(reason = 'fps_ambush') {
+        if (this._killedByCheeseMonster) return;
+        this._killedByCheeseMonster = true;
+
+        if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+            window.soundManager.playPsychosisSFX();
+        }
+        if (this.cheeseMonster) {
+            this.cheeseMonster.active = false;
+        }
+        if (this.engine3D) {
+            this.engine3D.enabled = false;
+        }
+        if (document.pointerLockElement) {
+            document.exitPointerLock();
+        }
+
+        // 🚔 Set penalty: 4 Police Officers will chase you on your next round!
+        window.pendingMonsterPolicePenalty = 4;
+
+        const deathMsg = "🧀💀 THE CHEESE MONSTER AMBUSHED AND DEFEATED YOU IN 3D FPS! (10% Chance)\n\n🚨 PENALTY: 4 Police Officers will chase after you next round!";
+
+        alert(deathMsg);
+
+        if (typeof this.nullifyLevelAndReturnToStore === 'function') {
+            await this.nullifyLevelAndReturnToStore();
+        } else if (window.showScreen) {
+            window.showScreen('store-screen');
+        }
+
+        if (this.hud) {
+            this.hud.showFollowerNotification('🚨 4 Police Officers will chase you next round! 🚔', false);
+        }
+
+        this._killedByCheeseMonster = false;
+    }
+
+    _renderCheeseMonster(ctx, camera) {
+        if (!this.cheeseMonster || !this.cheeseMonster.active || !camera) return;
+        const m = this.cheeseMonster;
+        const wrapped = typeof nearestWrap === 'function' ? nearestWrap(m.x, m.y, camera.getCenterX(), camera.getCenterY()) : { x: m.x, y: m.y };
+        if (!camera.isVisible(wrapped.x - 32, wrapped.y - 32, 64, 64)) return;
+        const screen = camera.worldToScreen(wrapped.x, wrapped.y);
+
+        ctx.save();
+        const time = performance.now() / 1000;
+        const bob = Math.sin(time * 6) * 3;
+        const cx = screen.x;
+        const cy = screen.y + bob;
+
+        // Glowing cheese aura
+        ctx.shadowColor = '#ffb703';
+        ctx.shadowBlur = 14;
+
+        // Menacing Cheddar Wedge Body
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - 22);
+        ctx.lineTo(cx + 24, cy + 18);
+        ctx.lineTo(cx - 24, cy + 18);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Swiss cheese holes
+        const holes = [
+            { x: cx - 8, y: cy - 4, r: 4 },
+            { x: cx + 10, y: cy + 2, r: 5 },
+            { x: cx - 2, y: cy + 12, r: 5 }
+        ];
+        holes.forEach(h => {
+            ctx.fillStyle = '#b45309';
+            ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath(); ctx.arc(h.x + 0.5, h.y + 0.5, h.r - 1.5, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath(); ctx.arc(h.x + 1, h.y + 1, Math.max(1, h.r - 2.5), 0, Math.PI * 2); ctx.fill();
+        });
+
+        // Glowing Red Demonic Eyes
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(cx - 10, cy - 2, 6, 6);
+        ctx.fillRect(cx + 4, cy - 2, 6, 6);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - 8, cy - 1, 2, 2);
+        ctx.fillRect(cx + 6, cy - 1, 2, 2);
+
+        // Gaping Maw with Sharp Teeth
+        ctx.fillStyle = '#180a02';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 8, 12, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - 8, cy + 4, 3, 4);
+        ctx.fillRect(cx - 3, cy + 4, 3, 5);
+        ctx.fillRect(cx + 2, cy + 4, 3, 4);
+        ctx.fillRect(cx - 6, cy + 9, 3, 4);
+        ctx.fillRect(cx, cy + 9, 3, 4);
+
+        // Waving Claws / Arms
+        const armWave = Math.sin(time * 8) * 4;
+        ctx.fillStyle = '#f59e0b';
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.moveTo(cx - 16, cy + 4);
+        ctx.lineTo(cx - 30, cy - 2 + armWave);
+        ctx.lineTo(cx - 24, cy + 12);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(cx + 16, cy + 4);
+        ctx.lineTo(cx + 30, cy - 2 - armWave);
+        ctx.lineTo(cx + 24, cy + 12);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        // Cheese Monster Tag above head
+        ctx.fillStyle = '#fde047';
+        ctx.font = 'bold 7px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('🧀 CHEESE MONSTER', cx, cy - 28);
+
+        ctx.restore();
     }
 
     activateSpeedChanger(changer) {
@@ -1456,6 +1708,39 @@ class Game {
         if (this.hud) {
             this.hud.showFollowerNotification(msg, true);
         }
+    }
+
+    getCityHallSpawnPosition() {
+        if (!this.gameMap) return { x: 32 * TILE_SIZE, y: 32 * TILE_SIZE };
+        let chBldg = null;
+        if (this.gameMap.buildings) {
+            chBldg = this.gameMap.buildings.find(b => b.type === 'cityhall' || b.type === 'city_hall' || b.type === 'philly_city_hall' || b.type === 'burj_khalifa' || b.type === 'christ_redeemer');
+        }
+        if (chBldg) {
+            let minTileX = Infinity, maxTileX = -Infinity, minTileY = Infinity, maxTileY = -Infinity;
+            for (const t of chBldg.tiles) {
+                if (t.x < minTileX) minTileX = t.x;
+                if (t.x > maxTileX) maxTileX = t.x;
+                if (t.y < minTileY) minTileY = t.y;
+                if (t.y > maxTileY) maxTileY = t.y;
+            }
+            const candidateOffsets = [
+                { x: Math.floor((minTileX + maxTileX) / 2), y: maxTileY + 1 }, // Below
+                { x: Math.floor((minTileX + maxTileX) / 2), y: minTileY - 1 }, // Above
+                { x: minTileX - 1, y: Math.floor((minTileY + maxTileY) / 2) }, // Left
+                { x: maxTileX + 1, y: Math.floor((minTileY + maxTileY) / 2) }  // Right
+            ];
+            for (const c of candidateOffsets) {
+                const tx = wrapTileX(c.x);
+                const ty = wrapTileY(c.y);
+                const tile = this.gameMap.getTile(tx, ty);
+                if (tile === TileType.ROAD || tile === TileType.SIDEWALK || tile === TileType.CROSSWALK || tile === TileType.PARK_PATH || tile === TileType.GRASS) {
+                    return { x: tx * TILE_SIZE + TILE_SIZE / 2, y: ty * TILE_SIZE + TILE_SIZE / 2 };
+                }
+            }
+            return { x: chBldg.x + chBldg.width / 2, y: chBldg.y + chBldg.height + 16 };
+        }
+        return { x: 32 * TILE_SIZE, y: 32 * TILE_SIZE };
     }
 
     pickupTrash() {
@@ -2572,7 +2857,7 @@ class Game {
                     if (!event.triggered && curTimeLeft <= event.triggerTime) {
                         event.triggered = true;
                         this.medicationAlertActive = true;
-                        this.medicationAlertTimer = this.medicationAlertMaxDuration || 12.0;
+                        this.medicationAlertTimer = this.medicationAlertMaxDuration || 10.0;
                         if (window.soundManager && typeof window.soundManager.playPillReminderSFX === 'function') {
                             window.soundManager.playPillReminderSFX();
                         }
@@ -2603,8 +2888,12 @@ class Game {
                         if (window.soundManager && typeof window.soundManager.startEarPiercingLoop === 'function') {
                             window.soundManager.startEarPiercingLoop();
                         }
+                        if (this.engine3D && typeof this.engine3D.buildMapForGame === 'function') {
+                            this.engine3D.buildMapForGame(this.gameMap, this.gameMap.theme);
+                        }
+                        this._spawnCheeseMonster();
                         if (this.hud) {
-                            this.hud.showFollowerNotification('🔊 MISSED MEDS 2 TIMES! EAR-PIERCING PSYCHOSIS ACTIVATED! Take meds [Shift+M] now! 💊⚠️', false);
+                            this.hud.showFollowerNotification('🧀 MISSED MEDS 2 TIMES! CHEESE MONSTER SPAWNED & BUILDINGS TURNED TO CHEESE! (10% 3D FPS Ambush: 4 Police Penalty!) 👾🧀', false);
                         }
                     } else if (this.medsMissedCount >= 3) {
                         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
@@ -2741,6 +3030,44 @@ class Game {
         // NPC update logic across all maps & modes
         if (this.npcManager) {
             this.npcManager.update(this.gameMap);
+        }
+
+        // 🧀 Cheese Monster AI & Chasing logic (Missed Meds 2 Psychosis)
+        if (this.cheeseMonster && this.cheeseMonster.active && this.player) {
+            const px = typeof wrapWorldX === 'function' ? wrapWorldX(this.player.x) : this.player.x;
+            const py = typeof wrapWorldY === 'function' ? wrapWorldY(this.player.y) : this.player.y;
+            const mx = typeof wrapWorldX === 'function' ? wrapWorldX(this.cheeseMonster.x) : this.cheeseMonster.x;
+            const my = typeof wrapWorldY === 'function' ? wrapWorldY(this.cheeseMonster.y) : this.cheeseMonster.y;
+            const wrapped = typeof nearestWrap === 'function' ? nearestWrap(mx, my, px, py) : { x: mx, y: my };
+            let dx = px - wrapped.x;
+            let dy = py - wrapped.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > 2) {
+                const moveDist = (this.cheeseMonster.speed || 2.3) * 60 * dt;
+                const nextX = wrapped.x + (dx / dist) * Math.min(moveDist, dist);
+                const nextY = wrapped.y + (dy / dist) * Math.min(moveDist, dist);
+                this.cheeseMonster.x = typeof wrapWorldX === 'function' ? wrapWorldX(nextX) : nextX;
+                this.cheeseMonster.y = typeof wrapWorldY === 'function' ? wrapWorldY(nextY) : nextY;
+            }
+
+            if (this.cheeseMonster.attackCooldown > 0) {
+                this.cheeseMonster.attackCooldown -= dt;
+            }
+
+            // Player collision with Cheese Monster in 2D -> Bites player (-15 stamina)
+            if (dist < 28 && this.cheeseMonster.attackCooldown <= 0) {
+                this.cheeseMonster.attackCooldown = 1.6;
+                if (window.soundManager && typeof window.soundManager.playCheeseBiteSFX === 'function') {
+                    window.soundManager.playCheeseBiteSFX();
+                }
+                if (this.player) {
+                    this.player.stamina = Math.max(0, (this.player.stamina || 0) - 15);
+                }
+                if (this.hud) {
+                    this.hud.showFollowerNotification('🧀💀 CHEESE MONSTER BIT YOU! -15 Stamina! (10% 3D FPS Ambush: 4 Police Penalty!) 👾', false);
+                }
+            }
         }
 
         // Rival Candidate update logic
@@ -2946,6 +3273,65 @@ class Game {
                             this.activateSpeedChanger(ch);
                         }
                         break;
+                    }
+                }
+            }
+
+            // ── Geometry Dash Spikes Collision & Jump Clearance (GD Cube mode) ──
+            if (this.gameMap && this.gameMap.spikes) {
+                if (this.player.spikeInvulnTimer > 0) {
+                    this.player.spikeInvulnTimer -= dt;
+                }
+
+                const px = wrapWorldX(this.player.x);
+                const py = wrapWorldY(this.player.y);
+                const isJumpingHigh = this.player.isJumping || (this.player.jumpHeight > 1.5);
+
+                for (const cluster of this.gameMap.spikes) {
+                    for (const sp of cluster.spikes) {
+                        const wSp = typeof nearestWrap === 'function' ? nearestWrap(sp.x, sp.y, px, py) : { x: sp.x, y: sp.y };
+                        const dx = px - wSp.x;
+                        const dy = py - wSp.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < (sp.radius || 11) + 4) {
+                            if (isJumpingHigh) {
+                                // Jumped safely over the spike!
+                                if (!sp._cleared) {
+                                    sp._cleared = true;
+                                    if (this.hud) {
+                                        this.trashManager.totalPoints += 25;
+                                        this.hud.updateScore(this.trashManager.totalPoints);
+                                    }
+                                }
+                            } else {
+                                // Grounded collision -> CRASH into spike! Sent back to City Hall!
+                                if (!this.player.spikeInvulnTimer || this.player.spikeInvulnTimer <= 0) {
+                                    this.player.spikeInvulnTimer = 1.2;
+                                    if (window.soundManager && typeof window.soundManager.playGDCrashSFX === 'function') {
+                                        window.soundManager.playGDCrashSFX();
+                                    }
+                                    this.player.stamina = Math.max(0, (this.player.stamina || 0) - 20);
+
+                                    // Teleport / Sent back to City Hall
+                                    const respawnPos = this.getCityHallSpawnPosition();
+                                    this.player.x = respawnPos.x;
+                                    this.player.y = respawnPos.y;
+                                    this.player.jumpHeight = 0;
+                                    this.player.jumpVelocity = 0;
+                                    this.player.isJumping = false;
+                                    if (this.camera) {
+                                        this.camera.snapTo(this.player.x, this.player.y);
+                                    }
+
+                                    if (this.hud) {
+                                        this.hud.showFollowerNotification(`💥 CRASHED INTO ${cluster.label.toUpperCase()}! Sent back to City Hall! 🏛️`, false);
+                                    }
+                                }
+                            }
+                        } else if (dist > 40) {
+                            sp._cleared = false;
+                        }
                     }
                 }
             }
@@ -3281,10 +3667,13 @@ class Game {
         this.followerCheckTimer += dt;
         if (this.followerCheckTimer >= 10) {
             this.followerCheckTimer -= 10;
+            const isNpesta = window.gdCubeUnlocked || localStorage.getItem('gdCubeUnlocked') === 'true';
+            const quota = isNpesta ? 10 : 7;
+            const lossThreshold = isNpesta ? 7 : 5;
             const baseFollowers = (window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0);
-            if (this.trashCollectedInWindow >= 7) {
+            if (this.trashCollectedInWindow >= quota) {
                 this._addSequentialFollower();
-            } else if (this.trashCollectedInWindow < 5) {
+            } else if (this.trashCollectedInWindow < lossThreshold) {
                 const totalCurrent = this.getRoundTotalFollowers();
                 if (totalCurrent > baseFollowers) {
                     if (window.fastFoodMode && this.fastFoodSuspensionTimer > 0) {
@@ -3429,23 +3818,45 @@ class Game {
             ctx.fill();
         }
 
-        // Title
-        const splashImg = this.spriteManager.getImage('splash');
-        if (splashImg && (splashImg.complete || splashImg instanceof HTMLCanvasElement)) {
-            const splashW = 400;
-            const splashH = 225;
-            ctx.drawImage(splashImg, w / 2 - splashW / 2, 10, splashW, splashH);
-        } else {
-            ctx.fillStyle = '#0f8';
-            ctx.font = 'bold 36px "Press Start 2P", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('TRASH MASTER', w / 2, 80);
+        // ── Dynamic Random Sticker Logo (Picked anew on each page load) ──
+        if (!this._randomStickerImg || this._randomStickerSrc !== window.currentRandomStickerPath) {
+            this._randomStickerSrc = window.currentRandomStickerPath || 'assets/stickers/ducky_sticker.png';
+            this._randomStickerImg = new Image();
+            this._randomStickerImg.src = this._randomStickerSrc;
         }
 
+        const stickerSize = 120;
+        const stickerX = w / 2 - stickerSize / 2;
+        const stickerY = 15;
+
+        if (this._randomStickerImg && (this._randomStickerImg.complete || this._randomStickerImg.naturalWidth > 0)) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 255, 204, 0.45)';
+            ctx.shadowBlur = 16;
+            ctx.drawImage(this._randomStickerImg, stickerX, stickerY, stickerSize, stickerSize);
+            ctx.restore();
+        }
+
+        // "TRASH MASTER" text positioned underneath, barely overlapping bottom edge of sticker
+        ctx.save();
+        ctx.font = 'bold 26px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        // Black outline for crisp readability over sticker
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#000000';
+        ctx.strokeText('TRASH MASTER', w / 2, stickerY + stickerSize - 6);
+        // Neon cyan glow fill
+        ctx.fillStyle = '#00ffcc';
+        ctx.shadowColor = 'rgba(0, 255, 204, 0.85)';
+        ctx.shadowBlur = 12;
+        ctx.fillText('TRASH MASTER', w / 2, stickerY + stickerSize - 6);
+        ctx.restore();
+
         // Subtitle glow
-        ctx.fillStyle = '#68f';
-        ctx.font = '12px "Press Start 2P", monospace';
-        ctx.fillText('Choose Your Character', w / 2, 260);
+        ctx.fillStyle = '#60a5fa';
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Choose Your Character', w / 2, stickerY + stickerSize + 22);
 
         // Character cards
         const isGdUnlocked = !!(window.gdCubeUnlocked || (typeof localStorage !== 'undefined' && localStorage.getItem('gdCubeUnlocked') === 'true'));
@@ -3455,7 +3866,7 @@ class Game {
         const cardGap = 20;
         const totalW = availableChars.length * (cardW + cardGap) - cardGap;
         const startX = (w - totalW) / 2;
-        const startY = (h - cardH) / 2 + 80;
+        const startY = Math.max(180, (h - cardH) / 2 + 55);
 
         for (let i = 0; i < availableChars.length; i++) {
             const char = availableChars[i];
@@ -3614,6 +4025,9 @@ class Game {
 
         if (this.gameMap && typeof this.gameMap.ensureNearbySpeedChangers === 'function') {
             this.gameMap.ensureNearbySpeedChangers(spawnX, spawnY);
+        }
+        if (this.gameMap && typeof this.gameMap.ensureNearbySpikes === 'function') {
+            this.gameMap.ensureNearbySpikes(spawnX, spawnY);
         }
 
         this.player = new Player(spawnX, spawnY, effectiveSprite);
@@ -3940,6 +4354,32 @@ class Game {
             }
         }
 
+        // ── Cheese Monster Defeat Penalty: 4 Police Officers chase you this round ──
+        if (window.pendingMonsterPolicePenalty > 0) {
+            const count = window.pendingMonsterPolicePenalty;
+            window.pendingMonsterPolicePenalty = 0;
+            if (this.crimeManager) {
+                this.crimeManager.police = this.crimeManager.police || [];
+                this.crimeManager.policeActive = true;
+                this.crimeManager.policeActiveTimer = 90.0;
+                let spawnX = (this.player ? this.player.x : 200) / TILE_SIZE;
+                let spawnY = (this.player ? this.player.y : 200) / TILE_SIZE;
+                const station = (this.gameMap && this.gameMap.buildings && this.gameMap.buildings[1]) ? this.gameMap.buildings[1] : null;
+                if (station && station.doorTiles && station.doorTiles.length > 0) {
+                    spawnX = station.doorTiles[0].x;
+                    spawnY = station.doorTiles[0].y;
+                }
+                for (let i = 0; i < count; i++) {
+                    const sx = typeof wrapWorldX === 'function' ? wrapWorldX((spawnX * TILE_SIZE) + (i % 2 === 0 ? 80 : -80) * Math.ceil((i + 1) / 2)) / TILE_SIZE : spawnX;
+                    const sy = typeof wrapWorldY === 'function' ? wrapWorldY((spawnY * TILE_SIZE) + (i % 2 === 0 ? 64 : -64) * Math.ceil((i + 1) / 2)) / TILE_SIZE : spawnY;
+                    this.crimeManager.police.push(new PoliceOfficer(sx, sy, false));
+                }
+            }
+            if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
+                this.hud.showFollowerNotification('🚨 MONSTER PENALTY: 4 Police Officers are chasing you this round! 🚔', false);
+            }
+        }
+
         // Fast Food Mode State
         this.hungerTimer = 45.0;
         this.hungerWarned25 = false;
@@ -3964,11 +4404,12 @@ class Game {
         // ── Medication System Initialization (3 times per round) ──
         this.medicationAlertActive = false;
         this.medicationAlertTimer = 0;
-        this.medicationAlertMaxDuration = 12.0;
+        this.medicationAlertMaxDuration = 10.0;
         this.medsMissed = false;
         this.medsMissedCount = 0;
         this.medsTakenCount = 0;
         this.noMedsActive = false;
+        this.cheeseMonster = null;
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
         }
@@ -3982,6 +4423,23 @@ class Game {
             }
         }
 
+        // Check if "crazy ho!" cheat was typed in the Store Terminal (immediately triggers 2x missed meds effects)
+        if (window.crazyHoCheat) {
+            window.crazyHoCheat = false;
+            this.medsMissed = true;
+            this.medsMissedCount = 2;
+            if (window.soundManager && typeof window.soundManager.startEarPiercingLoop === 'function') {
+                window.soundManager.startEarPiercingLoop();
+            }
+            if (this.engine3D && typeof this.engine3D.buildMapForGame === 'function') {
+                this.engine3D.buildMapForGame(this.gameMap, this.gameMap.theme);
+            }
+            this._spawnCheeseMonster();
+            if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
+                this.hud.showFollowerNotification('🧀 CRAZY HO! ACTIVE: Missed meds 2x effects immediately active! Cheese buildings & Cheese Monster chasing you! 👾', false);
+            }
+        }
+
         this.alexJonesModeActive = false;
         if (window.alexJonesCheat) {
             this.alexJonesModeActive = true;
@@ -3989,6 +4447,23 @@ class Game {
             if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
                 this.hud.showFollowerNotification("🐸 'alex jones' active: Everyone is a Leatherdaddy Frog!", true);
             }
+        }
+
+        // ── Infinite Round Cheat ──
+        this.infiniteRoundActive = false;
+        window.infiniteRoundActive = false;
+        if (window.infiniteRoundCheat) {
+            this.infiniteRoundActive = true;
+            window.infiniteRoundActive = true;
+            window.infiniteRoundCheat = false;
+            if (this.hud) {
+                this.hud.isInfinite = true;
+                if (typeof this.hud.showFollowerNotification === 'function') {
+                    this.hud.showFollowerNotification('♾️ INFINITE ROUND ACTIVE: Round has no time limit! ⏱️❌', true);
+                }
+            }
+        } else {
+            if (this.hud) this.hud.isInfinite = false;
         }
 
         const roundDur = (this.hud && this.hud.gameDuration) ? this.hud.gameDuration : 120;
@@ -4841,6 +5316,60 @@ class Game {
             }
         }
 
+        // ── Render Geometry Dash Spikes (visible when playing as Npesta / GD Cube) ──
+        if (isNpestaCube && this.gameMap && this.gameMap.spikes) {
+            for (const cluster of this.gameMap.spikes) {
+                const wrappedC = typeof nearestWrap === 'function' ? nearestWrap(cluster.centerX, cluster.centerY, this.camera.getCenterX(), this.camera.getCenterY()) : { x: cluster.centerX, y: cluster.centerY };
+                if (!this.camera.isVisible(wrappedC.x - 70, wrappedC.y - 70, 140, 140)) continue;
+
+                for (const sp of cluster.spikes) {
+                    const spW = typeof nearestWrap === 'function' ? nearestWrap(sp.x, sp.y, this.camera.getCenterX(), this.camera.getCenterY()) : { x: sp.x, y: sp.y };
+                    const screen = this.camera.worldToScreen(spW.x, spW.y);
+
+                    const spikeImg = this.spriteManager.getImage('gd_spike');
+                    if (spikeImg && (spikeImg.complete || spikeImg instanceof HTMLCanvasElement)) {
+                        ctx.drawImage(spikeImg, screen.x - 14, screen.y - 14, 28, 28);
+                    } else {
+                        // Procedural fallback
+                        const gradient = ctx.createLinearGradient(screen.x, screen.y - 14, screen.x, screen.y + 14);
+                        gradient.addColorStop(0, '#000000');
+                        gradient.addColorStop(0.45, '#000000');
+                        gradient.addColorStop(0.55, '#0f2b66');
+                        gradient.addColorStop(1, '#1d4ed8');
+
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.moveTo(screen.x, screen.y - 14);
+                        ctx.lineTo(screen.x + 13, screen.y + 13);
+                        ctx.lineTo(screen.x - 13, screen.y + 13);
+                        ctx.closePath();
+
+                        ctx.fillStyle = gradient;
+                        ctx.fill();
+
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2.5;
+                        ctx.lineJoin = 'round';
+                        ctx.stroke();
+
+                        ctx.strokeStyle = '#60a5fa';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+
+                // Cluster Label tag above cluster
+                const cScreen = this.camera.worldToScreen(wrappedC.x, wrappedC.y);
+                ctx.save();
+                ctx.fillStyle = cluster.count === 4 ? '#ff0055' : (cluster.count === 3 ? '#ffaa00' : (cluster.count === 2 ? '#ffff00' : '#00ffff'));
+                ctx.font = 'bold 6.5px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(cluster.label, cScreen.x, cScreen.y - 20);
+                ctx.restore();
+            }
+        }
+
         // ── Render Active Portals ──
         if (this.activePortals) {
             const now = performance.now() / 1000;
@@ -5074,6 +5603,11 @@ class Game {
         // Render Dragons
         if (this.dragons) {
             this.dragons.forEach(drag => drag.render(ctx, this.camera));
+        }
+
+        // Render 2D Cheese Monster (Psychosis Boss)
+        if (this.cheeseMonster && this.cheeseMonster.active) {
+            this._renderCheeseMonster(ctx, this.camera);
         }
 
         // Render Night Time Darkness Overlay (Solid Pitch Black)

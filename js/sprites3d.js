@@ -45,6 +45,7 @@ class Sprites3D {
             case 'char_npc': canvas = this._drawCitizen(); break;
             case 'police': canvas = this._drawPolice(); break;
             case 'char_pirate': canvas = this._drawPirate(); break;
+            case 'cheese_monster': canvas = this._drawCheeseMonster(); break;
 
             // Vehicles (2.5D Side Profile View)
             case 'char_truck': canvas = this._drawTrashTruck(); break;
@@ -89,6 +90,11 @@ class Sprites3D {
             case 'speed_pink':
             case 'speed_red':
                 return this._getSpeedChangerTexture(key);
+
+            // Geometry Dash Spikes
+            case 'gd_spike':
+                canvas = this._drawGDSpike();
+                break;
 
             default:
                 canvas = this._drawStudent();
@@ -151,6 +157,34 @@ class Sprites3D {
         return tex;
     }
 
+    _drawGDSpike() {
+        return this._createCanvas(64, 64, (ctx, w, h) => {
+            const gradient = ctx.createLinearGradient(32, 4, 32, 60);
+            gradient.addColorStop(0, '#000000');
+            gradient.addColorStop(0.45, '#000000');
+            gradient.addColorStop(0.55, '#0f2b66');
+            gradient.addColorStop(1, '#1d4ed8');
+
+            ctx.beginPath();
+            ctx.moveTo(32, 4);
+            ctx.lineTo(58, 60);
+            ctx.lineTo(6, 60);
+            ctx.closePath();
+
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3.5;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            ctx.strokeStyle = '#60a5fa';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        });
+    }
+
     _getLeatherdaddyFrogTexture() {
         if (this.cache.has('leatherdaddy_frog')) {
             return this.cache.get('leatherdaddy_frog');
@@ -197,6 +231,102 @@ class Sprites3D {
     // ============================================================
     // 👤 HEAD-ON 2.5D CHARACTER SPRITES (64 x 64)
     // ============================================================
+
+    _drawCheeseMonster() {
+        return this._createCanvas(64, 64, (ctx, w, h) => {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath(); ctx.ellipse(32, 60, 22, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+            // Menacing Cheddar Body (glowing yellow-orange wedge / blob)
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.moveTo(32, 6);
+            ctx.lineTo(56, 48);
+            ctx.lineTo(8, 48);
+            ctx.closePath();
+            ctx.fill();
+
+            // Outer crust / rind
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Swiss Cheese Holes
+            const holes = [
+                { x: 22, y: 22, r: 4 },
+                { x: 42, y: 26, r: 5 },
+                { x: 30, y: 42, r: 6 },
+                { x: 18, y: 44, r: 3 },
+                { x: 46, y: 44, r: 4 }
+            ];
+            holes.forEach(hole => {
+                ctx.fillStyle = '#b45309';
+                ctx.beginPath(); ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#78350f';
+                ctx.beginPath(); ctx.arc(hole.x + 0.5, hole.y + 0.5, hole.r - 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath(); ctx.arc(hole.x + 1, hole.y + 1, Math.max(1, hole.r - 2.5), 0, Math.PI * 2); ctx.fill();
+            });
+
+            // Glowing Demonic Red Eyes
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(20, 24, 6, 6);
+            ctx.fillRect(38, 24, 6, 6);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(22, 25, 2, 2);
+            ctx.fillRect(40, 25, 2, 2);
+
+            // Gaping Maw / Mouth with Sharp Teeth
+            ctx.fillStyle = '#180a02';
+            ctx.beginPath();
+            ctx.ellipse(32, 36, 14, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Sharp White Teeth
+            ctx.fillStyle = '#ffffff';
+            // Top teeth
+            ctx.fillRect(22, 30, 3, 4);
+            ctx.fillRect(27, 30, 3, 5);
+            ctx.fillRect(34, 30, 3, 5);
+            ctx.fillRect(39, 30, 3, 4);
+            // Bottom teeth
+            ctx.fillRect(24, 38, 3, 4);
+            ctx.fillRect(31, 38, 3, 5);
+            ctx.fillRect(37, 38, 3, 4);
+
+            // Waving Melted Cheese Claws / Arms
+            ctx.fillStyle = '#f59e0b';
+            // Left arm
+            ctx.beginPath();
+            ctx.moveTo(14, 32);
+            ctx.lineTo(2, 24);
+            ctx.lineTo(4, 38);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Right arm
+            ctx.beginPath();
+            ctx.moveTo(50, 32);
+            ctx.lineTo(62, 24);
+            ctx.lineTo(60, 38);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Cheese Drips at Bottom
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(16, 48, 6, 6);
+            ctx.fillRect(28, 48, 8, 8);
+            ctx.fillRect(42, 48, 6, 5);
+        });
+    }
 
     _drawRanger() {
         return this._createCanvas(64, 64, (ctx, w, h) => {

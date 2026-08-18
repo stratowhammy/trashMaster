@@ -34,8 +34,31 @@
         window.gameLog = function(msg) {
             console.log(msg);
         };
+
+        // ── Dynamic Random Sticker Logo (Picked anew on each page load) ──
+        window.STICKER_FILES = [
+            'cow_sticker.png',
+            'dolphin_sticker.png',
+            'ducky_sticker.png',
+            'grizzlybear_sticker.png',
+            'horse_balaclava_sticker.png',
+            'horsehat_sticker.png',
+            'lion_sticker.png',
+            'monkey_sticker.png',
+            'otter_sticker.png',
+            'penguin_sticker.png',
+            'polarbear_sticker.png',
+            'puma_sticker.png',
+            'ronaldo_sticker.png'
+        ];
+        window.currentRandomSticker = window.STICKER_FILES[Math.floor(Math.random() * window.STICKER_FILES.length)];
+        window.currentRandomStickerPath = 'assets/stickers/' + window.currentRandomSticker;
+
         window.addEventListener('DOMContentLoaded', () => {
             window.gameLog("DOM Fully Loaded and Parsed");
+            document.querySelectorAll('.trashmaster-sticker-logo').forEach(img => {
+                img.src = window.currentRandomStickerPath;
+            });
         });
     </script>
 </head>
@@ -43,7 +66,10 @@
     <div id="ui-layer">
         <!-- Login Screen -->
         <div id="login-screen" class="screen">
-            <img src="assets/sprites/trashmaster1.png" alt="Trash Master Logo" class="trashmaster-logo" style="max-width: 380px; width: 90%; height: auto; margin: 0 auto 15px auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 10px rgba(0,255,204,0.4));" />
+            <div class="trashmaster-logo-container">
+                <img src="" alt="Trash Master Sticker" class="trashmaster-sticker-logo" />
+                <h1 class="trashmaster-title-text">TRASH MASTER</h1>
+            </div>
             <div class="panel">
                 <h2>Player Login</h2>
                 <input type="text" id="login-username" placeholder="Username">
@@ -58,7 +84,10 @@
 
         <!-- Registration Screen -->
         <div id="register-screen" class="screen hidden">
-            <img src="assets/sprites/trashmaster1.png" alt="Trash Master Logo" class="trashmaster-logo" style="max-width: 380px; width: 90%; height: auto; margin: 0 auto 15px auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 10px rgba(0,255,204,0.4));" />
+            <div class="trashmaster-logo-container">
+                <img src="" alt="Trash Master Sticker" class="trashmaster-sticker-logo" />
+                <h1 class="trashmaster-title-text">TRASH MASTER</h1>
+            </div>
             <div class="panel" style="max-width: 480px;">
                 <h2 style="color: #00ffcc;">Create New Account</h2>
                 <p style="font-size: 8px; color: #aaa; margin-bottom: 12px; line-height: 1.5;">Register a username and password to start playing. Your account keeps all inventory, achievements, stats, letter progress, and photo gallery snapshots!</p>
@@ -93,12 +122,15 @@
         <!-- Sprite Selection Modal -->
         <div id="sprite-select-dialog" class="modal-backdrop hidden">
             <div class="modal-window">
-                <img src="assets/sprites/trashmaster1.png" alt="Trash Master Logo" class="trashmaster-logo" style="max-width: 280px; width: 85%; height: auto; margin: 0 auto 12px auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 8px rgba(0,255,204,0.4));" />
+                <div class="trashmaster-logo-container" style="margin-bottom: 12px;">
+                    <img src="" alt="Trash Master Sticker" class="trashmaster-sticker-logo" style="width: 110px; height: 110px;" />
+                    <h1 class="trashmaster-title-text" style="font-size: 20px; margin-top: -14px;">TRASH MASTER</h1>
+                </div>
                 <h2>CHOOSE YOUR PLAYER SPRITE</h2>
                 <p style="font-size: 11px; margin-bottom: 12px; color: #ccc;">Select the character sprite that will represent you throughout Trash Master:</p>
                 <div class="sprite-options-grid">
                     <button class="btn sprite-option-btn" data-sprite="char1">🌳 RANGER</button>
-                    <button class="btn sprite-option-btn" data-sprite="char2">🎓 STUDENT</button>
+                    <button class="btn sprite-option-btn active" data-sprite="char2">🎓 STUDENT</button>
                     <button class="btn sprite-option-btn" data-sprite="char3">🧪 SCIENTIST</button>
                     <button class="btn sprite-option-btn" data-sprite="char4">🏃 ATHLETE</button>
                     <button class="btn sprite-option-btn" data-sprite="char5">🤖 ROBOT</button>
@@ -1073,13 +1105,13 @@
     <script src="js/map.js?v=17"></script>
     <script src="js/map_dahgbad.js?v=3"></script>
     <script src="js/map_cucaracha.js?v=3"></script>
-    <script src="js/camera.js?v=4"></script>
-    <script src="js/sprites.js?v=16"></script>
+    <script src="js/camera.js?v=5"></script>
+    <script src="js/sprites.js?v=17"></script>
     <script src="js/player.js?v=7"></script>
     <script src="js/follower.js?v=6"></script>
     <script src="js/trash.js?v=6"></script>
     <script src="js/minimap.js?v=15"></script>
-    <script src="js/hud.js?v=9"></script>
+    <script src="js/hud.js?v=10"></script>
     <script src="js/npc.js?v=8"></script>
     <script src="js/pirate.js?v=6"></script>
     <script src="js/car.js?v=8"></script>
@@ -1094,8 +1126,8 @@
     <script src="js/map_builder3d.js?v=4"></script>
     <script src="js/billboard_manager3d.js?v=5"></script>
     <script src="js/fps_viewmodel.js?v=4"></script>
-    <script src="js/engine3d.js?v=6"></script>
+    <script src="js/engine3d.js?v=7"></script>
 
-    <script src="js/main.js?v=31"></script>
+    <script src="js/main.js?v=33"></script>
 </body>
 </html>

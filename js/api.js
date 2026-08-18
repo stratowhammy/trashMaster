@@ -329,13 +329,15 @@ function initUI() {
                         terminalHistory.innerHTML += `\n> ${cmd}`;
                         const cmdLower = cmd.toLowerCase();
                         if (cmdLower === 'eggs') {
-                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc;">🥚 EXECUTABLE TERMINAL COMMANDS:</span>\n<span style="color: #ffff00;">- eggs</span> : List all executable terminal commands\n<span style="color: #ffff00;">- npesta</span> : Unlock Geometry Dash Cube as a playable character!\n<span style="color: #ffff00;">- knowledge ho!</span> : Guaranteed City Library on your next round!\n<span style="color: #ffff00;">- ducky</span> : Activate Rubber Ducky mode!\n<span style="color: #ffff00;">- dragon ho!</span> : Activate Dragon Ho! cheat\n<span style="color: #ffff00;">- gold rush ho!</span> : Auto-activate Gold Rush at 45 seconds!\n<span style="color: #ffff00;">- no org</span> : Remove Organizers for 1 round\n<span style="color: #ffff00;">- no meds</span> : Remove medication requirement for 1 round\n<span style="color: #ffff00;">- alex jones</span> : Leatherdaddy Frog sprites for everyone!\n<span style="color: #ffff00;">- chaos / chaos mode / chaos ho!</span> : Unlock Chaos Mode\n<span style="color: #ffff00;">- clear</span> : Clear terminal history\n<span style="color: #ffff00;">- help</span> : Display terminal command list`;
+                            terminalHistory.innerHTML += `\n<span style="color: #00ffcc;">🥚 EXECUTABLE TERMINAL COMMANDS:</span>\n<span style="color: #ffff00;">- eggs</span> : List all executable terminal commands\n<span style="color: #ffff00;">- npesta</span> : Unlock Geometry Dash Cube as a playable character!\n<span style="color: #ffff00;">- knowledge ho!</span> : Guaranteed City Library on your next round!\n<span style="color: #ffff00;">- ducky</span> : Activate Rubber Ducky mode!\n<span style="color: #ffff00;">- dragon ho!</span> : Activate Dragon Ho! cheat\n<span style="color: #ffff00;">- gold rush ho!</span> : Auto-activate Gold Rush at 45 seconds!\n<span style="color: #ffff00;">- infinite round</span> : Make your next round have no time limit (Infinite Timer)!\n<span style="color: #ffff00;">- no org</span> : Remove Organizers for 1 round\n<span style="color: #ffff00;">- no meds</span> : Remove medication requirement for 1 round\n<span style="color: #ffff00;">- crazy ho!</span> : Immediately trigger 2x missed meds effects (Cheese Buildings & Cheese Monster active)!\n<span style="color: #ffff00;">- alex jones</span> : Leatherdaddy Frog sprites for everyone!\n<span style="color: #ffff00;">- chaos / chaos mode / chaos ho!</span> : Unlock Chaos Mode\n<span style="color: #ffff00;">- clear</span> : Clear terminal history\n<span style="color: #ffff00;">- help</span> : Display terminal command list`;
                         } else if (cmdLower === 'npesta') {
                             window.gdCubeUnlocked = true;
+                            window.npestaActivated = true;
                             localStorage.setItem('gdCubeUnlocked', 'true');
+                            localStorage.setItem('npestaActivated', 'true');
                             if (window.syncGDCubeVisibility) window.syncGDCubeVisibility();
                             if (window.soundManager) window.soundManager.playDingSFX();
-                            terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Geometry Dash Cube is now available as a selectable character!</span>`;
+                            terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Geometry Dash Cube & GD Face Timers are now activated!</span>`;
                         } else if (cmdLower === 'knowledge ho!' || cmdLower === 'knowledge ho' || cmdLower === 'knowledge_ho') {
                             window.knowledgeHoActive = true;
                             if (window.soundManager) window.soundManager.playAngelicChoirSFX();
@@ -349,12 +351,22 @@ function initUI() {
                         } else if (cmdLower === 'gold rush ho!' || cmdLower === 'gold rush ho' || cmdLower === 'gold rush') {
                             window.goldRushCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #ffd700; text-shadow: 0 0 5px #ffd700;">🏆 GOLD RUSH HO! Activated! Gold Rush will automatically trigger at 45 seconds into the round!</span>`;
+                        } else if (cmdLower === 'infinite round' || cmdLower === 'infinite round!' || cmdLower === 'infinite_round' || cmdLower === 'infiniteround' || cmdLower === 'infinite') {
+                            window.infiniteRoundCheat = true;
+                            if (window.soundManager) window.soundManager.playAngelicChoirSFX();
+                            terminalHistory.innerHTML += `\n<span style="color: #00ffff; text-shadow: 0 0 5px #00ffff;">♾️ INFINITE ROUND Activated! Your next round will have no time limit!</span>`;
                         } else if (cmdLower === 'no org' || cmdLower === 'no_org' || cmdLower === 'noorg') {
                             window.noOrgCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #ffaa00; text-shadow: 0 0 5px #ffaa00;">🚫 NO ORG Activated! Organizers removed for the next round!</span>`;
                         } else if (cmdLower === 'no meds' || cmdLower === 'no_meds' || cmdLower === 'nomeds') {
                             window.noMedsCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #00ffcc; text-shadow: 0 0 5px #00ffcc;">💊 NO MEDS Activated! Medication and sickness requirements removed for the next round!</span>`;
+                        } else if (cmdLower === 'crazy ho!' || cmdLower === 'crazy ho' || cmdLower === 'crazy_ho' || cmdLower === 'crazyho') {
+                            window.crazyHoCheat = true;
+                            if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+                                window.soundManager.playPsychosisSFX();
+                            }
+                            terminalHistory.innerHTML += `\n<span style="color: #ffcc00; text-shadow: 0 0 5px #ff8800;">🧀 CRAZY HO! Activated! Your next round will immediately start with 2x missed meds effects (Cheese Buildings & Cheese Monster chasing you)!</span>`;
                         } else if (cmdLower === 'alex jones' || cmdLower === 'alex_jones' || cmdLower === 'alexjones') {
                             window.alexJonesCheat = true;
                             terminalHistory.innerHTML += `\n<span style="color: #22c55e; text-shadow: 0 0 5px #22c55e;">🐸 ALEX JONES ACTIVATED! The water turned everyone into Leatherdaddy Frogs!</span>`;

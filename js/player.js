@@ -51,7 +51,8 @@ class Player {
     jump() {
         if (!this.isJumping && this.jumpHeight <= 0.01) {
             this.isJumping = true;
-            this.jumpVelocity = 5.6; // Upward jump velocity
+            const isGDCube = (this.spriteId === 'char7' || this.characterClass === 'char7');
+            this.jumpVelocity = isGDCube ? 6.4 : 5.6; // Crisp arcade jump velocity
             if (window.soundManager && typeof window.soundManager.playJumpSFX === 'function') {
                 window.soundManager.playJumpSFX();
             }
@@ -91,7 +92,9 @@ class Player {
         // Vertical jump physics update
         if (this.isJumping || this.jumpHeight > 0) {
             this.jumpHeight += this.jumpVelocity * 60 * dt;
-            this.jumpVelocity -= 26 * dt; // Gravity
+            const isGDCube = (this.spriteId === 'char7' || this.characterClass === 'char7');
+            const gravity = isGDCube ? 20.0 : 26.0; // GD arc allowing smooth jump clearance
+            this.jumpVelocity -= gravity * dt;
             if (this.jumpHeight <= 0) {
                 this.jumpHeight = 0;
                 this.jumpVelocity = 0;

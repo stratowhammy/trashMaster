@@ -111,6 +111,7 @@ class BaseMap {
         this.theme = 'default';
         this.roadDirections = [];
         this.speedChangers = [];
+        this.spikes = [];
     }
 
     getTileAttribute(x, y) {
@@ -297,12 +298,12 @@ class BaseMap {
             [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]];
         }
 
-        // Weighted distribution: 2x (green) and 0.5x (yellow) are abundant; 3x (pink) and 4x (red) are rare
+        // Even, rich distribution across all 4 Geometry Dash speed multipliers
         const weightedPool = [
-            'green',  'green',  'green',  'green',  'green',  'green',  'green',  'green',  'green',  'green',
-            'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow', 'yellow',
+            'yellow', 'yellow',
+            'green',  'green',
             'pink',   'pink',
-            'red'
+            'red',    'red'
         ];
 
         // Shuffle walkable tiles
@@ -330,7 +331,7 @@ class BaseMap {
             red: '4x'
         };
 
-        const count = Math.min(walkableTiles.length, 60);
+        const count = Math.min(walkableTiles.length, 100);
         let changerId = 1;
         for (let i = 0; i < count; i++) {
             const t = walkableTiles[i];
@@ -354,58 +355,181 @@ class BaseMap {
     ensureNearbySpeedChangers(spawnX, spawnY) {
         if (!this.speedChangers) this.speedChangers = [];
         
-        const hasNearbyGreen = this.speedChangers.some(ch => ch.type === 'green' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
         const hasNearbyYellow = this.speedChangers.some(ch => ch.type === 'yellow' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
+        const hasNearbyGreen = this.speedChangers.some(ch => ch.type === 'green' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
+        const hasNearbyPink = this.speedChangers.some(ch => ch.type === 'pink' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
+        const hasNearbyRed = this.speedChangers.some(ch => ch.type === 'red' && Math.abs(ch.tileX - spawnX) <= 8 && Math.abs(ch.tileY - spawnY) <= 8);
 
         const offsets = [
             { dx: 3, dy: 0 }, { dx: -3, dy: 0 }, { dx: 0, dy: 3 }, { dx: 0, dy: -3 },
-            { dx: 4, dy: 3 }, { dx: -4, dy: 3 }, { dx: 3, dy: -4 }, { dx: -3, dy: -4 }
+            { dx: 4, dy: 3 }, { dx: -4, dy: 3 }, { dx: 3, dy: -4 }, { dx: -4, dy: -4 },
+            { dx: 5, dy: 1 }, { dx: -5, dy: 1 }, { dx: 1, dy: 5 }, { dx: -1, dy: -5 }
         ];
 
         let changerId = this.speedChangers.length + 100;
 
-        if (!hasNearbyGreen) {
-            for (const off of offsets) {
+        const typesToEnsure = [];
+        if (!hasNearbyYellow) typesToEnsure.push({ type: 'yellow', mult: 0.5, sprite: 'speed_yellow', label: '0.5x' });
+        if (!hasNearbyGreen) typesToEnsure.push({ type: 'green', mult: 2.0, sprite: 'speed_green', label: '2x' });
+        if (!hasNearbyPink) typesToEnsure.push({ type: 'pink', mult: 3.0, sprite: 'speed_pink', label: '3x' });
+        if (!hasNearbyRed) typesToEnsure.push({ type: 'red', mult: 4.0, sprite: 'speed_red', label: '4x' });
+
+        let offsetIdx = 0;
+        for (const item of typesToEnsure) {
+            while (offsetIdx < offsets.length) {
+                const off = offsets[offsetIdx++];
                 const tx = wrapTileX(spawnX + off.dx);
                 const ty = wrapTileY(spawnY + off.dy);
                 const tile = this.getTile(tx, ty);
-                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.GRASS) {
+                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.GRASS || tile === TileType.PARK_PATH) {
                     this.speedChangers.unshift({
                         id: changerId++,
-                        type: 'green',
-                        speedMultiplier: 2.0,
-                        spriteKey: 'speed_green',
-                        label: '2x',
+                        type: item.type,
+                        speedMultiplier: item.mult,
+                        spriteKey: item.sprite,
+                        label: item.label,
                         tileX: tx,
                         tileY: ty,
                         x: tx * TILE_SIZE + TILE_SIZE / 2,
                         y: ty * TILE_SIZE + TILE_SIZE / 2,
                         size: 32,
-                        animOffset: 0
+                        animOffset: offsetIdx * 0.8
                     });
                     break;
                 }
             }
         }
+    }
 
-        if (!hasNearbyYellow) {
-            for (const off of offsets) {
-                const tx = wrapTileX(spawnX - off.dx);
-                const ty = wrapTileY(spawnY - off.dy);
+    _spawnSpikes() {
+        this.spikes = [];
+        const walkableTiles = [];
+
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                const tile = this.tiles[y] ? this.tiles[y][x] : null;
+                const attr = this.getTileAttribute(x, y);
+                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.PARK_PATH || attr === 'park tile') {
+                    if (tile !== TileType.BUILDING && tile !== TileType.LAKE) {
+                        walkableTiles.push({ x, y });
+                    }
+                }
+            }
+        }
+
+        // Shuffle walkable tiles
+        for (let i = walkableTiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]];
+        }
+
+        // Types of spike clusters: 1-spike, 2-spike, 3-spike, 4-spike (squeezed)
+        const clusterTypes = [
+            { count: 1, spacing: 0, squeezed: false, label: '1x Spike' },
+            { count: 2, spacing: 18, squeezed: false, label: '2x Double Spike' },
+            { count: 3, spacing: 16, squeezed: false, label: '3x TRIPLE SPIKE' },
+            { count: 4, spacing: 12, squeezed: true, label: '4x SQUEEZED QUAD SPIKE' }
+        ];
+
+        const totalClusters = Math.min(walkableTiles.length, 75);
+        let clusterId = 1;
+
+        for (let i = 0; i < totalClusters; i++) {
+            const t = walkableTiles[i];
+            const typeConfig = clusterTypes[i % clusterTypes.length];
+            const dir = Math.random() > 0.3 ? 'horizontal' : 'vertical'; // Mostly horizontal for running & jumping right
+            const cx = t.x * TILE_SIZE + TILE_SIZE / 2;
+            const cy = t.y * TILE_SIZE + TILE_SIZE / 2;
+
+            const clusterSpikes = [];
+            for (let s = 0; s < typeConfig.count; s++) {
+                const off = (s - (typeConfig.count - 1) / 2) * typeConfig.spacing;
+                const sx = dir === 'horizontal' ? (cx + off) : cx;
+                const sy = dir === 'horizontal' ? cy : (cy + off);
+                clusterSpikes.push({
+                    x: sx,
+                    y: sy,
+                    tileX: Math.floor(sx / TILE_SIZE),
+                    tileY: Math.floor(sy / TILE_SIZE),
+                    radius: typeConfig.squeezed ? 9 : 11
+                });
+            }
+
+            this.spikes.push({
+                id: clusterId++,
+                count: typeConfig.count,
+                squeezed: typeConfig.squeezed,
+                label: typeConfig.label,
+                dir: dir,
+                centerX: cx,
+                centerY: cy,
+                tileX: t.x,
+                tileY: t.y,
+                spikes: clusterSpikes
+            });
+        }
+    }
+
+    ensureNearbySpikes(spawnX, spawnY) {
+        if (!this.spikes) this.spikes = [];
+
+        const hasNearby1 = this.spikes.some(c => c.count === 1 && Math.abs(c.tileX - spawnX) <= 10 && Math.abs(c.tileY - spawnY) <= 10);
+        const hasNearby2 = this.spikes.some(c => c.count === 2 && Math.abs(c.tileX - spawnX) <= 10 && Math.abs(c.tileY - spawnY) <= 10);
+        const hasNearby3 = this.spikes.some(c => c.count === 3 && Math.abs(c.tileX - spawnX) <= 10 && Math.abs(c.tileY - spawnY) <= 10);
+        const hasNearby4 = this.spikes.some(c => c.count === 4 && Math.abs(c.tileX - spawnX) <= 10 && Math.abs(c.tileY - spawnY) <= 10);
+
+        const offsets = [
+            { dx: 4, dy: 1, dir: 'horizontal' },
+            { dx: 7, dy: 1, dir: 'horizontal' },
+            { dx: 11, dy: 1, dir: 'horizontal' },
+            { dx: 15, dy: 1, dir: 'horizontal' },
+            { dx: 4, dy: -2, dir: 'horizontal' },
+            { dx: 8, dy: -2, dir: 'horizontal' }
+        ];
+
+        const needed = [];
+        if (!hasNearby1) needed.push({ count: 1, spacing: 0, squeezed: false, label: '1x Spike' });
+        if (!hasNearby2) needed.push({ count: 2, spacing: 18, squeezed: false, label: '2x Double Spike' });
+        if (!hasNearby3) needed.push({ count: 3, spacing: 16, squeezed: false, label: '3x TRIPLE SPIKE' });
+        if (!hasNearby4) needed.push({ count: 4, spacing: 12, squeezed: true, label: '4x SQUEEZED QUAD SPIKE' });
+
+        let clusterId = this.spikes.length + 200;
+        let offIdx = 0;
+
+        for (const cfg of needed) {
+            while (offIdx < offsets.length) {
+                const off = offsets[offIdx++];
+                const tx = wrapTileX(spawnX + off.dx);
+                const ty = wrapTileY(spawnY + off.dy);
                 const tile = this.getTile(tx, ty);
-                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.GRASS) {
-                    this.speedChangers.unshift({
-                        id: changerId++,
-                        type: 'yellow',
-                        speedMultiplier: 0.5,
-                        spriteKey: 'speed_yellow',
-                        label: '0.5x',
+                if (tile === TileType.SIDEWALK || tile === TileType.ROAD || tile === TileType.CROSSWALK || tile === TileType.PARK_PATH) {
+                    const cx = tx * TILE_SIZE + TILE_SIZE / 2;
+                    const cy = ty * TILE_SIZE + TILE_SIZE / 2;
+                    const clusterSpikes = [];
+                    for (let s = 0; s < cfg.count; s++) {
+                        const sOff = (s - (cfg.count - 1) / 2) * cfg.spacing;
+                        const sx = off.dir === 'horizontal' ? (cx + sOff) : cx;
+                        const sy = off.dir === 'horizontal' ? cy : (cy + sOff);
+                        clusterSpikes.push({
+                            x: sx,
+                            y: sy,
+                            tileX: Math.floor(sx / TILE_SIZE),
+                            tileY: Math.floor(sy / TILE_SIZE),
+                            radius: cfg.squeezed ? 12 : 14
+                        });
+                    }
+
+                    this.spikes.unshift({
+                        id: clusterId++,
+                        count: cfg.count,
+                        squeezed: cfg.squeezed,
+                        label: cfg.label,
+                        dir: off.dir,
+                        centerX: cx,
+                        centerY: cy,
                         tileX: tx,
                         tileY: ty,
-                        x: tx * TILE_SIZE + TILE_SIZE / 2,
-                        y: ty * TILE_SIZE + TILE_SIZE / 2,
-                        size: 32,
-                        animOffset: 1.5
+                        spikes: clusterSpikes
                     });
                     break;
                 }
@@ -419,6 +543,7 @@ class BaseMap {
         this._spawnTrees();
         this._spawnShrooms();
         this._spawnSpeedChangers();
+        this._spawnSpikes();
     }
 
     _placeProceduralBuildings() {
@@ -1206,6 +1331,52 @@ class BaseMap {
                     ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
                     break;
                 }
+
+                // 🧀 CHEESE PSYCHOSIS: All buildings turned to Swiss / Cheddar Cheese!
+                if (window.game && window.game.medsMissedCount >= 2) {
+                    // Golden Cheddar Base
+                    ctx.fillStyle = '#ffb703';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#d97706';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(sx + 0.5, sy + 0.5, s - 1, s - 1);
+
+                    // Swiss cheese holes
+                    const seed = (tx * 19 + ty * 37);
+                    const holes = [
+                        { hx: 6 + (seed % 8), hy: 6 + ((seed * 3) % 8), r: 4 + (seed % 3) },
+                        { hx: 20 + ((seed * 7) % 6), hy: 18 + ((seed * 5) % 6), r: 5 + ((seed * 2) % 3) },
+                        { hx: 10 + ((seed * 11) % 6), hy: 24 + ((seed * 13) % 4), r: 3 + (seed % 2) }
+                    ];
+                    for (const h of holes) {
+                        ctx.fillStyle = '#b45309';
+                        ctx.beginPath();
+                        ctx.arc(sx + h.hx, sy + h.hy, h.r, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#92400e';
+                        ctx.beginPath();
+                        ctx.arc(sx + h.hx + 0.5, sy + h.hy + 0.5, Math.max(1, h.r - 1.5), 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#fef08a';
+                        ctx.beginPath();
+                        ctx.arc(sx + h.hx + 1, sy + h.hy + 1, Math.max(1, h.r - 2.5), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Check if player took bites of this cheese building tile
+                    if (this.cheeseBites && this.cheeseBites.has(`${tx},${ty}`)) {
+                        const biteCount = Math.min(5, this.cheeseBites.get(`${tx},${ty}`));
+                        ctx.fillStyle = '#78350f';
+                        for (let b = 0; b < biteCount; b++) {
+                            const bx = sx + 5 + (b * 5);
+                            const by = sy + 5 + ((b * 7) % 18);
+                            ctx.beginPath();
+                            ctx.arc(bx, by, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                    break;
+                }
                 
                 if (window.crimeMode && bldg) {
                     if (bldg.id === 0) {
@@ -1264,6 +1435,29 @@ class BaseMap {
                     ctx.strokeStyle = '#7a6548'; ctx.lineWidth = 1; ctx.strokeRect(sx,sy,s,s);
                     break;
                 }
+
+                // 🧀 Cheese Door in Cheese Psychosis mode
+                if (window.game && window.game.medsMissedCount >= 2) {
+                    const isOpen = bldg2 && this.openDoors.has(bldg2.id);
+                    ctx.fillStyle = isOpen ? '#111111' : '#fb8500';
+                    ctx.fillRect(sx, sy, s, s);
+                    ctx.strokeStyle = '#d97706';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+                    if (!isOpen) {
+                        ctx.fillStyle = '#fef08a';
+                        ctx.beginPath();
+                        ctx.arc(sx + s - 14, sy + s / 2, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#78350f';
+                        ctx.font = 'bold 6px "Press Start 2P", monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('🧀 CHEESE', sx + s/2, sy + s/2 - 2);
+                        ctx.fillText('DOOR', sx + s/2, sy + s/2 + 7);
+                    }
+                    break;
+                }
+
                 const isOpen = bldg2 && this.openDoors.has(bldg2.id);
                 if (isOpen) {
                     ctx.fillStyle = '#111111';

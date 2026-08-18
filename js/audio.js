@@ -860,6 +860,29 @@ class SoundManager {
         }
     }
 
+    startDragonFireLoop() {
+        if (this.dragonFireInterval) return; // already looping
+        this._loadDragonFireAudio();
+        this.playDragonFireSFX();
+        this.dragonFireInterval = setInterval(() => {
+            if (this.isMuted || this.sfxMuted) return;
+            this.playDragonFireSFX();
+        }, 1450);
+    }
+
+    stopDragonFireLoop() {
+        if (this.dragonFireInterval) {
+            clearInterval(this.dragonFireInterval);
+            this.dragonFireInterval = null;
+        }
+        if (this.dragonFireHtmlAudio) {
+            try {
+                this.dragonFireHtmlAudio.pause();
+                this.dragonFireHtmlAudio.currentTime = 0;
+            } catch (e) {}
+        }
+    }
+
     startEarPiercingLoop() {
         if (this.isMuted) return;
         if (!this.isSFXEnabled('ear_piercing')) return;

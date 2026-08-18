@@ -706,16 +706,21 @@ class Game {
                             if (typeof window.soundManager.startWawaweLoop === 'function') {
                                 window.soundManager.startWawaweLoop();
                             }
-                            if (typeof window.soundManager.playDragonFireSFX === 'function') {
-                                window.soundManager.playDragonFireSFX();
+                            if (typeof window.soundManager.startDragonFireLoop === 'function') {
+                                window.soundManager.startDragonFireLoop();
                             }
                         }
                         if (this.hud) {
                             this.hud.showFollowerNotification('🌀 CRAZY TWIST! 🐲 DRAGON FIRE & WAWAWE! (Press 4 to toggle normal) 🔥🌪️', true);
                         }
                     } else {
-                        if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
-                            window.soundManager.stopWawaweLoop();
+                        if (window.soundManager) {
+                            if (typeof window.soundManager.stopWawaweLoop === 'function') {
+                                window.soundManager.stopWawaweLoop();
+                            }
+                            if (typeof window.soundManager.stopDragonFireLoop === 'function') {
+                                window.soundManager.stopDragonFireLoop();
+                            }
                         }
                         const vp = document.getElementById('game-viewport');
                         if (vp) {
@@ -4457,6 +4462,9 @@ class Game {
         if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
             window.soundManager.stopWawaweLoop();
         }
+        if (window.soundManager && typeof window.soundManager.stopDragonFireLoop === 'function') {
+            window.soundManager.stopDragonFireLoop();
+        }
 
         // Check if "no meds" cheat was typed in the Store Terminal (removes meds requirement for just 1 round)
         if (window.noMedsCheat) {
@@ -4834,6 +4842,9 @@ class Game {
         if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
             window.soundManager.stopWawaweLoop();
         }
+        if (window.soundManager && typeof window.soundManager.stopDragonFireLoop === 'function') {
+            window.soundManager.stopDragonFireLoop();
+        }
         const vp = document.getElementById('game-viewport');
         if (vp) {
             vp.style.filter = '';
@@ -4904,6 +4915,9 @@ class Game {
             this.crazyTwistMode = false;
             if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
                 window.soundManager.stopWawaweLoop();
+            }
+            if (window.soundManager && typeof window.soundManager.stopDragonFireLoop === 'function') {
+                window.soundManager.stopDragonFireLoop();
             }
             const vp = document.getElementById('game-viewport');
             if (vp) {
@@ -5072,6 +5086,9 @@ class Game {
         this.crazyTwistMode = false;
         if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
             window.soundManager.stopWawaweLoop();
+        }
+        if (window.soundManager && typeof window.soundManager.stopDragonFireLoop === 'function') {
+            window.soundManager.stopDragonFireLoop();
         }
         const vp = document.getElementById('game-viewport');
         if (vp) {

@@ -30,7 +30,8 @@ class SoundManager {
             cash: true,
             choir: true,
             dialog: true,
-            ear_piercing: true
+            ear_piercing: true,
+            crazy_twist: (typeof localStorage !== 'undefined' ? localStorage.getItem('sfx_crazy_twist') !== 'false' : true)
         };
 
         this.NOTES = {
@@ -104,19 +105,32 @@ class SoundManager {
     // ── SFX Toggles Controls ──
     setSFXToggle(key, enabled) {
         this.sfxToggles[key] = !!enabled;
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(`sfx_${key}`, enabled ? 'true' : 'false');
+        }
         // If ear-piercing is disabled while it's actively playing, stop it immediately
         if (key === 'ear_piercing' && !enabled && this.earPiercingGain) {
             this.stopEarPiercingLoop();
+        }
+        // If crazy twist sound ('4') is disabled, stop loops immediately
+        if (key === 'crazy_twist' && !enabled) {
+            this.stopWawaweLoop();
+            this.stopDragonFireLoop();
         }
     }
 
     setAllSFXToggles(enabled) {
         for (const k in this.sfxToggles) {
             this.sfxToggles[k] = !!enabled;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(`sfx_${k}`, enabled ? 'true' : 'false');
+            }
         }
-        // If all SFX are disabled and ear-piercing is playing, stop it
-        if (!enabled && this.earPiercingGain) {
-            this.stopEarPiercingLoop();
+        // If all SFX are disabled and loops are playing, stop them
+        if (!enabled) {
+            if (this.earPiercingGain) this.stopEarPiercingLoop();
+            this.stopWawaweLoop();
+            this.stopDragonFireLoop();
         }
     }
 
@@ -708,7 +722,7 @@ class SoundManager {
     }
 
     playWawaweSFX() {
-        if (this.isMuted || this.sfxMuted) return;
+        if (!this.isSFXEnabled('crazy_twist')) return;
         if (!this.ctx) this._initAudio();
 
         // 1. Play decoded human choir voice buffer with boosted volume
@@ -748,11 +762,12 @@ class SoundManager {
     }
 
     startWawaweLoop() {
+        if (!this.isSFXEnabled('crazy_twist')) return;
         if (this.wawaweInterval) return; // already looping
         this._loadWawaweAudio();
         this.playWawaweSFX();
         this.wawaweInterval = setInterval(() => {
-            if (this.isMuted || this.sfxMuted) return;
+            if (!this.isSFXEnabled('crazy_twist')) return;
             this.playWawaweSFX();
         }, 950);
     }
@@ -792,7 +807,7 @@ class SoundManager {
     }
 
     playDragonFireSFX() {
-        if (this.isMuted || this.sfxMuted) return;
+        if (!this.isSFXEnabled('crazy_twist')) return;
         if (!this.ctx) this._initAudio();
 
         // 1. Play master dragon fire audio buffer
@@ -861,11 +876,12 @@ class SoundManager {
     }
 
     startDragonFireLoop() {
+        if (!this.isSFXEnabled('crazy_twist')) return;
         if (this.dragonFireInterval) return; // already looping
         this._loadDragonFireAudio();
         this.playDragonFireSFX();
         this.dragonFireInterval = setInterval(() => {
-            if (this.isMuted || this.sfxMuted) return;
+            if (!this.isSFXEnabled('crazy_twist')) return;
             this.playDragonFireSFX();
         }, 1450);
     }

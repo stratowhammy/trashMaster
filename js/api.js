@@ -390,6 +390,20 @@ function initUI() {
                             window.chaosCheatActive = true;
                             updateModeToggles();
                             terminalHistory.innerHTML += `\n<span style="color: #ff0055; text-shadow: 0 0 3px #ff0055;">Chaos Mode Unlocked for this round! Check the toggle.</span>`;
+                        } else if (cmdLower === 'mute 4' || cmdLower === 'no 4 sound' || cmdLower === 'mute 4 sound' || cmdLower === 'stop 4 sound') {
+                            if (window.soundManager) {
+                                window.soundManager.setSFXToggle('crazy_twist', false);
+                            }
+                            const chk = document.getElementById('sfx-crazy-twist');
+                            if (chk) chk.checked = false;
+                            terminalHistory.innerHTML += `\n<span style="color: #ffd700;">🔇 '4' Key Sound (Choir & Dragon Fire) has been MUTED.</span>`;
+                        } else if (cmdLower === 'unmute 4' || cmdLower === '4 sound on' || cmdLower === 'enable 4 sound') {
+                            if (window.soundManager) {
+                                window.soundManager.setSFXToggle('crazy_twist', true);
+                            }
+                            const chk = document.getElementById('sfx-crazy-twist');
+                            if (chk) chk.checked = true;
+                            terminalHistory.innerHTML += `\n<span style="color: #00ff99;">🔊 '4' Key Sound (Choir & Dragon Fire) has been UNMUTED.</span>`;
                         } else if (cmdLower === 'clear') {
                             terminalHistory.innerHTML = 'Ready.';
                         } else if (cmdLower === 'help' || cmdLower === 'commands') {
@@ -739,7 +753,7 @@ function initUI() {
     const btnSfxAllOn = document.getElementById('btn-sfx-all-on');
     const btnSfxAllOff = document.getElementById('btn-sfx-all-off');
 
-    const sfxKeys = ['click', 'trash', 'splat', 'ding', 'handshake', 'gunshot', 'cash', 'choir', 'dialog', 'ear-piercing'];
+    const sfxKeys = ['click', 'trash', 'splat', 'ding', 'handshake', 'gunshot', 'cash', 'choir', 'dialog', 'ear-piercing', 'crazy-twist'];
 
     const syncSoundOptionsUI = () => {
         if (soundtrackSelect && window.soundManager) {

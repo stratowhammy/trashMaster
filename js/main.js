@@ -701,14 +701,17 @@ class Game {
                 // 4 key: Toggle Crazy Twist Mode (Press again to return to normal)
                 if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
                     this.crazyTwistMode = !this.crazyTwistMode;
-                    if (window.soundManager && typeof window.soundManager.playWawaweSFX === 'function') {
-                        window.soundManager.playWawaweSFX();
-                    }
                     if (this.crazyTwistMode) {
+                        if (window.soundManager && typeof window.soundManager.startWawaweLoop === 'function') {
+                            window.soundManager.startWawaweLoop();
+                        }
                         if (this.hud) {
                             this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! WAWAWE! (Press 4 to toggle normal) 🌪️', true);
                         }
                     } else {
+                        if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
+                            window.soundManager.stopWawaweLoop();
+                        }
                         const vp = document.getElementById('game-viewport');
                         if (vp) {
                             vp.style.filter = '';
@@ -4446,6 +4449,9 @@ class Game {
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
         }
+        if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
+            window.soundManager.stopWawaweLoop();
+        }
 
         // Check if "no meds" cheat was typed in the Store Terminal (removes meds requirement for just 1 round)
         if (window.noMedsCheat) {
@@ -4820,6 +4826,9 @@ class Game {
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
         }
+        if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
+            window.soundManager.stopWawaweLoop();
+        }
         const vp = document.getElementById('game-viewport');
         if (vp) {
             vp.style.filter = '';
@@ -4888,6 +4897,9 @@ class Game {
             }
             this.doubleTrashPickup = false;
             this.crazyTwistMode = false;
+            if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
+                window.soundManager.stopWawaweLoop();
+            }
             const vp = document.getElementById('game-viewport');
             if (vp) {
                 vp.style.filter = '';
@@ -5053,6 +5065,9 @@ class Game {
         this.medsMissed = false;
         this.medicationAlertActive = false;
         this.crazyTwistMode = false;
+        if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
+            window.soundManager.stopWawaweLoop();
+        }
         const vp = document.getElementById('game-viewport');
         if (vp) {
             vp.style.filter = '';

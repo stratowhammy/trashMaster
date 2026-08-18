@@ -764,6 +764,22 @@ class SoundManager {
         playWe(now + 0.34, 0.30, 440, 820, 0.45);
     }
 
+    startWawaweLoop() {
+        if (this.wawaweInterval) return; // already looping
+        this.playWawaweSFX();
+        this.wawaweInterval = setInterval(() => {
+            if (this.isMuted || this.sfxMuted) return;
+            this.playWawaweSFX();
+        }, 700);
+    }
+
+    stopWawaweLoop() {
+        if (this.wawaweInterval) {
+            clearInterval(this.wawaweInterval);
+            this.wawaweInterval = null;
+        }
+    }
+
     startEarPiercingLoop() {
         if (this.isMuted) return;
         if (!this.isSFXEnabled('ear_piercing')) return;

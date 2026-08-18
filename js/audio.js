@@ -693,7 +693,7 @@ class SoundManager {
     _loadWawaweAudio() {
         if (this.wawaweAudioBuffer || this._loadingWawawe) return;
         this._loadingWawawe = true;
-        fetch('assets/audio/wawawe.wav')
+        fetch('assets/audio/wawawe.wav?v=2')
             .then(res => res.arrayBuffer())
             .then(buf => {
                 if (!this.ctx) this._initAudio();
@@ -710,13 +710,13 @@ class SoundManager {
         if (this.isMuted || this.sfxMuted) return;
         if (!this.ctx) this._initAudio();
 
-        // 1. Play decoded real human voice buffer with boosted volume
+        // 1. Play decoded human choir voice buffer with boosted volume
         if (this.ctx && this.wawaweAudioBuffer) {
             try {
                 const source = this.ctx.createBufferSource();
                 source.buffer = this.wawaweAudioBuffer;
                 const gain = this.ctx.createGain();
-                gain.gain.value = 1.4; // loud and clear human voice
+                gain.gain.value = 1.5; // grand, resonant human choir volume
                 source.connect(gain);
                 gain.connect(this.masterGain);
                 source.start(this.ctx.currentTime);
@@ -727,7 +727,7 @@ class SoundManager {
         // 2. Play via HTML5 Audio element
         try {
             if (!this.wawaweHtmlAudio) {
-                this.wawaweHtmlAudio = new Audio('assets/audio/wawawe.wav');
+                this.wawaweHtmlAudio = new Audio('assets/audio/wawawe.wav?v=2');
             }
             this.wawaweHtmlAudio.currentTime = 0;
             this.wawaweHtmlAudio.volume = Math.min(1.0, this.volume * 3.5);
@@ -753,7 +753,7 @@ class SoundManager {
         this.wawaweInterval = setInterval(() => {
             if (this.isMuted || this.sfxMuted) return;
             this.playWawaweSFX();
-        }, 650);
+        }, 950);
     }
 
     stopWawaweLoop() {

@@ -69,7 +69,7 @@ class HUD {
     }
 
     getGDFaceInfo(trashCount) {
-        const isNpesta = !!(window.npestaActivated || (typeof localStorage !== 'undefined' && localStorage.getItem('npestaActivated') === 'true'));
+        const isNpesta = !!(window.npestaActivated || (this.game && this.game.player && (this.game.player.spriteId === 'char7' || this.game.player.characterClass === 'char7')));
         if (!isNpesta) return null;
 
         // With npesta activated: countdown extends to 10 pieces.
@@ -265,7 +265,7 @@ class HUD {
         ctx.restore();
 
         // Next follower progress & trash countdown
-        const isNpesta = window.gdCubeUnlocked || localStorage.getItem('gdCubeUnlocked') === 'true';
+        const isNpesta = !!(window.npestaActivated || (this.game && this.game.player && (this.game.player.spriteId === 'char7' || this.game.player.characterClass === 'char7')));
         const evalTime = Math.ceil(this.evalTimer || 0);
         const evalTrash = this.trashInWindow || 0;
         const gdFace = this.getGDFaceInfo(evalTrash);
@@ -992,7 +992,7 @@ class HUD {
         ctx.textAlign = 'right';
         ctx.fillText(`TRASH:${totalRoundTrash}`, currX + p1W - 8, panelY + 44);
 
-        const isNpesta = window.gdCubeUnlocked || localStorage.getItem('gdCubeUnlocked') === 'true';
+        const isNpesta = !!(window.npestaActivated || (game && game.player && (game.player.spriteId === 'char7' || game.player.characterClass === 'char7')));
         const gdFace = this.getGDFaceInfo(evalTrash);
 
         if (gdFace) {

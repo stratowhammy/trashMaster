@@ -560,8 +560,8 @@ class Engine3D {
         const totalRoundTrash = (this.game.trashCollectedInRound !== undefined) ? this.game.trashCollectedInRound : 0;
         const trashInWindow = (this.game.trashCollectedInWindow !== undefined) ? this.game.trashCollectedInWindow : (hud.trashInWindow || 0);
         const evalTime = Math.ceil(hud.evalTimer || 0);
-        const isNpesta = !!(window.npestaActivated || (typeof localStorage !== 'undefined' && localStorage.getItem('npestaActivated') === 'true'));
-        const gdFace = hud.getGDFaceInfo ? hud.getGDFaceInfo(trashInWindow) : null;
+        const isNpesta = !!(window.npestaActivated || (this.game && this.game.player && (this.game.player.spriteId === 'char7' || this.game.player.characterClass === 'char7')));
+        const gdFace = isNpesta && hud.getGDFaceInfo ? hud.getGDFaceInfo(trashInWindow) : null;
 
         ctx.fillStyle = '#38bdf8';
         ctx.font = '7.5px "Press Start 2P", monospace';

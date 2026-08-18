@@ -3719,7 +3719,7 @@ class Game {
         this.followerCheckTimer += dt;
         if (this.followerCheckTimer >= 10) {
             this.followerCheckTimer -= 10;
-            const isNpesta = window.gdCubeUnlocked || localStorage.getItem('gdCubeUnlocked') === 'true';
+            const isNpesta = !!(window.npestaActivated || (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')));
             const quota = isNpesta ? 10 : 7;
             const lossThreshold = isNpesta ? 7 : 5;
             const baseFollowers = (window.playerHasTruck ? (window.playerHasTruck * 2) : 0) + (window.employeesHired || 0);
@@ -4827,6 +4827,34 @@ class Game {
         window.travelDestination = null;
         window.customMapData = null;
 
+        // Reset Nepesta / GD Cube mode at end of 1 round
+        if (window.npestaActivated || window.gdCubeUnlocked || (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7'))) {
+            window.npestaActivated = false;
+            window.gdCubeUnlocked = false;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('npestaActivated');
+                localStorage.removeItem('gdCubeUnlocked');
+            }
+            const revertSprite = window.preNpestaSprite || 'char0';
+            window.preNpestaSprite = null;
+            if (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')) {
+                this.player.spriteId = revertSprite;
+                this.player.characterClass = revertSprite;
+            }
+            window.chosenSprite = revertSprite;
+            window.playerChosenSprite = revertSprite;
+            window.playerSprite = revertSprite;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('playerSprite', revertSprite);
+            }
+            if (window.apiCall) {
+                window.apiCall('/api/game/set-chosen-sprite', 'POST', { sprite_id: revertSprite }).catch(() => {});
+            }
+            if (typeof window.syncGDCubeVisibility === 'function') {
+                window.syncGDCubeVisibility();
+            }
+        }
+
         const chaosToggle = document.getElementById('chaos-toggle');
         if (chaosToggle) chaosToggle.checked = false;
 
@@ -4953,6 +4981,35 @@ class Game {
             window.chaosMode = false;
             window.knowledgeHoActive = false;
             this.knowledgeHoActive = false;
+
+            // Reset Nepesta / GD Cube mode at end of 1 round
+            if (window.npestaActivated || window.gdCubeUnlocked || (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7'))) {
+                window.npestaActivated = false;
+                window.gdCubeUnlocked = false;
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem('npestaActivated');
+                    localStorage.removeItem('gdCubeUnlocked');
+                }
+                const revertSprite = window.preNpestaSprite || 'char0';
+                window.preNpestaSprite = null;
+                if (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')) {
+                    this.player.spriteId = revertSprite;
+                    this.player.characterClass = revertSprite;
+                }
+                window.chosenSprite = revertSprite;
+                window.playerChosenSprite = revertSprite;
+                window.playerSprite = revertSprite;
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('playerSprite', revertSprite);
+                }
+                if (window.apiCall) {
+                    window.apiCall('/api/game/set-chosen-sprite', 'POST', { sprite_id: revertSprite }).catch(() => {});
+                }
+                if (typeof window.syncGDCubeVisibility === 'function') {
+                    window.syncGDCubeVisibility();
+                }
+            }
+
             const chaosToggle = document.getElementById('chaos-toggle');
             if (chaosToggle) chaosToggle.checked = false;
             if (result && result.today_games_count !== undefined) {
@@ -5114,6 +5171,28 @@ class Game {
         if (window.soundManager && typeof window.soundManager.stopDragonFireLoop === 'function') {
             window.soundManager.stopDragonFireLoop();
         }
+
+        // Reset Nepesta / GD Cube mode
+        if (window.npestaActivated || window.gdCubeUnlocked) {
+            window.npestaActivated = false;
+            window.gdCubeUnlocked = false;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('npestaActivated');
+                localStorage.removeItem('gdCubeUnlocked');
+            }
+            const revertSprite = window.preNpestaSprite || 'char0';
+            window.preNpestaSprite = null;
+            window.chosenSprite = revertSprite;
+            window.playerChosenSprite = revertSprite;
+            window.playerSprite = revertSprite;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('playerSprite', revertSprite);
+            }
+            if (typeof window.syncGDCubeVisibility === 'function') {
+                window.syncGDCubeVisibility();
+            }
+        }
+
         const vp = document.getElementById('game-viewport');
         if (vp) {
             vp.style.filter = '';

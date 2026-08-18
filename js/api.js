@@ -333,8 +333,10 @@ function initUI() {
                         } else if (cmdLower === 'npesta') {
                             window.gdCubeUnlocked = true;
                             window.npestaActivated = true;
-                            localStorage.setItem('gdCubeUnlocked', 'true');
-                            localStorage.setItem('npestaActivated', 'true');
+                            // Save pre-npesta sprite to cleanly revert back after 1 round
+                            if (!window.preNpestaSprite) {
+                                window.preNpestaSprite = window.chosenSprite || window.playerChosenSprite || (window.game && window.game.player && window.game.player.spriteId !== 'char7' ? window.game.player.spriteId : 'char0');
+                            }
                             if (window.syncGDCubeVisibility) window.syncGDCubeVisibility();
                             if (window.soundManager) window.soundManager.playDingSFX();
 
@@ -348,9 +350,9 @@ function initUI() {
                                     window.game.player.characterClass = 'char7';
                                 }
                                 apiCall('/api/game/set-chosen-sprite', 'POST', { sprite_id: 'char7' }).catch(console.error);
-                                terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Trash Truck owner detected: Player sprite automatically changed to GD CUBE! 🟩</span>`;
+                                terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED (1 ROUND)! Trash Truck owner detected: Player sprite automatically changed to GD CUBE! 🟩</span>`;
                             } else {
-                                terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Geometry Dash Cube & GD Face Timers are now activated!</span>`;
+                                terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED (1 ROUND)! Geometry Dash Cube & GD Face Timers activated for 1 round!</span>`;
                             }
                         } else if (cmdLower === 'knowledge ho!' || cmdLower === 'knowledge ho' || cmdLower === 'knowledge_ho') {
                             window.knowledgeHoActive = true;

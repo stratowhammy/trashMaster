@@ -698,15 +698,25 @@ class Game {
                     this._rangerTryCaptureAnimal();
                 }
 
-                // 4 key: Activate Crazy Twist Mode until end of round
+                // 4 key: Toggle Crazy Twist Mode (Press again to return to normal)
                 if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
-                    if (!this.crazyTwistMode) {
-                        this.crazyTwistMode = true;
+                    this.crazyTwistMode = !this.crazyTwistMode;
+                    if (this.crazyTwistMode) {
                         if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
                             window.soundManager.playPsychosisSFX();
                         }
                         if (this.hud) {
-                            this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! Everything is going crazy and twisting until round end! 🌪️', true);
+                            this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! Everything is going crazy and twisting! (Press 4 to toggle normal) 🌪️', true);
+                        }
+                    } else {
+                        const vp = document.getElementById('game-viewport');
+                        if (vp) {
+                            vp.style.filter = '';
+                            vp.style.transform = '';
+                            vp.style.transformOrigin = '';
+                        }
+                        if (this.hud) {
+                            this.hud.showFollowerNotification('✨ Back to normal!', true);
                         }
                     }
                 }

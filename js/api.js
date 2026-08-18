@@ -337,7 +337,21 @@ function initUI() {
                             localStorage.setItem('npestaActivated', 'true');
                             if (window.syncGDCubeVisibility) window.syncGDCubeVisibility();
                             if (window.soundManager) window.soundManager.playDingSFX();
-                            terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Geometry Dash Cube & GD Face Timers are now activated!</span>`;
+
+                            // If a user with a trash truck activated 'npesta' in the terminal, replace their sprite with the GD cube sprite automatically
+                            const hasTrashTruck = (window.playerHasTruck && window.playerHasTruck > 0) || (playerHasTruck && playerHasTruck > 0);
+                            if (hasTrashTruck) {
+                                window.chosenSprite = 'char7';
+                                window.playerChosenSprite = 'char7';
+                                if (window.game && window.game.player) {
+                                    window.game.player.spriteId = 'char7';
+                                    window.game.player.characterClass = 'char7';
+                                }
+                                apiCall('/api/game/set-chosen-sprite', 'POST', { sprite_id: 'char7' }).catch(console.error);
+                                terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Trash Truck owner detected: Player sprite automatically changed to GD CUBE! 🟩</span>`;
+                            } else {
+                                terminalHistory.innerHTML += `\n<span style="color: #00ff99; text-shadow: 0 0 5px #00ff99;">🟩 NPESTA SPEEDRUN UNLOCKED! Geometry Dash Cube & GD Face Timers are now activated!</span>`;
+                            }
                         } else if (cmdLower === 'knowledge ho!' || cmdLower === 'knowledge ho' || cmdLower === 'knowledge_ho') {
                             window.knowledgeHoActive = true;
                             if (window.soundManager) window.soundManager.playAngelicChoirSFX();

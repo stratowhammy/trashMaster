@@ -44,6 +44,7 @@ class SoundManager {
         };
 
         this._initUserEvents();
+        this._loadWawaweAudio();
     }
 
     _initAudio() {
@@ -689,114 +690,87 @@ class SoundManager {
         osc2.stop(now + 0.85);
     }
 
+    _loadWawaweAudio() {
+        if (this.wawaweAudioBuffer || this._loadingWawawe) return;
+        this._loadingWawawe = true;
+        fetch('assets/audio/wawawe.wav')
+            .then(res => res.arrayBuffer())
+            .then(buf => {
+                if (!this.ctx) this._initAudio();
+                if (this.ctx) {
+                    this.ctx.decodeAudioData(buf, (decoded) => {
+                        this.wawaweAudioBuffer = decoded;
+                    }, () => {});
+                }
+            })
+            .catch(() => {});
+    }
+
     playWawaweSFX() {
         if (this.isMuted || this.sfxMuted) return;
         if (!this.ctx) this._initAudio();
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
 
-        // --- Syllable: "Wa" with speech-formant sweep & boosted harmonics ---
-        const playWa = (startTime, dur, baseFreq, targetFreq, fStart, fEnd, vol) => {
-            const osc = this.ctx.createOscillator();
-            const oscSub = this.ctx.createOscillator();
-            const filter = this.ctx.createBiquadFilter();
-            const gain = this.ctx.createGain();
+        // 1. Play decoded real human voice buffer with boosted volume
+        if (this.ctx && this.wawaweAudioBuffer) {
+            try {
+                const source = this.ctx.createBufferSource();
+                source.buffer = this.wawaweAudioBuffer;
+                const gain = this.ctx.createGain();
+                gain.gain.value = 1.4; // loud and clear human voice
+                source.connect(gain);
+                gain.connect(this.masterGain);
+                source.start(this.ctx.currentTime);
+                return;
+            } catch (e) {}
+        }
 
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(baseFreq, startTime);
-            osc.frequency.exponentialRampToValueAtTime(targetFreq, startTime + dur * 0.5);
-            osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.88, startTime + dur);
+        // 2. Play via HTML5 Audio element
+        try {
+            if (!this.wawaweHtmlAudio) {
+                this.wawaweHtmlAudio = new Audio('assets/audio/wawawe.wav');
+            }
+            this.wawaweHtmlAudio.currentTime = 0;
+            this.wawaweHtmlAudio.volume = Math.min(1.0, this.volume * 3.5);
+            this.wawaweHtmlAudio.play().catch(() => {});
+        } catch (e) {}
 
-            oscSub.type = 'sine';
-            oscSub.frequency.setValueAtTime(baseFreq, startTime);
-            oscSub.frequency.exponentialRampToValueAtTime(targetFreq, startTime + dur * 0.5);
-            oscSub.frequency.exponentialRampToValueAtTime(baseFreq * 0.88, startTime + dur);
-
-            // Formant Wah sweep with boosted peaking resonance
-            filter.type = 'peaking';
-            filter.gain.setValueAtTime(12, startTime);
-            filter.Q.setValueAtTime(3.5, startTime);
-            filter.frequency.setValueAtTime(fStart, startTime);
-            filter.frequency.exponentialRampToValueAtTime(fEnd, startTime + dur * 0.6);
-            filter.frequency.exponentialRampToValueAtTime(fStart * 1.1, startTime + dur);
-
-            gain.gain.setValueAtTime(0.001, startTime);
-            gain.gain.linearRampToValueAtTime(vol, startTime + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
-
-            osc.connect(filter);
-            oscSub.connect(gain);
-            filter.connect(gain);
-            gain.connect(this.masterGain);
-
-            osc.start(startTime);
-            oscSub.start(startTime);
-            osc.stop(startTime + dur);
-            oscSub.stop(startTime + dur);
-        };
-
-        // --- Syllable: "We!" with loud bright upward squeak ---
-        const playWe = (startTime, dur, baseFreq, targetFreq, vol) => {
-            const osc = this.ctx.createOscillator();
-            const oscTone = this.ctx.createOscillator();
-            const filter = this.ctx.createBiquadFilter();
-            const gain = this.ctx.createGain();
-
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(baseFreq, startTime);
-            osc.frequency.exponentialRampToValueAtTime(targetFreq, startTime + dur * 0.65);
-            osc.frequency.exponentialRampToValueAtTime(targetFreq * 1.12, startTime + dur);
-
-            oscTone.type = 'sine';
-            oscTone.frequency.setValueAtTime(baseFreq, startTime);
-            oscTone.frequency.exponentialRampToValueAtTime(targetFreq, startTime + dur * 0.65);
-            oscTone.frequency.exponentialRampToValueAtTime(targetFreq * 1.12, startTime + dur);
-
-            // "EE" formant filter (high, bright resonance)
-            filter.type = 'peaking';
-            filter.gain.setValueAtTime(14, startTime);
-            filter.Q.setValueAtTime(4.2, startTime);
-            filter.frequency.setValueAtTime(1900, startTime);
-            filter.frequency.exponentialRampToValueAtTime(3100, startTime + dur * 0.5);
-
-            gain.gain.setValueAtTime(0.001, startTime);
-            gain.gain.linearRampToValueAtTime(vol, startTime + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
-
-            osc.connect(filter);
-            oscTone.connect(gain);
-            filter.connect(gain);
-            gain.connect(this.masterGain);
-
-            osc.start(startTime);
-            oscTone.start(startTime);
-            osc.stop(startTime + dur);
-            oscTone.stop(startTime + dur);
-        };
-
-        // 1st "Wa" (t = 0.0s)
-        playWa(now, 0.15, 220, 310, 420, 1300, 0.85);
-
-        // 2nd "Wa" (t = 0.16s)
-        playWa(now + 0.16, 0.16, 260, 380, 500, 1600, 0.92);
-
-        // 3rd "We!" (t = 0.34s)
-        playWe(now + 0.34, 0.30, 440, 820, 1.05);
+        // 3. Fallback to native SpeechSynthesis human voice if file loading
+        if (typeof window !== 'undefined' && window.speechSynthesis && !this.wawaweAudioBuffer) {
+            try {
+                const utt = new SpeechSynthesisUtterance("Wah wah wee!");
+                utt.pitch = 1.35;
+                utt.rate = 1.4;
+                utt.volume = 1.0;
+                window.speechSynthesis.speak(utt);
+            } catch (e) {}
+        }
     }
 
     startWawaweLoop() {
         if (this.wawaweInterval) return; // already looping
+        this._loadWawaweAudio();
         this.playWawaweSFX();
         this.wawaweInterval = setInterval(() => {
             if (this.isMuted || this.sfxMuted) return;
             this.playWawaweSFX();
-        }, 700);
+        }, 650);
     }
 
     stopWawaweLoop() {
         if (this.wawaweInterval) {
             clearInterval(this.wawaweInterval);
             this.wawaweInterval = null;
+        }
+        if (this.wawaweHtmlAudio) {
+            try {
+                this.wawaweHtmlAudio.pause();
+                this.wawaweHtmlAudio.currentTime = 0;
+            } catch (e) {}
+        }
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+            try {
+                window.speechSynthesis.cancel();
+            } catch (e) {}
         }
     }
 

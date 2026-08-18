@@ -45,6 +45,7 @@ class SoundManager {
 
         this._initUserEvents();
         this._loadWawaweAudio();
+        this._loadDragonFireAudio();
     }
 
     _initAudio() {
@@ -770,6 +771,91 @@ class SoundManager {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
             try {
                 window.speechSynthesis.cancel();
+            } catch (e) {}
+        }
+    }
+
+    _loadDragonFireAudio() {
+        if (this.dragonFireAudioBuffer || this._loadingDragonFire) return;
+        this._loadingDragonFire = true;
+        fetch('assets/audio/dragon_fire.wav?v=1')
+            .then(res => res.arrayBuffer())
+            .then(buf => {
+                if (!this.ctx) this._initAudio();
+                if (this.ctx) {
+                    this.ctx.decodeAudioData(buf, (decoded) => {
+                        this.dragonFireAudioBuffer = decoded;
+                    }, () => {});
+                }
+            })
+            .catch(() => {});
+    }
+
+    playDragonFireSFX() {
+        if (this.isMuted || this.sfxMuted) return;
+        if (!this.ctx) this._initAudio();
+
+        // 1. Play master dragon fire audio buffer
+        if (this.ctx && this.dragonFireAudioBuffer) {
+            try {
+                const source = this.ctx.createBufferSource();
+                source.buffer = this.dragonFireAudioBuffer;
+                const gain = this.ctx.createGain();
+                gain.gain.value = 1.35; // powerful roaring flame blast
+                source.connect(gain);
+                gain.connect(this.masterGain);
+                source.start(this.ctx.currentTime);
+                return;
+            } catch (e) {}
+        }
+
+        // 2. Play via HTML5 Audio element fallback
+        try {
+            if (!this.dragonFireHtmlAudio) {
+                this.dragonFireHtmlAudio = new Audio('assets/audio/dragon_fire.wav?v=1');
+            }
+            this.dragonFireHtmlAudio.currentTime = 0;
+            this.dragonFireHtmlAudio.volume = Math.min(1.0, this.volume * 3.2);
+            this.dragonFireHtmlAudio.play().catch(() => {});
+        } catch (e) {}
+
+        // 3. Procedural Synthesizer fallback if buffer loading
+        if (this.ctx) {
+            try {
+                const now = this.ctx.currentTime;
+                // Low dragon roar rumble
+                const osc = this.ctx.createOscillator();
+                const roarGain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 1.2);
+                roarGain.gain.setValueAtTime(0.4, now);
+                roarGain.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
+                osc.connect(roarGain);
+                roarGain.connect(this.masterGain);
+                osc.start(now);
+                osc.stop(now + 1.3);
+
+                // Fire noise whoosh
+                const noiseBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * 1.4, this.ctx.sampleRate);
+                const output = noiseBuf.getChannelData(0);
+                for (let i = 0; i < noiseBuf.length; i++) {
+                    output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.9));
+                }
+                const noiseNode = this.ctx.createBufferSource();
+                noiseNode.buffer = noiseBuf;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(400, now);
+                filter.frequency.exponentialRampToValueAtTime(2400, now + 0.3);
+                filter.frequency.exponentialRampToValueAtTime(300, now + 1.3);
+                const fireGain = this.ctx.createGain();
+                fireGain.gain.setValueAtTime(0.6, now);
+                fireGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+                noiseNode.connect(filter);
+                filter.connect(fireGain);
+                fireGain.connect(this.masterGain);
+                noiseNode.start(now);
             } catch (e) {}
         }
     }

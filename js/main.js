@@ -702,11 +702,16 @@ class Game {
                 if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
                     this.crazyTwistMode = !this.crazyTwistMode;
                     if (this.crazyTwistMode) {
-                        if (window.soundManager && typeof window.soundManager.startWawaweLoop === 'function') {
-                            window.soundManager.startWawaweLoop();
+                        if (window.soundManager) {
+                            if (typeof window.soundManager.startWawaweLoop === 'function') {
+                                window.soundManager.startWawaweLoop();
+                            }
+                            if (typeof window.soundManager.playDragonFireSFX === 'function') {
+                                window.soundManager.playDragonFireSFX();
+                            }
                         }
                         if (this.hud) {
-                            this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! WAWAWE! (Press 4 to toggle normal) 🌪️', true);
+                            this.hud.showFollowerNotification('🌀 CRAZY TWIST! 🐲 DRAGON FIRE & WAWAWE! (Press 4 to toggle normal) 🔥🌪️', true);
                         }
                     } else {
                         if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {

@@ -6,8 +6,15 @@ class Player {
     constructor(tileX, tileY, spriteId) {
         this.x = tileX * TILE_SIZE + TILE_SIZE / 2;
         this.y = tileY * TILE_SIZE + TILE_SIZE / 2;
-        const chosen = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
+        let chosen = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
+        if (chosen === 'char0' || !chosen || !chosen.startsWith('char')) {
+            chosen = 'char2';
+        }
+        if (chosen === 'char7' && !window.npestaActivated && !window.gdCubeUnlocked) {
+            chosen = (window.preNpestaSprite && window.preNpestaSprite !== 'char7' && window.preNpestaSprite !== 'char0') ? window.preNpestaSprite : 'char2';
+        }
         this.spriteId = chosen;
+        this.characterClass = chosen;
         
         // Base original speeds: Athlete=8, GD Cube=7.5 (1.25x normal), Standard=6. Default speed is now 0.8x of baseline.
         const isAthlete = (chosen === 'char4');

@@ -4035,7 +4035,15 @@ class Game {
 
     _startGame(spriteId) {
         if (window.gameLog) window.gameLog(`Game._startGame() called with spriteId: ${spriteId}`);
-        const effectiveSprite = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
+        let effectiveSprite = window.chosenSprite || window.playerChosenSprite || spriteId || 'char2';
+        if (effectiveSprite === 'char0' || !effectiveSprite || !effectiveSprite.startsWith('char')) {
+            effectiveSprite = 'char2';
+        }
+        if (effectiveSprite === 'char7' && !window.npestaActivated && !window.gdCubeUnlocked) {
+            effectiveSprite = (window.preNpestaSprite && window.preNpestaSprite !== 'char7' && window.preNpestaSprite !== 'char0') ? window.preNpestaSprite : 'char2';
+        }
+        window.chosenSprite = effectiveSprite;
+        window.playerChosenSprite = effectiveSprite;
 
         if (window.travelDestination) {
             window.playerHasTruck = false; // Disable truck abroad
@@ -4835,9 +4843,12 @@ class Game {
                 localStorage.removeItem('npestaActivated');
                 localStorage.removeItem('gdCubeUnlocked');
             }
-            const revertSprite = window.preNpestaSprite || 'char0';
+            let revertSprite = window.preNpestaSprite;
+            if (!revertSprite || revertSprite === 'char7' || revertSprite === 'char0' || !revertSprite.startsWith('char')) {
+                revertSprite = (typeof localStorage !== 'undefined' && localStorage.getItem('playerSprite') && localStorage.getItem('playerSprite') !== 'char7' && localStorage.getItem('playerSprite') !== 'char0') ? localStorage.getItem('playerSprite') : 'char2';
+            }
             window.preNpestaSprite = null;
-            if (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')) {
+            if (this.player) {
                 this.player.spriteId = revertSprite;
                 this.player.characterClass = revertSprite;
             }
@@ -4990,9 +5001,12 @@ class Game {
                     localStorage.removeItem('npestaActivated');
                     localStorage.removeItem('gdCubeUnlocked');
                 }
-                const revertSprite = window.preNpestaSprite || 'char0';
+                let revertSprite = window.preNpestaSprite;
+                if (!revertSprite || revertSprite === 'char7' || revertSprite === 'char0' || !revertSprite.startsWith('char')) {
+                    revertSprite = (typeof localStorage !== 'undefined' && localStorage.getItem('playerSprite') && localStorage.getItem('playerSprite') !== 'char7' && localStorage.getItem('playerSprite') !== 'char0') ? localStorage.getItem('playerSprite') : 'char2';
+                }
                 window.preNpestaSprite = null;
-                if (this.player && (this.player.spriteId === 'char7' || this.player.characterClass === 'char7')) {
+                if (this.player) {
                     this.player.spriteId = revertSprite;
                     this.player.characterClass = revertSprite;
                 }
@@ -5180,7 +5194,10 @@ class Game {
                 localStorage.removeItem('npestaActivated');
                 localStorage.removeItem('gdCubeUnlocked');
             }
-            const revertSprite = window.preNpestaSprite || 'char0';
+            let revertSprite = window.preNpestaSprite;
+            if (!revertSprite || revertSprite === 'char7' || revertSprite === 'char0' || !revertSprite.startsWith('char')) {
+                revertSprite = (typeof localStorage !== 'undefined' && localStorage.getItem('playerSprite') && localStorage.getItem('playerSprite') !== 'char7' && localStorage.getItem('playerSprite') !== 'char0') ? localStorage.getItem('playerSprite') : 'char2';
+            }
             window.preNpestaSprite = null;
             window.chosenSprite = revertSprite;
             window.playerChosenSprite = revertSprite;

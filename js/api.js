@@ -335,7 +335,7 @@ function initUI() {
                             window.npestaActivated = true;
                             // Save pre-npesta sprite to cleanly revert back after 1 round
                             if (!window.preNpestaSprite) {
-                                window.preNpestaSprite = window.chosenSprite || window.playerChosenSprite || (window.game && window.game.player && window.game.player.spriteId !== 'char7' ? window.game.player.spriteId : 'char0');
+                                window.preNpestaSprite = (window.chosenSprite && window.chosenSprite !== 'char7' && window.chosenSprite !== 'char0') ? window.chosenSprite : ((window.playerChosenSprite && window.playerChosenSprite !== 'char7' && window.playerChosenSprite !== 'char0') ? window.playerChosenSprite : 'char2');
                             }
                             if (window.syncGDCubeVisibility) window.syncGDCubeVisibility();
                             if (window.soundManager) window.soundManager.playDingSFX();
@@ -1490,8 +1490,10 @@ async function refreshGameState() {
         window.playerStreakQualified = data.streak_qualified !== undefined ? data.streak_qualified : 0;
         window.playerLastActiveDate = data.last_active_date || null;
         window.todayGamesCount = data.today_games_count !== undefined ? data.today_games_count : 0;
-        window.chosenSprite = data.chosen_sprite || 'char2';
+        const rawSprite = data.chosen_sprite || (typeof localStorage !== 'undefined' ? localStorage.getItem('playerSprite') : null);
+        window.chosenSprite = (rawSprite && rawSprite !== 'char0' && (rawSprite !== 'char7' || window.npestaActivated || window.gdCubeUnlocked)) ? rawSprite : 'char2';
         window.playerChosenSprite = window.chosenSprite;
+        if (typeof localStorage !== 'undefined') localStorage.setItem('playerSprite', window.chosenSprite);
         window.currentUsername = data.username || window.currentUsername || localStorage.getItem('trashMasterUsername');
         window.currentUserAvatar = data.avatar_sticker || localStorage.getItem('trashMasterAvatar') || 'ducky_sticker.png';
         window.currentUserBio = data.bio || 'Ready to clean up the city!';

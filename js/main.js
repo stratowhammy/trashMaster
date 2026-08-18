@@ -698,8 +698,15 @@ class Game {
                     this._rangerTryCaptureAnimal();
                 }
 
-                // 4 key: Toggle Crazy Twist Mode (Press again to return to normal)
+                // 4 key: Toggle Crazy Twist Mode (Cannot exit in Chaos Mode)
                 if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
+                    if (window.chaosMode) {
+                        this.crazyTwistMode = true;
+                        if (this.hud) {
+                            this.hud.showFollowerNotification('🌀 Chaos Mode: You cannot escape the Crazy Twist! 🌪️🔥', false);
+                        }
+                        return;
+                    }
                     this.crazyTwistMode = !this.crazyTwistMode;
                     if (this.crazyTwistMode) {
                         if (window.soundManager) {
@@ -4597,6 +4604,23 @@ class Game {
         if (window.soundManager) {
             window.soundManager.playTrack(window.chaosMode ? 'chaos' : (window.selectedMusicTrack || 'game'));
         }
+
+        // ── Chaos Mode: Immediately activate Crazy Twist effects with no escape ──
+        if (window.chaosMode) {
+            this.crazyTwistMode = true;
+            if (window.soundManager) {
+                if (typeof window.soundManager.startWawaweLoop === 'function') {
+                    window.soundManager.startWawaweLoop();
+                }
+                if (typeof window.soundManager.startDragonFireLoop === 'function') {
+                    window.soundManager.startDragonFireLoop();
+                }
+            }
+            if (this.hud && typeof this.hud.showFollowerNotification === 'function') {
+                this.hud.showFollowerNotification('🌀 CHAOS MODE: CRAZY TWIST, DRAGON FIRE & WAWAWE ACTIVATED! NO ESCAPE! 🌪️🔥', true);
+            }
+        }
+
         console.log('Game state set. Player:', this.player);
     }
 

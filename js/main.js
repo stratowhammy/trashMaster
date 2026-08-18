@@ -698,6 +698,19 @@ class Game {
                     this._rangerTryCaptureAnimal();
                 }
 
+                // 4 key: Activate Crazy Twist Mode until end of round
+                if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
+                    if (!this.crazyTwistMode) {
+                        this.crazyTwistMode = true;
+                        if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
+                            window.soundManager.playPsychosisSFX();
+                        }
+                        if (this.hud) {
+                            this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! Everything is going crazy and twisting until round end! 🌪️', true);
+                        }
+                    }
+                }
+
                 // Prevent scrolling with arrow keys
                 if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
                     e.preventDefault();
@@ -2918,14 +2931,23 @@ class Game {
                 }
             }
 
-            // Apply or clear viewport visual distortion (100% invert & 90deg rotate)
+            // Apply or clear viewport visual distortion (Crazy Twist Mode or Meds Missed)
             const viewport = document.getElementById('game-viewport');
             if (viewport) {
-                if (this.medsMissed) {
+                if (this.crazyTwistMode) {
+                    const now = performance.now() / 1000;
+                    const twistAngle = Math.sin(now * 3) * 28 + (now * 55) % 360;
+                    const twistSkew = Math.sin(now * 4.5) * 14;
+                    const twistScale = 0.88 + Math.sin(now * 5.2) * 0.16;
+                    const hue = Math.floor((now * 140) % 360);
+                    viewport.style.filter = `hue-rotate(${hue}deg) saturate(260%) contrast(135%)`;
+                    viewport.style.transform = `rotate(${twistAngle}deg) skew(${twistSkew}deg) scale(${twistScale})`;
+                    viewport.style.transformOrigin = 'center center';
+                } else if (this.medsMissed) {
                     viewport.style.filter = 'invert(100%)';
                     viewport.style.transform = 'rotate(90deg) scale(0.85)';
                     viewport.style.transformOrigin = 'center center';
-                } else {
+                } else if (viewport.style.transform !== '') {
                     viewport.style.filter = '';
                     viewport.style.transform = '';
                     viewport.style.transformOrigin = '';
@@ -4409,6 +4431,7 @@ class Game {
         this.medsMissedCount = 0;
         this.medsTakenCount = 0;
         this.noMedsActive = false;
+        this.crazyTwistMode = false;
         this.cheeseMonster = null;
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
@@ -4783,6 +4806,7 @@ class Game {
         this.medsMissed = false;
         this.medicationAlertActive = false;
         this.medsMissedCount = 0;
+        this.crazyTwistMode = false;
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
         }
@@ -4853,6 +4877,13 @@ class Game {
                 this._endGoldRush();
             }
             this.doubleTrashPickup = false;
+            this.crazyTwistMode = false;
+            const vp = document.getElementById('game-viewport');
+            if (vp) {
+                vp.style.filter = '';
+                vp.style.transform = '';
+                vp.style.transformOrigin = '';
+            }
             window.chaosCheatActive = false;
             window.chaosMode = false;
             window.knowledgeHoActive = false;
@@ -5011,6 +5042,7 @@ class Game {
         this.goldRushTimer = 0;
         this.medsMissed = false;
         this.medicationAlertActive = false;
+        this.crazyTwistMode = false;
         const vp = document.getElementById('game-viewport');
         if (vp) {
             vp.style.filter = '';

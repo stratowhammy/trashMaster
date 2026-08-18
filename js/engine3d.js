@@ -199,10 +199,13 @@ class Engine3D {
             this.camera.position.set(player3dX, 1.8 + headBob + jumpElev, player3dZ);
             this.playerLight.position.set(player3dX, 1.8 + jumpElev, player3dZ);
 
-            // Update Camera Rotation (Yaw & Pitch)
+            // Update Camera Rotation (Yaw, Pitch & Crazy Twist Roll)
+            const isTwist = !!(this.game && this.game.crazyTwistMode);
+            const twistRoll = isTwist ? Math.sin(performance.now() / 300) * 0.75 + (performance.now() / 800) % (Math.PI * 2) : 0;
             const euler = new THREE.Euler(0, 0, 0, 'YXZ');
             euler.x = this.pitch;
             euler.y = this.yaw;
+            euler.z = twistRoll;
             this.camera.quaternion.setFromEuler(euler);
         }
 

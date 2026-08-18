@@ -701,12 +701,12 @@ class Game {
                 // 4 key: Toggle Crazy Twist Mode (Press again to return to normal)
                 if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
                     this.crazyTwistMode = !this.crazyTwistMode;
+                    if (window.soundManager && typeof window.soundManager.playWawaweSFX === 'function') {
+                        window.soundManager.playWawaweSFX();
+                    }
                     if (this.crazyTwistMode) {
-                        if (window.soundManager && typeof window.soundManager.playPsychosisSFX === 'function') {
-                            window.soundManager.playPsychosisSFX();
-                        }
                         if (this.hud) {
-                            this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! Everything is going crazy and twisting! (Press 4 to toggle normal) 🌪️', true);
+                            this.hud.showFollowerNotification('🌀 CRAZY TWIST ACTIVATED! WAWAWE! (Press 4 to toggle normal) 🌪️', true);
                         }
                     } else {
                         const vp = document.getElementById('game-viewport');

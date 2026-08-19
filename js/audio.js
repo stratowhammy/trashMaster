@@ -705,6 +705,95 @@ class SoundManager {
         osc2.stop(now + 0.85);
     }
 
+    playScreamSFX() {
+        if (!this.isSFXEnabled('crazy_twist')) return;
+        if (!this.ctx) this._initAudio();
+        if (!this.ctx) return;
+        // Ensure AudioContext is active (critical for click-triggered sounds)
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+        }
+        const now = this.ctx.currentTime;
+
+        // Create a dedicated output gain so scream is audible even if music is muted
+        const outGain = this.ctx.createGain();
+        outGain.gain.setValueAtTime(0.35, now);
+        outGain.connect(this.ctx.destination);
+
+        // Scream: sharp rising oscillator with vibrato
+        const screamOsc = this.ctx.createOscillator();
+        const screamGain = this.ctx.createGain();
+        const vibrato = this.ctx.createOscillator();
+        const vibratoGain = this.ctx.createGain();
+
+        screamOsc.type = 'sawtooth';
+        screamOsc.frequency.setValueAtTime(400, now);
+        screamOsc.frequency.linearRampToValueAtTime(1200, now + 0.15);
+        screamOsc.frequency.linearRampToValueAtTime(800, now + 0.5);
+        screamOsc.frequency.exponentialRampToValueAtTime(200, now + 1.0);
+
+        // Add vibrato for human-voice-like warble
+        vibrato.type = 'sine';
+        vibrato.frequency.setValueAtTime(30, now);
+        vibratoGain.gain.setValueAtTime(50, now);
+        vibrato.connect(vibratoGain);
+        vibratoGain.connect(screamOsc.frequency);
+
+        screamGain.gain.setValueAtTime(1.0, now);
+        screamGain.gain.setValueAtTime(1.0, now + 0.15);
+        screamGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        filter.frequency.linearRampToValueAtTime(600, now + 0.8);
+        filter.Q.setValueAtTime(3, now);
+
+        screamOsc.connect(filter);
+        filter.connect(screamGain);
+        screamGain.connect(outGain);
+
+        vibrato.start(now);
+        screamOsc.start(now);
+        vibrato.stop(now + 1.0);
+        screamOsc.stop(now + 1.0);
+
+        // White noise burst for breath/air
+        const noiseLen = Math.floor(this.ctx.sampleRate * 0.6);
+        const noiseBuf = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
+        const noiseData = noiseBuf.getChannelData(0);
+        for (let i = 0; i < noiseLen; i++) noiseData[i] = Math.random() * 2 - 1;
+
+        const noiseSrc = this.ctx.createBufferSource();
+        noiseSrc.buffer = noiseBuf;
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.25, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.setValueAtTime(2000, now);
+
+        noiseSrc.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(outGain);
+        noiseSrc.start(now);
+        noiseSrc.stop(now + 0.6);
+
+        // Sub-bass impact
+        const subOsc = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(100, now);
+        subOsc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+        subGain.gain.setValueAtTime(0.5, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        subOsc.connect(subGain);
+        subGain.connect(outGain);
+        subOsc.start(now);
+        subOsc.stop(now + 0.3);
+    }
+
     _loadWawaweAudio() {
         if (this.wawaweAudioBuffer || this._loadingWawawe) return;
         this._loadingWawawe = true;

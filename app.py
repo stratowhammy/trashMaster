@@ -283,6 +283,21 @@ def init_db():
             ''')
         except sqlite3.OperationalError:
             pass
+
+        try:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS error_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    username TEXT NOT NULL,
+                    category TEXT DEFAULT 'General',
+                    error_text TEXT NOT NULL,
+                    status TEXT DEFAULT 'open',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        except sqlite3.OperationalError:
+            pass
         db.commit()
         
         # Create default admin if not exists
@@ -560,6 +575,93 @@ def generate_accounts():
         
     db.commit()
     return jsonify({'accounts': new_accounts})
+
+@app.route('/api/errors/report', methods=['POST'])
+def report_error():
+    data = request.json or {}
+    error_text = (data.get('error_text') or '').strip()
+    category = (data.get('category') or 'General').strip()
+    
+    if not error_text:
+        return jsonify({'error': 'Error description cannot be empty'}), 400
+
+    user_data = verify_token(request)
+    user_id = user_data['user_id'] if user_data else None
+    username = user_data['username'] if user_data else (data.get('username') or 'Anonymous')
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO error_reports (user_id, username, category, error_text, status)
+        VALUES (?, ?, ?, ?, 'open')
+    """, (user_id, username, category, error_text))
+    db.commit()
+    report_id = cursor.lastrowid
+
+    return jsonify({
+        'success': True,
+        'id': report_id,
+        'message': 'Error report submitted successfully! The creator will see it in the Errors tab.'
+    })
+
+@app.route('/api/errors', methods=['GET'])
+def get_error_reports():
+    user_data = verify_token(request)
+    if not user_data or (user_data.get('role') != 'admin' and user_data.get('username') not in ['admin', 'creator']):
+        return jsonify({'error': 'Forbidden: Only the game creator can view the error reports.'}), 403
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        SELECT id, user_id, username, category, error_text, status, created_at
+        FROM error_reports
+        ORDER BY id DESC
+    """)
+    rows = cursor.fetchall()
+    errors = [{
+        'id': r['id'],
+        'user_id': r['user_id'],
+        'username': r['username'],
+        'category': r['category'] or 'General',
+        'error_text': r['error_text'],
+        'status': r['status'] or 'open',
+        'created_at': str(r['created_at']) if r['created_at'] else ''
+    } for r in rows]
+
+    return jsonify({'errors': errors, 'total': len(errors)})
+
+@app.route('/api/errors/resolve', methods=['POST'])
+def resolve_error_report():
+    user_data = verify_token(request)
+    if not user_data or (user_data.get('role') != 'admin' and user_data.get('username') not in ['admin', 'creator']):
+        return jsonify({'error': 'Forbidden'}), 403
+
+    data = request.json or {}
+    report_id = data.get('id')
+    new_status = data.get('status', 'resolved')
+    if not report_id:
+        return jsonify({'error': 'Report ID required'}), 400
+        
+    db = get_db()
+    db.execute("UPDATE error_reports SET status=? WHERE id=?", (new_status, report_id))
+    db.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/errors/delete', methods=['POST'])
+def delete_error_report():
+    user_data = verify_token(request)
+    if not user_data or (user_data.get('role') != 'admin' and user_data.get('username') not in ['admin', 'creator']):
+        return jsonify({'error': 'Forbidden'}), 403
+
+    data = request.json or {}
+    report_id = data.get('id')
+    if not report_id:
+        return jsonify({'error': 'Report ID required'}), 400
+        
+    db = get_db()
+    db.execute("DELETE FROM error_reports WHERE id=?", (report_id,))
+    db.commit()
+    return jsonify({'success': True})
 
 @app.route('/api/game/sync', methods=['GET'])
 def sync_game():

@@ -4,10 +4,16 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
+:root {
+    --cursor-default: url('../assets/sprites/cursor_trashcan.png?v=7') 16 0, url('../assets/sprites/cursor_trashcan.svg?v=7') 16 0, default;
+    --cursor-pointer: url('../assets/sprites/cursor_pointer_trashcan.png?v=7') 16 0, url('../assets/sprites/cursor_pointer_trashcan.svg?v=7') 16 0, pointer;
+}
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    cursor: var(--cursor-default);
 }
 
 html, body {
@@ -16,9 +22,17 @@ html, body {
     overflow: hidden;
     background: #121630;
     font-family: 'Press Start 2P', monospace;
-    cursor: default;
+    cursor: var(--cursor-default);
     user-select: none;
     -webkit-user-select: none;
+}
+
+button, .btn, a, input[type="button"], input[type="submit"], input[type="color"], select, [role="button"], .interactive, .clickable, .floating-mona-lisa, [style*="cursor: pointer"], [style*="cursor:pointer"], :hover[style*="cursor: pointer"], :hover[style*="cursor:pointer"], .stats-tab-btn, .play-btn, .secondary, .tab-btn, .leaderboard-tab-btn, .audio-btn, .store-item, .inventory-item-slot, .color-btn, .skin-card, .car-item, .accessory-item, .boat-item, .posse-item, .tenant-item, .map-card {
+    cursor: var(--cursor-pointer) !important;
+}
+
+.toggle-container, .toggle-container *, .toggle-container:hover, .game-modes-grid .toggle-container, .game-modes-grid .toggle-container *, .toggle-label {
+    cursor: var(--cursor-default) !important;
 }
 
 #gameCanvas3d {
@@ -310,10 +324,12 @@ button, .btn, input[type="button"], input[type="submit"] {
     display: flex;
     align-items: center;
     transition: background 0.2s;
+    cursor: var(--cursor-default) !important;
 }
 
 .game-modes-grid .toggle-container:hover {
     background: rgba(0, 136, 255, 0.15);
+    cursor: var(--cursor-default) !important;
 }
 
 .game-modes-grid .toggle-label {
@@ -703,29 +719,32 @@ button, .btn, input[type="button"], input[type="submit"] {
 @keyframes barShimmer { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
 
 /* Cursor styles */
-#gameCanvas:hover { cursor: crosshair; }
-.char-select #gameCanvas:hover { cursor: pointer; }
+#gameCanvas, #gameCanvas:hover, #gameCanvas3d, #gameCanvas3d:hover, #game-viewport { cursor: var(--cursor-default) !important; }
+.char-select #gameCanvas:hover { cursor: var(--cursor-pointer) !important; }
 
 /* Switch Toggle styles */
 .toggle-container {
     display: flex;
     align-items: center;
     margin-bottom: 15px;
+    cursor: var(--cursor-default) !important;
 }
 .switch {
     position: relative;
     display: inline-block;
     width: 34px;
     height: 20px;
+    cursor: var(--cursor-default) !important;
 }
 .switch input { 
     opacity: 0;
     width: 0;
     height: 0;
+    cursor: var(--cursor-default) !important;
 }
 .slider {
     position: absolute;
-    cursor: pointer;
+    cursor: var(--cursor-default) !important;
     top: 0;
     left: 0;
     right: 0;
@@ -1060,6 +1079,85 @@ input:checked + .slider:before {
 #floating-quick-controls.in-game button {
     width: auto !important;
     padding: 10px 14px !important;
+}
+
+/* Dance Course Animations */
+.dance-disco-grid {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    background: repeating-linear-gradient(90deg, rgba(255,0,255,0.2) 0px, rgba(255,0,255,0.2) 30px, rgba(0,255,204,0.2) 30px, rgba(0,255,204,0.2) 60px);
+    border-top: 2px solid rgba(255,0,255,0.5);
+    animation: discoFloorPulse 1.2s infinite alternate;
+}
+
+@keyframes discoFloorPulse {
+    0% { filter: hue-rotate(0deg) brightness(1); }
+    100% { filter: hue-rotate(180deg) brightness(1.4); }
+}
+
+.dance-anim-right {
+    animation: danceRight 0.8s ease-in-out infinite alternate;
+}
+@keyframes danceRight {
+    0% { transform: translateX(0px) rotate(0deg) translateY(0px); }
+    50% { transform: translateX(80px) rotate(12deg) translateY(-20px); }
+    100% { transform: translateX(130px) rotate(-8deg) translateY(0px); }
+}
+
+.dance-anim-left {
+    animation: danceLeft 0.8s ease-in-out infinite alternate;
+}
+@keyframes danceLeft {
+    0% { transform: translateX(0px) rotate(0deg) translateY(0px); }
+    50% { transform: translateX(-80px) rotate(-12deg) translateY(-20px); }
+    100% { transform: translateX(-130px) rotate(8deg) translateY(0px); }
+}
+
+.dance-anim-groovy {
+    animation: danceGroovy 0.55s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes danceGroovy {
+    0% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+    25% { transform: translateY(-24px) rotate(-18deg) scale(1.15, 0.85); }
+    50% { transform: translateY(0) rotate(0deg) scale(0.85, 1.15); }
+    75% { transform: translateY(-24px) rotate(18deg) scale(1.15, 0.85); }
+    100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+
+.dance-anim-eat-can {
+    animation: danceEatCan 1.2s ease-in-out infinite;
+}
+@keyframes danceEatCan {
+    0% { transform: translateX(-60px) rotate(0deg); }
+    40% { transform: translateX(0px) scale(1.2, 0.8) rotate(-5deg); }
+    50% { transform: translateX(10px) scale(1.3, 1.3) rotate(10deg); filter: drop-shadow(0 0 15px gold); }
+    70% { transform: translateX(0px) scale(1, 1) rotate(0deg); }
+    100% { transform: translateX(-60px) rotate(0deg); }
+}
+
+.dance-can-anim {
+    animation: canBounceEat 1.2s ease-in-out infinite;
+}
+@keyframes canBounceEat {
+    0% { transform: translateX(60px) translateY(0) scale(1); opacity: 1; }
+    40% { transform: translateX(10px) translateY(-10px) scale(1.1); opacity: 1; }
+    50% { transform: translateX(0px) translateY(0) scale(0.2); opacity: 0; }
+    70% { transform: translateX(0px) translateY(0) scale(0); opacity: 0; }
+    100% { transform: translateX(60px) translateY(0) scale(1); opacity: 1; }
+}
+
+.dance-anim-freestyle {
+    animation: danceFreestyle 0.6s ease-in-out infinite alternate;
+}
+@keyframes danceFreestyle {
+    0% { transform: rotate(-25deg) translateY(-20px) scale(1.2); filter: hue-rotate(0deg) drop-shadow(0 0 15px #ff00ff); }
+    25% { transform: rotate(180deg) translateY(10px) scale(1); filter: hue-rotate(90deg) drop-shadow(0 0 20px #00ffcc); }
+    50% { transform: rotate(360deg) translateY(-30px) scale(1.3); filter: hue-rotate(180deg) drop-shadow(0 0 25px #ffcc00); }
+    75% { transform: rotate(200deg) translateY(0px) scale(0.9); filter: hue-rotate(270deg) drop-shadow(0 0 15px #00ccff); }
+    100% { transform: rotate(0deg) translateY(-25px) scale(1.25); filter: hue-rotate(360deg) drop-shadow(0 0 30px #ff00aa); }
 }
 
 

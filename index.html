@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Trash Master — A 2D collection game where you clean up the city! Pick a character, collect trash, earn followers, and beat the clock.">
     <title>Trash Master — Clean Up the City!</title>
-    <link rel="stylesheet" href="css/style.css?v=5">
+    <link rel="stylesheet" href="css/style.css?v=6">
     <script>
         function showError(message, stack) {
             const errDiv = document.createElement('div');
@@ -140,15 +140,53 @@
             </div>
         </div>
 
-        <!-- Admin Screen -->
-        <div id="admin-screen" class="screen hidden">
-            <h1>Admin Dashboard</h1>
-            <div class="panel admin-panel">
-                <h2>Generate Accounts</h2>
-                <input type="number" id="admin-count" value="1" min="1" max="50">
-                <button id="btn-generate" class="btn">Generate</button>
-                <div id="generated-accounts" class="account-list"></div>
-                <button id="btn-admin-logout" class="btn secondary">Logout</button>
+        <!-- Admin / Creator Screen -->
+        <div id="admin-screen" class="screen hidden admin-screen-container" style="padding: 20px; max-width: 950px; margin: 0 auto; overflow-y: auto; height: 100vh; box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <h1 style="color: #00ffcc; font-size: 15px; margin: 0; text-shadow: 2px 2px #004433;">👑 CREATOR / ADMIN DASHBOARD</h1>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-admin-goto-store" class="btn" style="background: #0088cc; font-size: 8px; padding: 8px 14px;">Store Hub 🛒</button>
+                    <button id="btn-admin-logout" class="btn secondary" style="font-size: 8px; padding: 8px 14px;">Logout</button>
+                </div>
+            </div>
+
+            <!-- Dashboard Navigation Tabs -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btn-admin-tab-errors" class="btn highlight-btn" style="flex: 1; padding: 12px; font-size: 9px; background: #881122; border: 2px solid #ff4444; color: #fff;">
+                    ⚠️ ERRORS TAB <span id="admin-error-badge" style="background: #ff0055; padding: 2px 6px; border-radius: 4px; font-size: 7px; margin-left: 6px;">0</span>
+                </button>
+                <button id="btn-admin-tab-accounts" class="btn secondary" style="flex: 1; padding: 12px; font-size: 9px; background: #1e293b; border: 2px solid #334466; color: #aaa;">
+                    👥 GENERATE ACCOUNTS
+                </button>
+            </div>
+
+            <!-- Tab 1: Errors Tab Panel -->
+            <div id="admin-panel-errors" class="panel admin-panel" style="background: rgba(15, 23, 42, 0.95); border: 2px solid #ff4444; border-radius: 8px; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <h2 style="color: #ff4444; font-size: 11px; margin: 0;">📋 USER ERROR REPORTS</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="admin-error-filter" style="background: #1e293b; border: 1px solid #ff4444; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 6px; border-radius: 4px;">
+                            <option value="all">Show All</option>
+                            <option value="open">Open Only</option>
+                            <option value="resolved">Resolved Only</option>
+                        </select>
+                        <button id="btn-admin-refresh-errors" class="btn" style="background: #00aa66; font-size: 7px; padding: 6px 12px;">Refresh 🔄</button>
+                    </div>
+                </div>
+                <div id="admin-errors-list" style="max-height: 520px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
+                    <div style="color: #888; font-size: 8px; text-align: center; padding: 30px;">Loading error reports...</div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Generate Accounts Panel -->
+            <div id="admin-panel-accounts" class="panel admin-panel hidden" style="background: rgba(15, 23, 42, 0.95); border: 2px solid #00ccff; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #00ccff; font-size: 11px; margin-bottom: 15px;">Generate Player Accounts</h2>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                    <label style="font-size: 8px; color: #aaa;">Count (1-50):</label>
+                    <input type="number" id="admin-count" value="1" min="1" max="50" style="width: 80px; padding: 8px; background: #1e293b; border: 1px solid #00ccff; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; border-radius: 4px;">
+                    <button id="btn-generate" class="btn" style="background: #00aa66; font-size: 8px; padding: 8px 16px;">Generate 🚀</button>
+                </div>
+                <div id="generated-accounts" class="account-list" style="max-height: 400px; overflow-y: auto; font-size: 8px; color: #cbd5e1; line-height: 1.8;"></div>
             </div>
         </div>
 
@@ -283,6 +321,9 @@
                             <button id="btn-store-view-inventory" class="btn inventory-btn">Letters</button>
                             <button id="btn-audio-settings" class="btn audio-btn" style="background: #442266; border-color: #8844cc;">Audio</button>
                             <button id="btn-keybinds-settings" class="btn keybinds-btn" style="background: #006688; border-color: #00ccff;">Controls ⌨️</button>
+                            <button id="btn-open-report-error" class="btn report-error-btn" style="background: #881122; border-color: #ff3344; color: #ffffff;">Report Error ⚠️</button>
+                            <button id="btn-open-dance" class="btn dance-btn" style="background: #9900aa; border-color: #ff00ff; color: #ffffff;">Dance 💃</button>
+                            <button id="btn-open-errors-tab" class="btn errors-tab-btn" style="background: #773300; border-color: #ffaa00; color: #ffffff; display: none;">Errors Tab 📋</button>
                             <button id="btn-store-logout" class="btn logout-btn">Logout</button>
                         </div>
                     </div>
@@ -1091,11 +1132,115 @@
         </div>
     </div>
 
+    <!-- Report an Error Modal Dialog -->
+    <div id="report-error-dialog" class="hidden" style="position: fixed; z-index: 1010; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #0f172a; border: 4px solid #ff3344; border-radius: 12px; padding: 25px; width: 620px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(255, 51, 68, 0.4); text-align: center; box-sizing: border-box;">
+            <h2 style="color: #ff4444; font-family: 'Press Start 2P', monospace; font-size: 13px; margin: 0 0 12px 0; text-shadow: 2px 2px #440011; letter-spacing: 1px;">⚠️ REPORT AN ERROR / BUG</h2>
+            <p style="color: #cbd5e1; font-family: 'Press Start 2P', monospace; font-size: 7px; margin-bottom: 15px; line-height: 1.6;">
+                Describe the error or glitch you encountered.<br>All submissions are instantly sent to the creator's Errors Tab!
+            </p>
+
+            <div style="text-align: left; margin-bottom: 12px;">
+                <label style="color: #ffaa00; font-family: 'Press Start 2P', monospace; font-size: 7px; display: block; margin-bottom: 6px;">CATEGORY:</label>
+                <select id="error-report-category" style="width: 100%; background: #1e293b; border: 2px solid #ff4444; border-radius: 6px; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px; box-sizing: border-box;">
+                    <option value="Gameplay Bug">🎮 Gameplay Bug / Glitch</option>
+                    <option value="Visual / Animation">🎨 Visual / Animation Issue</option>
+                    <option value="Audio / Music">🔊 Audio / Music Issue</option>
+                    <option value="Crash / Freeze">💥 Crash / Freeze</option>
+                    <option value="Store / Inventory">🛒 Store / Inventory Issue</option>
+                    <option value="Other">📝 Other Feedback / Issue</option>
+                </select>
+            </div>
+
+            <div style="text-align: left; margin-bottom: 15px; flex: 1; display: flex; flex-direction: column;">
+                <label style="color: #ffaa00; font-family: 'Press Start 2P', monospace; font-size: 7px; display: block; margin-bottom: 6px;">DESCRIBE THE ERROR:</label>
+                <textarea id="error-report-text" rows="5" placeholder="Type what happened, what went wrong, or what you were doing..." style="width: 100%; background: #1e293b; border: 2px solid #ff4444; border-radius: 6px; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 10px; resize: vertical; min-height: 100px; box-sizing: border-box; line-height: 1.6;"></textarea>
+            </div>
+
+            <div id="error-report-feedback" style="font-family: 'Press Start 2P', monospace; font-size: 8px; margin-bottom: 12px; min-height: 14px;"></div>
+
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-error-report-cancel" class="btn secondary" style="padding: 10px 20px; font-size: 8px; font-family: 'Press Start 2P', monospace;">CANCEL</button>
+                <button id="btn-error-report-submit" class="btn" style="background: #00aa66; border: 2px solid #00ffcc; color: #fff; padding: 10px 24px; font-size: 9px; font-family: 'Press Start 2P', monospace; text-shadow: 0 0 5px #00ffcc;">SUBMIT REPORT 🚀</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Standalone Errors Tab Modal Dialog (Creator & Player Viewer) -->
+    <div id="errors-tab-dialog" class="hidden" style="position: fixed; z-index: 1010; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: #0f172a; border: 4px solid #ffaa00; border-radius: 12px; padding: 25px; width: 780px; max-width: 95%; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(255, 170, 0, 0.4); box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <h2 style="color: #ffaa00; font-family: 'Press Start 2P', monospace; font-size: 13px; margin: 0; text-shadow: 2px 2px #442200; letter-spacing: 1px;">📋 ERRORS TAB (CREATOR VIEW)</h2>
+                <button id="btn-errors-dialog-close" class="btn secondary" style="padding: 6px 14px; font-size: 8px; font-family: 'Press Start 2P', monospace;">✖ CLOSE</button>
+            </div>
+            <p style="color: #cbd5e1; font-family: 'Press Start 2P', monospace; font-size: 7px; margin-bottom: 12px; line-height: 1.5;">
+                All reported errors and bugs submitted by players are received here in real time.
+            </p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <div style="font-size: 7.5px; color: #ffcc00; font-family: 'Press Start 2P', monospace;">
+                    TOTAL REPORTS: <span id="errors-dialog-count">0</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <select id="errors-dialog-filter" style="background: #1e293b; border: 1px solid #ffaa00; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 6px; border-radius: 4px;">
+                        <option value="all">Show All</option>
+                        <option value="open">Open Only</option>
+                        <option value="resolved">Resolved Only</option>
+                    </select>
+                    <button id="btn-errors-dialog-refresh" class="btn" style="background: #00aa66; font-size: 7px; padding: 6px 12px; font-family: 'Press Start 2P', monospace;">REFRESH 🔄</button>
+                </div>
+            </div>
+            <div id="errors-dialog-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px; max-height: 500px; min-height: 200px;">
+                <div style="color: #888; font-size: 8px; text-align: center; padding: 30px;">Loading error reports...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dance Course Modal Dialog -->
+    <div id="dance-course-dialog" class="hidden" style="position: fixed; z-index: 1012; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; top: 0; left: 0;">
+        <div style="background: linear-gradient(180deg, #180828 0%, #0d0618 100%); border: 4px solid #ff00ff; border-radius: 14px; padding: 25px; width: 640px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 0 50px rgba(255, 0, 255, 0.45); box-sizing: border-box; position: relative;">
+            
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="color: #ff00ff; font-family: 'Press Start 2P', monospace; font-size: 13px; margin: 0; text-shadow: 2px 2px #440044; letter-spacing: 1px;">🕺 DANCE COURSE 💃</h2>
+                <button id="btn-dance-course-close" class="btn secondary" style="padding: 6px 12px; font-size: 8px; font-family: 'Press Start 2P', monospace;">✖</button>
+            </div>
+
+            <!-- Dance Floor Visual Stage -->
+            <div id="dance-stage" style="width: 100%; height: 180px; background: radial-gradient(circle, #2b0b4a 0%, #0c0416 80%); border: 2px solid #ff55ff; border-radius: 8px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: inset 0 0 30px rgba(255,0,255,0.3);">
+                <!-- Disco Floor Grid -->
+                <div class="dance-disco-grid"></div>
+                <!-- Dancer Avatar Sprite -->
+                <div id="dance-dancer-container" style="position: relative; z-index: 2; transition: all 0.3s ease;">
+                    <img id="dance-dancer-sprite" src="assets/sprites/char2.png" alt="Dancer" style="width: 75px; height: 75px; image-rendering: pixelated; filter: drop-shadow(0 0 10px #ff00ff);">
+                </div>
+                <!-- Props (Soda Can) -->
+                <img id="dance-can-sprite" src="assets/sprites/trash2.png" alt="Can" style="position: absolute; width: 45px; height: 45px; image-rendering: pixelated; display: none; filter: drop-shadow(0 0 8px #00ffff); z-index: 3;">
+            </div>
+
+            <!-- Dance Course Step Instruction Text -->
+            <div id="dance-instruction-text" style="color: #00ffcc; font-family: 'Press Start 2P', monospace; font-size: 13px; margin-bottom: 25px; min-height: 40px; display: flex; align-items: center; justify-content: center; text-shadow: 2px 2px #004433; line-height: 1.6; word-break: break-word;">
+                move to the right
+            </div>
+
+            <!-- Buttons Area -->
+            <div id="dance-buttons-container" style="display: flex; flex-direction: column; gap: 12px; align-items: center; width: 100%;">
+                <button id="btn-dance-continue" class="btn highlight-btn" style="background: #00cc88; border: 3px solid #00ffcc; color: #fff; padding: 12px 30px; font-size: 10px; font-family: 'Press Start 2P', monospace; text-shadow: 0 0 5px #00ffcc; min-width: 200px;">
+                    Continue
+                </button>
+                <button id="btn-dance-end-course" class="btn" style="background: #aa1133; border: 2px solid #ff4466; color: #fff; padding: 10px 24px; font-size: 9px; font-family: 'Press Start 2P', monospace; display: none;">
+                    end dance course
+                </button>
+            </div>
+
+        </div>
+    </div>
+
     <!-- Fixed Audio, Keybinds, FPS Toggle & Pause Buttons (Controlled by CSS & in-game class) -->
     <div id="floating-quick-controls">
         <button id="btn-fps-toggle" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #ffaa00; color: #ffaa00;">🕹️ 2D RETRO</button>
         <button id="btn-sound-menu" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #00ffcc; color: #00ffcc;">SOUND</button>
         <button id="btn-keybinds-menu" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #00ccff; color: #00ccff;">KEYS ⌨️</button>
+        <button id="btn-floating-report-error" style="background: rgba(140, 20, 20, 0.92); border: 2px solid #ff4444; color: #ff9999;">REPORT ERROR ⚠️</button>
+        <button id="btn-floating-dance" style="background: rgba(140, 0, 150, 0.92); border: 2px solid #ff00ff; color: #ff99ff;">DANCE 💃</button>
         <button id="btn-pause" style="background: rgba(20, 25, 40, 0.92); border: 2px solid #ffcc00; color: #ffcc00;">PAUSE</button>
         <button id="btn-return-store" style="background: rgba(220, 38, 38, 0.92); border: 2px solid #ff4444; color: #ffffff; display: none;">RETURN TO STORE</button>
     </div>
@@ -1104,7 +1249,7 @@
     <script src="js/keybinds.js?v=1"></script>
     <script src="8bit_lofi_soundtrack.js"></script>
     <script src="js/audio.js?v=5"></script>
-    <script src="js/api.js?v=17"></script>
+    <script src="js/api.js?v=20"></script>
     <script src="js/map.js?v=17"></script>
     <script src="js/map_dahgbad.js?v=3"></script>
     <script src="js/map_cucaracha.js?v=3"></script>

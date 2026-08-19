@@ -92,6 +92,7 @@ function showScreen(screenId) {
         if (gameViewport) gameViewport.classList.add('hidden');
         if (gameCanvas) gameCanvas.classList.add('hidden');
         if (gameCanvas3d) gameCanvas3d.classList.add('hidden');
+        document.querySelectorAll('.floating-mona-lisa').forEach(el => el.remove());
         if (screenId === 'store-screen' || screenId === 'store-items-screen') {
             if (typeof updateStoreUI === 'function') updateStoreUI();
         }
@@ -283,6 +284,12 @@ function initUI() {
 
     if (btnAdminLogout) btnAdminLogout.addEventListener('click', logout);
     if (btnStoreLogout) btnStoreLogout.addEventListener('click', logout);
+
+    // ── Error Reporting & Errors Tab Management ──
+    initErrorReporting();
+
+    // ── Dance Course System ──
+    initDanceCourse();
 
     // Open Shop / Discrete Store Page
     const btnOpenShop = document.getElementById('btn-open-shop');
@@ -1709,6 +1716,10 @@ function updateStoreUI() {
     if (typeof renderTrophyRoom === 'function') {
         renderTrophyRoom();
     }
+
+    if (typeof updateCreatorVisibility === 'function') {
+        updateCreatorVisibility();
+    }
 }
 
 function renderStore() {
@@ -2327,11 +2338,485 @@ function updateModeToggles() {
     }
 }
 
+// ── Error Reporting & Errors Tab Management ──
+function initErrorReporting() {
+    const dialogReport = document.getElementById('report-error-dialog');
+    const btnOpenReport = document.getElementById('btn-open-report-error');
+    const btnFloatingReport = document.getElementById('btn-floating-report-error');
+    const btnCancelReport = document.getElementById('btn-error-report-cancel');
+    const btnSubmitReport = document.getElementById('btn-error-report-submit');
+    const reportText = document.getElementById('error-report-text');
+    const reportCategory = document.getElementById('error-report-category');
+    const reportFeedback = document.getElementById('error-report-feedback');
+
+    // Standalone Errors Dialog
+    const dialogErrors = document.getElementById('errors-tab-dialog');
+    const btnOpenErrorsDialog = document.getElementById('btn-open-errors-tab');
+    const btnCloseErrorsDialog = document.getElementById('btn-errors-dialog-close');
+    const btnRefreshErrorsDialog = document.getElementById('btn-errors-dialog-refresh');
+    const filterErrorsDialog = document.getElementById('errors-dialog-filter');
+
+    // Admin Screen Components
+    const btnAdminTabErrors = document.getElementById('btn-admin-tab-errors');
+    const btnAdminTabAccounts = document.getElementById('btn-admin-tab-accounts');
+    const adminPanelErrors = document.getElementById('admin-panel-errors');
+    const adminPanelAccounts = document.getElementById('admin-panel-accounts');
+    const btnAdminRefreshErrors = document.getElementById('btn-admin-refresh-errors');
+    const adminErrorFilter = document.getElementById('admin-error-filter');
+    const btnAdminGotoStore = document.getElementById('btn-admin-goto-store');
+
+    function openReportModal() {
+        if (!dialogReport) return;
+        if (reportText) reportText.value = '';
+        if (reportFeedback) {
+            reportFeedback.textContent = '';
+            reportFeedback.style.color = '#fff';
+        }
+        dialogReport.classList.remove('hidden');
+        if (window.soundManager) window.soundManager.playDialogAppearSFX();
+    }
+
+    function closeReportModal() {
+        if (dialogReport) dialogReport.classList.add('hidden');
+    }
+
+    if (btnOpenReport) btnOpenReport.addEventListener('click', openReportModal);
+    if (btnFloatingReport) btnFloatingReport.addEventListener('click', openReportModal);
+    if (btnCancelReport) btnCancelReport.addEventListener('click', closeReportModal);
+
+    if (btnSubmitReport) {
+        btnSubmitReport.addEventListener('click', async () => {
+            const text = (reportText && reportText.value.trim()) || '';
+            const category = (reportCategory && reportCategory.value) || 'General';
+            if (!text) {
+                if (reportFeedback) {
+                    reportFeedback.textContent = '❌ Please describe the error before submitting!';
+                    reportFeedback.style.color = '#ff4444';
+                }
+                return;
+            }
+
+            if (reportFeedback) {
+                reportFeedback.textContent = '⏳ Sending report to the creator...';
+                reportFeedback.style.color = '#ffcc00';
+            }
+            btnSubmitReport.disabled = true;
+
+            try {
+                const username = window.currentUsername || localStorage.getItem('trashMasterUsername') || 'Anonymous';
+                const result = await apiCall('/api/errors/report', 'POST', {
+                    error_text: text,
+                    category: category,
+                    username: username
+                });
+
+                if (reportFeedback) {
+                    reportFeedback.textContent = '✅ ' + (result.message || 'Error reported successfully!');
+                    reportFeedback.style.color = '#00ffcc';
+                }
+                if (reportText) reportText.value = '';
+
+                setTimeout(() => {
+                    closeReportModal();
+                    btnSubmitReport.disabled = false;
+                    if (window.game && window.game.hud && typeof window.game.hud.showFollowerNotification === 'function') {
+                        window.game.hud.showFollowerNotification("⚠️ Error report sent to creator!", true);
+                    }
+                }, 1200);
+
+                // Refresh open error lists if visible
+                renderErrorReports('admin-errors-list', (adminErrorFilter && adminErrorFilter.value) || 'all');
+                renderErrorReports('errors-dialog-list', (filterErrorsDialog && filterErrorsDialog.value) || 'all');
+            } catch (err) {
+                btnSubmitReport.disabled = false;
+                if (reportFeedback) {
+                    reportFeedback.textContent = '❌ Failed to submit: ' + (err.message || 'Unknown error');
+                    reportFeedback.style.color = '#ff4444';
+                }
+            }
+        });
+    }
+
+    // Helper: Fetch and render error reports in a container
+    async function renderErrorReports(containerId, filter = 'all') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        try {
+            const data = await apiCall('/api/errors', 'GET');
+            const errors = data.errors || [];
+
+            // Update badge counters
+            const badge = document.getElementById('admin-error-badge');
+            if (badge) badge.textContent = errors.filter(e => e.status !== 'resolved').length;
+            const dialogCount = document.getElementById('errors-dialog-count');
+            if (dialogCount) dialogCount.textContent = errors.length;
+
+            const filtered = errors.filter(e => {
+                if (filter === 'open') return e.status !== 'resolved';
+                if (filter === 'resolved') return e.status === 'resolved';
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div style="color: #64748b; font-size: 8px; text-align: center; padding: 30px; border: 1px dashed #334466; border-radius: 6px; font-family: 'Press Start 2P', monospace;">
+                        ✨ No error reports found${filter !== 'all' ? ' for filter: ' + filter : ''}! All systems clean!
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            filtered.forEach(item => {
+                const isResolved = item.status === 'resolved';
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    background: ${isResolved ? 'rgba(30, 41, 59, 0.6)' : 'rgba(20, 10, 15, 0.85)'};
+                    border: 2px solid ${isResolved ? '#334466' : '#ff4444'};
+                    border-radius: 6px;
+                    padding: 12px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    text-align: left;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                `;
+
+                const header = document.createElement('div');
+                header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;';
+                
+                const catBadge = document.createElement('span');
+                catBadge.style.cssText = `
+                    font-size: 7px;
+                    background: ${isResolved ? '#1e293b' : '#450a0a'};
+                    border: 1px solid ${isResolved ? '#64748b' : '#ff4444'};
+                    color: ${isResolved ? '#94a3b8' : '#ff8888'};
+                    padding: 3px 6px;
+                    border-radius: 4px;
+                    font-family: 'Press Start 2P', monospace;
+                `;
+                catBadge.textContent = item.category || 'General';
+
+                const meta = document.createElement('span');
+                meta.style.cssText = "font-size: 6.5px; color: #888; font-family: 'Press Start 2P', monospace;";
+                meta.textContent = `By: ${item.username || 'Anonymous'} | ${item.created_at || 'Recently'}`;
+
+                header.appendChild(catBadge);
+                header.appendChild(meta);
+
+                const content = document.createElement('div');
+                content.style.cssText = `
+                    font-size: 8px;
+                    color: ${isResolved ? '#94a3b8' : '#ffffff'};
+                    line-height: 1.6;
+                    font-family: 'Press Start 2P', monospace;
+                    word-break: break-word;
+                    white-space: pre-wrap;
+                    background: rgba(0,0,0,0.3);
+                    padding: 8px;
+                    border-radius: 4px;
+                    ${isResolved ? 'text-decoration: line-through;' : ''}
+                `;
+                content.textContent = item.error_text;
+
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 4px;';
+
+                const statusTag = document.createElement('span');
+                statusTag.style.cssText = `font-size: 6.5px; font-family: 'Press Start 2P', monospace; color: ${isResolved ? '#4ade80' : '#f87171'}; margin-right: auto;`;
+                statusTag.textContent = isResolved ? 'STATUS: RESOLVED ✓' : 'STATUS: OPEN ⚠️';
+
+                const btnResolve = document.createElement('button');
+                btnResolve.className = 'btn';
+                btnResolve.style.cssText = `
+                    font-size: 6.5px;
+                    padding: 4px 8px;
+                    background: ${isResolved ? '#334155' : '#00aa66'};
+                    border: 1px solid ${isResolved ? '#64748b' : '#00ffcc'};
+                    color: #fff;
+                    font-family: 'Press Start 2P', monospace;
+                `;
+                btnResolve.textContent = isResolved ? 'Re-open ↺' : 'Mark Resolved ✓';
+                btnResolve.addEventListener('click', async () => {
+                    await apiCall('/api/errors/resolve', 'POST', {
+                        id: item.id,
+                        status: isResolved ? 'open' : 'resolved'
+                    });
+                    renderErrorReports(containerId, filter);
+                });
+
+                const btnDelete = document.createElement('button');
+                btnDelete.className = 'btn secondary';
+                btnDelete.style.cssText = "font-size: 6.5px; padding: 4px 8px; background: #660011; border: 1px solid #ff4444; color: #ffaaaa; font-family: 'Press Start 2P', monospace;";
+                btnDelete.textContent = 'Delete 🗑️';
+                btnDelete.addEventListener('click', async () => {
+                    if (confirm('Are you sure you want to delete this error report?')) {
+                        await apiCall('/api/errors/delete', 'POST', { id: item.id });
+                        renderErrorReports(containerId, filter);
+                    }
+                });
+
+                actions.appendChild(statusTag);
+                actions.appendChild(btnResolve);
+                actions.appendChild(btnDelete);
+
+                card.appendChild(header);
+                card.appendChild(content);
+                card.appendChild(actions);
+                container.appendChild(card);
+            });
+        } catch (err) {
+            container.innerHTML = `<div style="color: #ff4444; font-size: 8px; padding: 20px; font-family: 'Press Start 2P', monospace;">Failed to load error reports: ${err.message}</div>`;
+        }
+    }
+
+    function isCreator() {
+        const username = window.currentUsername || localStorage.getItem('trashMasterUsername') || '';
+        const role = userRole || localStorage.getItem('trashMasterRole') || '';
+        return role === 'admin' || username === 'admin' || username === 'creator';
+    }
+
+    window.updateCreatorVisibility = () => {
+        const btnOpenErrors = document.getElementById('btn-open-errors-tab');
+        if (btnOpenErrors) {
+            btnOpenErrors.style.display = isCreator() ? 'inline-block' : 'none';
+        }
+    };
+
+    // Standalone Errors Dialog Listeners
+    if (btnOpenErrorsDialog) {
+        btnOpenErrorsDialog.addEventListener('click', () => {
+            if (!isCreator()) {
+                alert('Access restricted to the game creator only.');
+                return;
+            }
+            if (dialogErrors) dialogErrors.classList.remove('hidden');
+            renderErrorReports('errors-dialog-list', (filterErrorsDialog && filterErrorsDialog.value) || 'all');
+            if (window.soundManager) window.soundManager.playDialogAppearSFX();
+        });
+    }
+
+    if (btnCloseErrorsDialog) {
+        btnCloseErrorsDialog.addEventListener('click', () => {
+            if (dialogErrors) dialogErrors.classList.add('hidden');
+        });
+    }
+
+    if (btnRefreshErrorsDialog) {
+        btnRefreshErrorsDialog.addEventListener('click', () => {
+            if (isCreator()) {
+                renderErrorReports('errors-dialog-list', (filterErrorsDialog && filterErrorsDialog.value) || 'all');
+            }
+        });
+    }
+
+    if (filterErrorsDialog) {
+        filterErrorsDialog.addEventListener('change', () => {
+            if (isCreator()) {
+                renderErrorReports('errors-dialog-list', filterErrorsDialog.value);
+            }
+        });
+    }
+
+    // Admin Screen Tabs Listeners
+    if (btnAdminTabErrors) {
+        btnAdminTabErrors.addEventListener('click', () => {
+            if (btnAdminTabErrors) {
+                btnAdminTabErrors.style.background = '#881122';
+                btnAdminTabErrors.style.borderColor = '#ff4444';
+                btnAdminTabErrors.style.color = '#fff';
+            }
+            if (btnAdminTabAccounts) {
+                btnAdminTabAccounts.style.background = '#1e293b';
+                btnAdminTabAccounts.style.borderColor = '#334466';
+                btnAdminTabAccounts.style.color = '#aaa';
+            }
+            if (adminPanelErrors) adminPanelErrors.classList.remove('hidden');
+            if (adminPanelAccounts) adminPanelAccounts.classList.add('hidden');
+            renderErrorReports('admin-errors-list', (adminErrorFilter && adminErrorFilter.value) || 'all');
+        });
+    }
+
+    if (btnAdminTabAccounts) {
+        btnAdminTabAccounts.addEventListener('click', () => {
+            if (btnAdminTabAccounts) {
+                btnAdminTabAccounts.style.background = '#0066aa';
+                btnAdminTabAccounts.style.borderColor = '#00ccff';
+                btnAdminTabAccounts.style.color = '#fff';
+            }
+            if (btnAdminTabErrors) {
+                btnAdminTabErrors.style.background = '#1e293b';
+                btnAdminTabErrors.style.borderColor = '#334466';
+                btnAdminTabErrors.style.color = '#aaa';
+            }
+            if (adminPanelAccounts) adminPanelAccounts.classList.remove('hidden');
+            if (adminPanelErrors) adminPanelErrors.classList.add('hidden');
+        });
+    }
+
+    if (btnAdminRefreshErrors) {
+        btnAdminRefreshErrors.addEventListener('click', () => {
+            renderErrorReports('admin-errors-list', (adminErrorFilter && adminErrorFilter.value) || 'all');
+        });
+    }
+
+    if (adminErrorFilter) {
+        adminErrorFilter.addEventListener('change', () => {
+            renderErrorReports('admin-errors-list', adminErrorFilter.value);
+        });
+    }
+
+    if (btnAdminGotoStore) {
+        btnAdminGotoStore.addEventListener('click', async () => {
+            if (typeof refreshGameState === 'function') await refreshGameState();
+            if (typeof renderStore === 'function') renderStore();
+            if (typeof showScreen === 'function') showScreen('store-screen');
+        });
+    }
+
+    // Auto-load reports if admin screen is shown
+    window.loadAdminErrors = () => {
+        if (isCreator()) {
+            renderErrorReports('admin-errors-list', (adminErrorFilter && adminErrorFilter.value) || 'all');
+        }
+    };
+
+    // Initial check
+    window.updateCreatorVisibility();
+}
+
+// ── Dance Course System ──
+function initDanceCourse() {
+    const dialog = document.getElementById('dance-course-dialog');
+    const btnOpenStore = document.getElementById('btn-open-dance');
+    const btnOpenFloating = document.getElementById('btn-floating-dance');
+    const btnClose = document.getElementById('btn-dance-course-close');
+    const btnContinue = document.getElementById('btn-dance-continue');
+    const btnEndCourse = document.getElementById('btn-dance-end-course');
+    const instructionText = document.getElementById('dance-instruction-text');
+    const dancerSprite = document.getElementById('dance-dancer-sprite');
+    const dancerContainer = document.getElementById('dance-dancer-container');
+    const canSprite = document.getElementById('dance-can-sprite');
+
+    let currentStep = 0;
+
+    const DANCE_STEPS = [
+        {
+            text: 'move to the right',
+            animClass: 'dance-anim-right',
+            showCan: false
+        },
+        {
+            text: 'move to the left',
+            animClass: 'dance-anim-left',
+            showCan: false
+        },
+        {
+            text: 'now do the groovy groovy',
+            animClass: 'dance-anim-groovy',
+            showCan: false
+        },
+        {
+            text: 'now eat the can',
+            animClass: 'dance-anim-eat-can',
+            showCan: true
+        },
+        {
+            text: 'do your own dance',
+            animClass: 'dance-anim-freestyle',
+            showCan: false,
+            isEnd: true
+        }
+    ];
+
+    function applyStep(stepIndex) {
+        currentStep = Math.max(0, Math.min(stepIndex, DANCE_STEPS.length - 1));
+        const step = DANCE_STEPS[currentStep];
+
+        if (instructionText) {
+            instructionText.textContent = step.text;
+        }
+
+        // Update Dancer Animation
+        if (dancerContainer) {
+            dancerContainer.className = step.animClass || '';
+        }
+
+        // Update Can Prop
+        if (canSprite) {
+            if (step.showCan) {
+                canSprite.style.display = 'block';
+                canSprite.className = 'dance-can-anim';
+            } else {
+                canSprite.style.display = 'none';
+                canSprite.className = '';
+            }
+        }
+
+        // Update Buttons
+        if (step.isEnd) {
+            if (btnContinue) btnContinue.style.display = 'none';
+            if (btnEndCourse) btnEndCourse.style.display = 'inline-block';
+        } else {
+            if (btnContinue) {
+                btnContinue.style.display = 'inline-block';
+                btnContinue.textContent = 'Continue';
+            }
+            if (btnEndCourse) btnEndCourse.style.display = 'none';
+        }
+    }
+
+    function openDanceCourse() {
+        if (!dialog) return;
+        currentStep = 0;
+
+        // Update dancer sprite to match user's current avatar/sprite
+        if (dancerSprite) {
+            const currentSprite = window.chosenSprite || localStorage.getItem('trashMasterChosenSprite') || 'char2';
+            dancerSprite.src = `assets/sprites/${currentSprite}.png`;
+        }
+
+        applyStep(0);
+        dialog.classList.remove('hidden');
+        if (window.soundManager && typeof window.soundManager.playDialogAppearSFX === 'function') {
+            window.soundManager.playDialogAppearSFX();
+        }
+    }
+
+    function closeDanceCourse() {
+        if (dialog) dialog.classList.add('hidden');
+        currentStep = 0;
+        if (dancerContainer) dancerContainer.className = '';
+        if (canSprite) canSprite.style.display = 'none';
+    }
+
+    if (btnOpenStore) btnOpenStore.addEventListener('click', openDanceCourse);
+    if (btnOpenFloating) btnOpenFloating.addEventListener('click', openDanceCourse);
+    if (btnClose) btnClose.addEventListener('click', closeDanceCourse);
+    if (btnEndCourse) btnEndCourse.addEventListener('click', closeDanceCourse);
+
+    if (btnContinue) {
+        btnContinue.addEventListener('click', () => {
+            if (currentStep < DANCE_STEPS.length - 1) {
+                applyStep(currentStep + 1);
+                if (window.soundManager && typeof window.soundManager.playCollectSFX === 'function') {
+                    window.soundManager.playCollectSFX();
+                }
+            }
+        });
+    }
+
+    window.openDanceCourse = openDanceCourse;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initUI();
     if (authToken) {
-        if (userRole === 'admin') showScreen('admin-screen');
-        else {
+        if (userRole === 'admin') {
+            showScreen('admin-screen');
+            if (typeof window.loadAdminErrors === 'function') window.loadAdminErrors();
+        } else {
             refreshGameState().then(() => {
                 renderStore();
                 showScreen('store-screen');
@@ -2343,6 +2828,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+            const danceDialog = document.getElementById('dance-course-dialog');
+            if (danceDialog && !danceDialog.classList.contains('hidden')) {
+                danceDialog.classList.add('hidden');
+            }
+            const reportErrorDialog = document.getElementById('report-error-dialog');
+            if (reportErrorDialog && !reportErrorDialog.classList.contains('hidden')) {
+                reportErrorDialog.classList.add('hidden');
+            }
+            const errorsTabDialog = document.getElementById('errors-tab-dialog');
+            if (errorsTabDialog && !errorsTabDialog.classList.contains('hidden')) {
+                errorsTabDialog.classList.add('hidden');
+            }
             const trophyDialog = document.getElementById('trophy-dialog');
             if (trophyDialog && !trophyDialog.classList.contains('hidden')) {
                 trophyDialog.classList.add('hidden');

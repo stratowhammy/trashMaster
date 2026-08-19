@@ -720,6 +720,8 @@ class Game {
                         if (this.hud) {
                             this.hud.showFollowerNotification('🌀 CRAZY TWIST! 🐲 DRAGON FIRE & WAWAWE! (Press 4 to toggle normal) 🔥🌪️', true);
                         }
+                        // Spawn 10 floating Mona Lisa pictures on the sides of the screen
+                        this._spawnFloatingMonaLisas();
                     } else {
                         if (window.soundManager) {
                             if (typeof window.soundManager.stopWawaweLoop === 'function') {
@@ -738,6 +740,8 @@ class Game {
                         if (this.hud) {
                             this.hud.showFollowerNotification('✨ Back to normal!', true);
                         }
+                        // Remove floating Mona Lisas
+                        this._removeFloatingMonaLisas();
                     }
                 }
 
@@ -4470,6 +4474,7 @@ class Game {
         this.medsTakenCount = 0;
         this.noMedsActive = false;
         this.crazyTwistMode = false;
+        this._removeFloatingMonaLisas();
         this.cheeseMonster = null;
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
@@ -4899,6 +4904,7 @@ class Game {
         this.medicationAlertActive = false;
         this.medsMissedCount = 0;
         this.crazyTwistMode = false;
+        this._removeFloatingMonaLisas();
         if (window.soundManager && typeof window.soundManager.stopEarPiercingLoop === 'function') {
             window.soundManager.stopEarPiercingLoop();
         }
@@ -4976,6 +4982,7 @@ class Game {
             }
             this.doubleTrashPickup = false;
             this.crazyTwistMode = false;
+            this._removeFloatingMonaLisas();
             if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
                 window.soundManager.stopWawaweLoop();
             }
@@ -5169,6 +5176,100 @@ class Game {
         }
     }
 
+    // --- Floating & Spinning Mona Lisa Effect ---
+    _spawnFloatingMonaLisas() {
+        this._removeFloatingMonaLisas(); // clear any existing ones first
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < 10; i++) {
+            const img = document.createElement('img');
+            img.src = 'assets/sprites/mona_lisa.jpg';
+            img.className = 'floating-mona-lisa';
+            // 5 on the left side, 5 on the right side
+            const isLeft = i < 5;
+            const size = 70 + Math.random() * 50; // 70-120px wide
+            const topPercent = 5 + (i % 5) * 18 + Math.random() * 5; // spread vertically
+            const duration = 2.5 + Math.random() * 3; // 2.5-5.5s spin & float cycle
+            const delay = Math.random() * -6; // stagger start
+            const isReverse = Math.random() > 0.5;
+            const animName = isReverse ? 'monaFloatSpinReverse' : 'monaFloatSpin';
+
+            Object.assign(img.style, {
+                position: 'fixed',
+                width: size + 'px',
+                height: 'auto',
+                top: topPercent + '%',
+                [isLeft ? 'left' : 'right']: (5 + Math.random() * 30) + 'px',
+                zIndex: '999999',
+                pointerEvents: 'auto',
+                cursor: "url('assets/sprites/cursor_pointer_trashcan.png?v=7') 16 0, url('assets/sprites/cursor_pointer_trashcan.svg?v=7') 16 0, pointer",
+                opacity: '0.85',
+                filter: 'drop-shadow(0 0 8px gold)',
+                borderRadius: '4px',
+                animation: `${animName} ${duration}s linear ${delay}s infinite`,
+            });
+            // Click on a Mona Lisa to hear a scream + panic spin
+            img.addEventListener('click', (evt) => {
+                evt.stopPropagation();
+                evt.preventDefault();
+
+                // Play a real human scream sound file
+                try {
+                    const scream = new Audio('assets/audio/scream.wav');
+                    scream.volume = 1.0;
+                    scream.play().catch(() => {});
+                } catch (err) {
+                    console.warn('[MonaLisa] Audio error:', err);
+                }
+
+                // Visual feedback — rapid panic spin + red flash
+                img.style.border = '3px solid red';
+                img.style.animation = 'monaClickScream 0.6s ease-out';
+                setTimeout(() => {
+                    img.style.border = '';
+                    img.style.animation = `${animName} ${duration}s linear ${delay}s infinite`;
+                }, 600);
+            });
+            fragment.appendChild(img);
+        }
+        // Append to document.body so images render ABOVE the game canvas
+        document.body.appendChild(fragment);
+
+        // Inject / update the keyframe animation
+        let style = document.getElementById('mona-lisa-float-style');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'mona-lisa-float-style';
+            document.head.appendChild(style);
+        }
+        style.textContent = `
+            @keyframes monaFloatSpin {
+                0% { transform: translateY(0px) rotate(0deg); }
+                25% { transform: translateY(-20px) rotate(90deg); }
+                50% { transform: translateY(0px) rotate(180deg); }
+                75% { transform: translateY(20px) rotate(270deg); }
+                100% { transform: translateY(0px) rotate(360deg); }
+            }
+            @keyframes monaFloatSpinReverse {
+                0% { transform: translateY(0px) rotate(360deg); }
+                25% { transform: translateY(-20px) rotate(270deg); }
+                50% { transform: translateY(0px) rotate(180deg); }
+                75% { transform: translateY(20px) rotate(90deg); }
+                100% { transform: translateY(0px) rotate(0deg); }
+            }
+            @keyframes monaClickScream {
+                0% { transform: scale(1.3) rotate(0deg); }
+                25% { transform: scale(1.4) rotate(180deg); }
+                50% { transform: scale(1.3) rotate(360deg); }
+                75% { transform: scale(1.2) rotate(540deg); }
+                100% { transform: scale(1) rotate(720deg); }
+            }
+        `;
+    }
+
+    _removeFloatingMonaLisas() {
+        document.querySelectorAll('.floating-mona-lisa').forEach(el => el.remove());
+    }
+
     _restartGame() {
         if (this.goldRushActive) {
             this._endGoldRush();
@@ -5179,6 +5280,7 @@ class Game {
         this.medsMissed = false;
         this.medicationAlertActive = false;
         this.crazyTwistMode = false;
+        this._removeFloatingMonaLisas();
         if (window.soundManager && typeof window.soundManager.stopWawaweLoop === 'function') {
             window.soundManager.stopWawaweLoop();
         }
